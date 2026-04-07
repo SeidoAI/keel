@@ -8,6 +8,20 @@ Core responsibility: launch containerised agents that work autonomously, with st
 
 ---
 
+## Customisability — Project Repo as the Source of Truth
+
+`agent-containers` is a thin runtime. It ships no skills, no templates, no defaults of its own. Everything customisable lives in the project repo:
+
+- **Skills** — `<project>/.claude/skills/`
+- **Agent definitions** — `<project>/agents/`
+- **Orchestration patterns** — `<project>/orchestration/`
+- **Enums** — `<project>/enums/`
+- **Templates** (artifacts, issues, comments, sessions) — `<project>/templates/`
+
+The project repo is the single source of truth and the centre of customisability, auditability, and version control. `agent-containers` clones the project repo, mounts what it needs, runs the orchestration pattern the project repo defines, and stays out of the way.
+
+---
+
 ## Feedback Loop Implementation
 
 ### The full feedback table
@@ -130,9 +144,18 @@ context:
 # entrypoint-claude.sh — handles both first launch and re-engagement
 set -e
 
-cd /workspace/repo
-git config user.name "$AGENT_GIT_USERNAME"
-git config user.email "$AGENT_GIT_EMAIL"
+# Configure the same git identity in every cloned repo. The session may have
+# multiple repos under /workspace/repos/, all writable by the same agent.
+for REPO_DIR in /workspace/repos/*/; do
+  if [ -d "$REPO_DIR/.git" ]; then
+    git -C "$REPO_DIR" config user.name "$AGENT_GIT_USERNAME"
+    git -C "$REPO_DIR" config user.email "$AGENT_GIT_EMAIL"
+  fi
+done
+
+# Default working directory: the first repo. The agent navigates between
+# /workspace/repos/<name>/ as needed based on issue/session context.
+cd /workspace/repos/"$(ls /workspace/repos | head -n1)"
 
 RE_ENGAGE_FILE="/workspace/config/re_engage.yaml"
 SESSION_ID_FILE="/workspace/config/claude_session_id"
@@ -186,7 +209,7 @@ else
   # FIRST LAUNCH: start fresh
   ISSUE_FILE="/workspace/project/issues/${ISSUE_KEY}.yaml"
 
-  claude -p "You are working on issue ${ISSUE_KEY}. Read the issue at ${ISSUE_FILE}. The project repo is at /workspace/project/. Follow the skill instructions in .claude/skills/."
+  claude -p "You are working on issue ${ISSUE_KEY}. Read the issue at ${ISSUE_FILE}. The project repo is at /workspace/project/. Target repos are under /workspace/repos/<name>/ — cd into the right one based on issue context. Follow the skill instructions in .claude/skills/."
 fi
 
 # Capture session ID for future re-engagements
@@ -369,22 +392,47 @@ Each session gets a named Docker volume that persists across container restarts:
 ```
 Volume: vol-wave1-agent-a
   /workspace/
-  ├── repo/          # git clone, with agent's commits and working changes
-  ├── project/       # project repo clone
-  ├── docs/          # read-only bind mount from project docs
+  ├── repos/         # NEW: multi-repo (was just `repo/`)
+  │   ├── web-app-backend/
+  │   └── web-app-infrastructure/
+  ├── project/       # project repo clone (unchanged)
+  ├── docs/          # read-only — merged from agent + issue + session docs
+  ├── artifacts/     # NEW: where the agent writes plan/checklists
   ├── config/        # session config, re-engage context, issue key
-  └── .claude/       # Claude Code session data, skills, settings
+  └── .claude/       # skills mounted from project repo .claude/skills/
 ```
+
+### Multi-repo cloning
+
+Sessions declare an array of repos via `session.repos[*]` (see the Session model in `agent-projects-plan.md`). All repos are equal — there is no primary. Each one is cloned into `/workspace/repos/<repo-name>/`, and each gets the same agent git identity configured. The agent can branch and PR in any of them.
+
+### Document mounting from issues, sessions, and agent definitions
+
+`/workspace/docs/` is the union of three doc lists, deduplicated by path and mounted read-only:
+
+- **Agent-level** — `agent.context.docs` from `<project>/agents/<id>.yaml` (existing)
+- **Issue-level** — `Issue.docs` from each issue assigned to the session (NEW, optional)
+- **Session-level** — `AgentSession.docs` from the session YAML (NEW, optional)
+
+Each path is relative to the project repo. The container launch code reads the issue + session + agent and unions the three lists before mounting at `/workspace/docs/<path>` read-only.
 
 **First launch:**
 ```bash
 docker volume create vol-wave1-agent-a
+
+# For each repo declared in session.repos[*], the launch code clones into
+# /workspace/repos/<repo-name>/ and sets the same agent git identity.
+# Each merged doc path from agent + issue + session is bind-mounted read-only
+# under /workspace/docs/<path>.
+
 docker run \
   --name agent-wave1-a \
   -v vol-wave1-agent-a:/workspace \
-  -v /path/to/project/docs:/workspace/docs:ro \
+  -v /path/to/project/docs/api-contract.yaml:/workspace/docs/api-contract.yaml:ro \
+  -v /path/to/project/docs/auth/jwt-spec.md:/workspace/docs/auth/jwt-spec.md:ro \
   -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
-  -e GITHUB_TOKEN="$GITHUB_TOKEN_BACKEND" \
+  -e GITHUB_TOKEN_BACKEND="$GITHUB_TOKEN_BACKEND" \
+  -e GITHUB_TOKEN_INFRA="$GITHUB_TOKEN_INFRA" \
   -e AGENT_GIT_USERNAME="seido-backend-bot" \
   -e AGENT_GIT_EMAIL="backend-bot@seido.dev" \
   --network agent-net-wave1-a \
@@ -404,13 +452,13 @@ context:
       summary: "src/api/auth.py:45 — E302"
 EOF'
 
-# Launch new container with same volume
+# Launch new container with same volume — repos already cloned in /workspace/repos/
 docker run \
   --name agent-wave1-a-re1 \
   -v vol-wave1-agent-a:/workspace \
-  -v /path/to/project/docs:/workspace/docs:ro \
   -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
-  -e GITHUB_TOKEN="$GITHUB_TOKEN_BACKEND" \
+  -e GITHUB_TOKEN_BACKEND="$GITHUB_TOKEN_BACKEND" \
+  -e GITHUB_TOKEN_INFRA="$GITHUB_TOKEN_INFRA" \
   -e AGENT_GIT_USERNAME="seido-backend-bot" \
   -e AGENT_GIT_EMAIL="backend-bot@seido.dev" \
   --network agent-net-wave1-a \
@@ -421,6 +469,49 @@ docker run \
 ```bash
 docker volume rm vol-wave1-agent-a  # only after session marked completed
 ```
+
+---
+
+## Skills — Loaded from the Project Repo
+
+`agent-containers` ships **no skills**. Every skill an agent reads comes from the project repo's `.claude/skills/` directory at container launch time. There is no "packaged default skill" baked into the runtime image.
+
+How skills get into the project repo: the `agent-project` package ships them as defaults under `templates/skills/`. `agent-project init` copies the entire `templates/skills/` tree into the new project's `.claude/skills/`. After init, the project owns them — they are committed to git, version-controlled, auditable, and freely editable per project. Two projects can have completely different rules for messaging, both fully under their own control.
+
+### `setup_skills()` — workspace.py
+
+Before the agent starts, `agent_containers/core/workspace.py` calls a `setup_skills()` function that copies the required skills from the project repo into the container workspace.
+
+```python
+# agent_containers/core/workspace.py
+def setup_skills(workspace_dir: Path, project_dir: Path, agent: AgentDefinition):
+    """Copy required skills from the project repo into the container workspace."""
+    project_skills_dir = project_dir / ".claude" / "skills"
+    workspace_skills_dir = workspace_dir / ".claude" / "skills"
+
+    # Default skills that every agent gets, regardless of agent definition
+    default_skills = ["agent-messaging"]
+
+    # Skills the agent definition asks for (e.g. "backend-development", "verification")
+    agent_skills = agent.context.skills
+
+    for skill_name in default_skills + agent_skills:
+        src = project_skills_dir / skill_name
+        if not src.exists():
+            raise ConfigError(
+                f"Skill '{skill_name}' not found at {src}. "
+                f"Run 'agent-project init' to install default skills, "
+                f"or add it manually to .claude/skills/."
+            )
+        copy_tree(src, workspace_skills_dir / skill_name)
+```
+
+### Default and per-agent skills
+
+- **Default for every agent**: `["agent-messaging"]` — loaded regardless of what the agent definition says, so every container can talk to the human via the MCP messaging server.
+- **Per-agent**: whatever is listed in `agent.context.skills` — typical examples are `backend-development`, `frontend-development`, `verification`, `project-manager`.
+
+If a required skill is missing from `<project>/.claude/skills/`, `setup_skills()` raises a `ConfigError` with a hint to run `agent-project init`. The container does not start with missing skills.
 
 ---
 
@@ -456,7 +547,10 @@ async def list_tools():
                 "properties": {
                     "type": {
                         "type": "string",
-                        "enum": ["question", "plan_approval", "progress", "stuck", "escalation", "handover", "fyi"],
+                        "enum": [
+                            "question", "plan_approval", "progress", "stuck", "escalation",
+                            "handover", "fyi", "status",   # NEW
+                        ],
                     },
                     "priority": {
                         "type": "string",
@@ -513,6 +607,27 @@ async def call_tool(name: str, arguments: dict):
             formatted.append(f"Response to message {msg['in_reply_to']}:\n{msg['body']}")
         return [TextContent(type="text", text="\n---\n".join(formatted))]
 ```
+
+### Status messages — structured body
+
+Unlike other message types where `body` is free Markdown, `status` has a structured body with two fields: `state` and `summary`.
+
+```json
+{
+  "type": "status",
+  "priority": "informational",
+  "body": {
+    "state": "implementing",
+    "summary": "Wired the JWT middleware into the auth router. Now writing unit tests for the validation logic."
+  }
+}
+```
+
+- **`state`** — drawn from the `AgentState` enum. The enum is defined in `agent-project` and is customisable per project via `<project>/enums/agent_state.yaml`. Default states: `investigating`, `planning`, `awaiting_plan_approval`, `implementing`, `testing`, `debugging`, `refactoring`, `documenting`, `self_verifying`, `blocked`, `handed_off`, `done`.
+- **`summary`** — 1-2 sentences, plain text. Captures what just happened and what's next.
+- **Priority** — always `informational`. A status message never blocks the agent — it sends and keeps working.
+
+**Convention**: agents send a status message every 5 minutes of active work, plus on every state transition (e.g. moving from `planning` to `implementing`). The orchestrator updates `session.current_state` from the latest status message, and the UI displays the current state as a badge on the session card.
 
 ### Container configuration for MCP
 
@@ -606,6 +721,141 @@ IMPLICIT_EGRESS = [
 
 ---
 
+## CLI Commands
+
+### Single-container launch and lifecycle
+
+```
+agent-containers launch <session-id>          # foreground attached to current terminal
+agent-containers launch <session-id> --detach # background
+agent-containers stop <session-id>
+agent-containers list
+agent-containers status <session-id>
+agent-containers cleanup <session-id>
+```
+
+The `--iterm` flag has been removed from `launch`. The user already runs the CLI from a terminal — spawning another one to attach to the same agent is pointless. Default is foreground; `--detach` runs the container in the background.
+
+### Wave launch
+
+```
+agent-containers launch-wave <wave>                # all detached
+agent-containers launch-wave <wave> --terminal     # spawn one terminal per agent
+```
+
+`launch-wave` brings up multiple containers at once. With `--terminal`, the configured terminal launcher (see below) opens a tab/window per agent.
+
+### Open a terminal for a running container
+
+```
+agent-containers terminal <session-id>      # opens a terminal attached to one container
+agent-containers terminal-all               # opens terminals for all running containers
+```
+
+These replace the removed `iterm` and `iterm-all` subcommands. Both use the configured terminal launcher and run `docker exec -it <container> /bin/bash` inside.
+
+### Terminal launcher — configurable
+
+Different users use different terminals. The launcher is configured in `~/.agent-containers/config.yaml`:
+
+```yaml
+# ~/.agent-containers/config.yaml
+terminal_launcher:
+  command: iterm           # iterm | terminal | ghostty | alacritty | kitty | wezterm | tmux | none
+  # OR fully custom:
+  custom: |
+    osascript -e 'tell application "Ghostty" to ...'
+```
+
+Built-in launchers:
+
+| Name | macOS | Linux | Notes |
+|------|-------|-------|-------|
+| `iterm` | osascript → iTerm2 | n/a | macOS only |
+| `terminal` | osascript → Terminal.app | n/a | macOS only |
+| `ghostty` | osascript → Ghostty | xdotool / dbus | cross-platform |
+| `alacritty` | `alacritty -e ...` | `alacritty -e ...` | spawns new windows |
+| `kitty` | `kitty @ launch ...` | same | uses kitty remote control |
+| `wezterm` | `wezterm cli spawn ...` | same | |
+| `tmux` | new tmux window | new tmux window | requires existing tmux session |
+| `none` | no terminal spawning | no terminal spawning | run all `--detach` |
+
+If no config file is present, the default is `none` (run detached, user opens terminals manually if desired). Users can opt in to a specific launcher.
+
+For fully custom setups, set `terminal_launcher.custom` with a shell command template. The launcher abstraction passes the `docker exec` command in via a placeholder.
+
+---
+
+## Orchestration Runtime
+
+A new Python module `agent_containers/core/orchestration.py` is the orchestration runtime. It **lives in agent-containers but is configured by the project repo**. The patterns and hooks live in `<project>/orchestration/`. The runtime reads them on every event.
+
+This matches the broader principle: the project repo is the configuration; `agent-containers` is the engine that executes that configuration.
+
+### Key functions
+
+- **`load_pattern(project_dir, name)`** — reads `<project>/orchestration/<name>.yaml`
+- **`merge_overrides(pattern, session)`** — applies session-level overrides on top of project default
+- **`evaluate_event(pattern, event, ctx)`** — looks up matching event, evaluates conditions, returns action list
+- **`run_action(action, ctx)`** — executes a built-in action: `re_engage`, `launch_agent`, `send_message`, `wait_for`, `merge_pr`, `notify_human`, `require_artifact`, `update_session_status_summary`, `publish_to_ui`, plus `if/then/else` branches
+- **`call_hook(hook_name, event, ctx)`** — invokes a Python hook from `<project>/orchestration/hooks/`
+
+### Event sources
+
+The orchestrator reacts to events from:
+
+- File watcher on the project repo (issue/session/artifact changes)
+- WebSocket messages from running containers (agent status updates)
+- GitHub webhook polling (CI status, PR reviews)
+- MCP messages from agents (plan ready, status updates, blocking questions)
+
+### Deterministic runtime + Claude-driven PM agent
+
+The PM agent (a Claude-driven container) handles judgement-heavy decisions: plan review, scope changes, conflict resolution. The deterministic orchestrator handles the simple event → action flows defined in the YAML pattern. They work together — the YAML rules can call out to the PM agent (via `launch_agent`) for any decision that needs reasoning.
+
+---
+
+## PM Agent Project-Repo PR Review
+
+Coding agents push PRs to two places:
+
+- **Target repos** — `web-app-backend`, `web-app-infrastructure`, etc. — containing the actual code changes.
+- **Project repo** — containing updates to issues, sessions, concept nodes, comments, and artifacts produced during the session.
+
+The PM agent's job is to review the **project-repo PRs** before they land. Code-PR review on target repos is handled by the verifier agent (separate flow).
+
+### Checks
+
+When a coding agent opens a PR to the project repo, the PM agent runs the following checks:
+
+1. **Schema validation** — every changed YAML file passes pydantic validation
+2. **Reference integrity** — all `[[node-id]]` references in changed files resolve to existing nodes
+3. **Status transition validity** — issue/session status transitions match `project.yaml` rules
+4. **Required-fields check** — issues have all required frontmatter (executor, verifier, repo, etc.)
+5. **Markdown structure** — issue bodies have all required sections (Context, Acceptance criteria, etc.)
+6. **Concept node freshness** — newly added/edited nodes have valid `source` (file exists, hash computed)
+7. **Artifact presence** — sessions in `completed` state have all artifacts marked `required: true` in `templates/artifacts/manifest.yaml` (default set: `plan.md`, `task-checklist.md`, `verification-checklist.md`, `recommended-testing-plan.md`, `post-completion-comments.md`)
+8. **No orphan additions** — new nodes are referenced by at least one issue or marked `planned`
+9. **Comment provenance** — new comments have valid author + type
+10. **Project standards** — free-form rules in `templates/standards.md`
+
+### Outcomes
+
+- **All pass** → PM posts an approval review on the PR. If `auto_merge_on_pass` is enabled in the active orchestration pattern, the PM also merges.
+- **Any fail** → PM posts a `request_changes` review with specific feedback per failing check, and the orchestrator re-engages the coding agent with the failures as context.
+
+### Invocation
+
+The PM agent invokes the agent-project CLI:
+
+```
+agent-project pm review-pr <pr-number> --repo <project-repo>
+```
+
+This command runs all checks against the diff, prints results, and returns a non-zero exit code on any failure. The PM agent (containerised or not) calls it directly.
+
+---
+
 ## Package structure
 
 ```
@@ -618,24 +868,39 @@ agent-containers/
 │       │   ├── main.py              # Click CLI root
 │       │   ├── launch.py            # launch, launch-wave
 │       │   ├── manage.py            # list, status, stop, cleanup
-│       │   └── terminal.py          # attach, iterm, iterm-all
+│       │   └── terminal.py          # terminal, terminal-all
 │       ├── core/
 │       │   ├── container.py         # Docker container lifecycle (create, start, stop, rm)
 │       │   ├── volume.py            # Docker volume management (create, mount, cleanup)
 │       │   ├── network.py           # Egress policy enforcement (network create, iptables)
-│       │   ├── workspace.py         # Repo cloning, skill copying, config injection
+│       │   ├── workspace.py         # Multi-repo cloning, doc mounting, setup_skills() (loads
+│       │   │                        #   skills from <project>/.claude/skills/), config injection
+│       │   ├── orchestration.py     # NEW: orchestration runtime — reads patterns from
+│       │   │                        #   <project>/orchestration/, evaluates events, runs actions
 │       │   ├── re_engage.py         # Write re-engagement context, format triggers
 │       │   ├── permissions.py       # Parse agent permissions from agent definition
 │       │   └── status.py            # Read/write container + session status
 │       ├── integrations/
-│       │   ├── iterm.py             # iTerm2 osascript integration
+│       │   ├── terminals/           # Terminal launcher abstraction (one file per launcher)
+│       │   │   ├── launcher.py      # Abstract base + dispatch from config
+│       │   │   ├── iterm.py
+│       │   │   ├── terminal.py
+│       │   │   ├── ghostty.py
+│       │   │   ├── alacritty.py
+│       │   │   ├── kitty.py
+│       │   │   ├── wezterm.py
+│       │   │   ├── tmux.py
+│       │   │   └── none.py
 │       │   └── docker_cli.py        # Docker CLI wrapper (subprocess-based)
-│       └── templates/
+│       └── templates/                # Jinja2 templates for shell scripts ONLY.
+│                                     # No skills, no agent defaults — those live in the
+│                                     # project repo (shipped via the agent-project package).
 │           ├── entrypoint-claude.sh.j2
 │           ├── entrypoint-langgraph.sh.j2
 │           └── entrypoint-custom.sh.j2
-├── mcp_server/
-│   └── agent_messaging.py          # MCP server for agent ↔ human messaging
+├── mcp_server/                       # Runtime binary that runs INSIDE the container.
+│   └── agent_messaging.py            #   The skill that teaches its use ships in the
+│                                     #   agent-project templates, NOT here.
 ├── scripts/
 │   └── agent-msg                    # Fallback shell script (curl wrapper)
 ├── docker/
@@ -647,6 +912,7 @@ agent-containers/
     │   ├── test_permissions.py
     │   ├── test_re_engage.py
     │   ├── test_workspace.py
+    │   ├── test_orchestration.py
     │   └── test_network.py
     └── integration/
         ├── test_container_lifecycle.py

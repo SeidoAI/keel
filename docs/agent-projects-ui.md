@@ -6,6 +6,8 @@ Command-and-control centre for the agent development platform. Local development
 
 **Tech stack**: React 19, TypeScript 5.8, Vite 7, Tailwind CSS v4, shadcn/ui, React Flow (XyFlow), TanStack Query v5, Biome, Vitest.
 
+**Source-of-truth principle**: All customisable data — enums, templates, orchestration patterns, artifact manifests, skills — comes from the project repo, not from the agent-projects-ui package. The UI is purely a visualizer and command surface; it never owns config.
+
 ---
 
 ## 1. Startup Experience
@@ -99,9 +101,13 @@ backend/src/agent_projects_api/
 │   ├── graph.py               # GET /api/projects/:id/graph/{deps,concept}
 │   ├── sessions.py            # GET /api/projects/:id/sessions[/:sid], re-engage
 │   ├── agents.py              # GET /api/projects/:id/agents[/:aid]
-│   ├── containers.py          # GET/POST /api/containers — launch, stop, stats, logs
+│   ├── containers.py          # GET/POST /api/containers — launch, stop, stats, logs, terminal
 │   ├── messages.py            # POST/GET /api/messages — agent messaging
 │   ├── github.py              # GET /api/github/prs, checks, reviews
+│   ├── artifacts.py           # GET/POST /api/projects/:id/sessions/:sid/artifacts[/:name]
+│   ├── pm_reviews.py          # GET/POST /api/projects/:id/pm-reviews[/:pr]
+│   ├── orchestration.py       # GET /api/projects/:id/orchestration/pattern
+│   ├── enums.py               # GET /api/projects/:id/enums/:name
 │   ├── actions.py             # POST /api/actions/{action}
 │   └── ws.py                  # WebSocket /api/ws
 │
@@ -111,9 +117,12 @@ backend/src/agent_projects_api/
 │   ├── node_service.py        # CRUD via agent_project.core.node_store
 │   ├── graph_service.py       # Build graphs via agent_project.core.concept_graph
 │   ├── session_service.py     # Read sessions, trigger re-engagement
-│   ├── container_service.py   # Docker CLI wrapper: ps, stats, logs, start, stop
+│   ├── container_service.py   # Docker CLI wrapper: ps, stats, logs, start, stop, terminal
 │   ├── github_service.py      # gh CLI wrapper: PRs, checks, reviews, merge, close
 │   ├── message_service.py     # SQLite CRUD for messages
+│   ├── artifact_service.py    # Read artifact manifest + files, approve/reject gates
+│   ├── pm_review_service.py   # Run PM PR review checks via agent_project.core.pm_review
+│   ├── orchestration_service.py # Resolve active orchestration pattern with overrides
 │   ├── file_watcher.py        # watchdog filesystem monitor → event queue
 │   └── action_service.py      # Execute actions (delete branch, merge PR, validate)
 │
@@ -275,7 +284,42 @@ type GitHubEvent = {
   details: Record<string, unknown>;
   timestamp: string;
 };
+
+type StatusUpdateEvent = {
+  type: "status_update";
+  session_id: string;
+  state: string;             // from agent_state enum
+  summary: string;           // 1-2 sentence plain text
+  timestamp: string;
+};
+
+type ArtifactUpdatedEvent = {
+  type: "artifact_updated";
+  session_id: string;
+  artifact_name: string;     // e.g. "task-checklist"
+  file: string;              // e.g. "task-checklist.md"
+  timestamp: string;
+};
+
+type PmReviewCompletedEvent = {
+  type: "pm_review_completed";
+  repo: string;
+  pr_number: number;
+  passed: boolean;
+  failed_checks: string[];
+  timestamp: string;
+};
+
+type ApprovalPendingEvent = {
+  type: "approval_pending";
+  session_id: string;
+  artifact_name: string;
+  agent: string;
+  timestamp: string;
+};
 ```
+
+`status_update` is broadcast to all clients viewing a session whenever the orchestrator processes a new status message. `artifact_updated` is emitted by the file watcher when an artifact file in `sessions/<id>/artifacts/` changes. `pm_review_completed` fires when a PM PR review finishes. `approval_pending` fires when an artifact with `approval_gate: true` is awaiting human approval.
 
 ### Polling intervals for non-filesystem sources
 
@@ -293,18 +337,22 @@ type GitHubEvent = {
 ### URL structure
 
 ```
-/                                      → redirect to /p/:id or /projects
-/projects                              → project list
-/p/:projectId                          → redirect to /p/:id/board
-/p/:projectId/board                    → kanban board
-/p/:projectId/graph                    → concept graph
-/p/:projectId/graph?focus=:nodeId      → graph focused on node
-/p/:projectId/issues/:key              → issue detail
-/p/:projectId/nodes/:nodeId            → node detail
-/p/:projectId/agents                   → agent monitor
-/p/:projectId/agents/:sessionId        → session detail
-/p/:projectId/messages                 → message inbox
-/p/:projectId/messages/:sessionId      → message thread
+/                                                   → redirect to /p/:id or /projects
+/projects                                           → project list
+/p/:projectId                                       → redirect to /p/:id/board
+/p/:projectId/board                                 → kanban board
+/p/:projectId/graph                                 → concept graph
+/p/:projectId/graph?focus=:nodeId                   → graph focused on node
+/p/:projectId/issues/:key                           → issue detail
+/p/:projectId/nodes/:nodeId                         → node detail
+/p/:projectId/agents                                → agent monitor
+/p/:projectId/agents/:sessionId                     → session detail
+/p/:projectId/messages                              → message inbox
+/p/:projectId/messages/:sessionId                   → message thread
+/p/:projectId/approvals                             → approval queue
+/p/:projectId/pm-reviews                            → PM PR review dashboard
+/p/:projectId/sessions/:sid/artifacts/:name         → single-artifact viewer
+/p/:projectId/orchestration                         → view active orchestration pattern (read-only)
 ```
 
 ### React Router
@@ -326,6 +374,11 @@ const router = createBrowserRouter([
       { path: "agents/:sessionId", element: <SessionDetail /> },
       { path: "messages", element: <MessageInbox /> },
       { path: "messages/:sessionId", element: <MessageThread /> },
+      { path: "approvals", element: <ApprovalQueue /> },
+      { path: "pm-reviews", element: <PmReviewList /> },
+      { path: "pm-reviews/:prNumber", element: <PmReviewDetail /> },
+      { path: "sessions/:sid/artifacts/:name", element: <ArtifactViewer /> },
+      { path: "orchestration", element: <OrchestrationView /> },
     ],
   },
 ]);
@@ -404,11 +457,13 @@ GET  /api/projects/:id/agents/:aid         → agent definition
 GET  /api/containers                       → running containers [{id, session_id, status, stats}]
 GET  /api/containers/:id/stats             → resource usage
 GET  /api/containers/:id/logs?tail=50      → logs
-POST /api/containers/launch                → {session_id, project_id, iterm?}
+POST /api/containers/launch                → {session_id, project_id}
 POST /api/containers/:id/stop
-POST /api/containers/:id/iterm             → open iTerm2 tab
+POST /api/containers/:id/terminal          → open a terminal tab via the configured terminal launcher
 POST /api/containers/cleanup               → remove stopped
 ```
+
+The backend uses the terminal launcher configured in `~/.agent-containers/config.yaml` (`iterm`, `terminal`, `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, `none`, or a fully custom command). Because this is a localhost dev tool, the launcher runs on the same machine as the user.
 
 ### Messages
 ```
@@ -424,6 +479,28 @@ GET  /api/messages/unread                  → blocking unread count
 GET  /api/github/prs?repo=X               → list PRs (&head=branch)
 GET  /api/github/prs/:n/checks?repo=X     → CI results
 GET  /api/github/prs/:n/reviews?repo=X    → reviews
+```
+
+### Artifacts
+```
+GET  /api/projects/:id/sessions/:sid/artifacts                     → list artifacts for a session (from manifest + actual files)
+GET  /api/projects/:id/sessions/:sid/artifacts/:name               → get one artifact's rendered content
+POST /api/projects/:id/sessions/:sid/artifacts/:name/approve       → approve a gated artifact
+POST /api/projects/:id/sessions/:sid/artifacts/:name/reject        → reject with feedback
+GET  /api/projects/:id/artifact-manifest                           → return the active artifact manifest from `templates/artifacts/manifest.yaml`
+```
+
+### PM Reviews
+```
+GET  /api/projects/:id/pm-reviews                  → list pending PM PR reviews of project-repo PRs
+GET  /api/projects/:id/pm-reviews/:pr-number       → full check results for one PM review
+POST /api/projects/:id/pm-reviews/:pr-number/run   → manually trigger PM review
+```
+
+### Orchestration & Enums
+```
+GET  /api/projects/:id/orchestration/pattern       → return active orchestration pattern (resolved with overrides)
+GET  /api/projects/:id/enums/:name                 → return an enum (for UI label/color rendering)
 ```
 
 ### Actions
@@ -476,6 +553,32 @@ const queryKeys = {
 
 ## 8. Feedback & Re-engagement UI
 
+### Agent Monitor — session card
+
+Each session card shows a status state badge driven by `session.current_state` (set by the orchestrator from the latest status message):
+
+```
+┌──────────────────────────────────────┐
+│ wave1-agent-a · backend-coder        │
+│ [implementing] Wired JWT middleware. │
+│ Now writing unit tests.              │
+│ ─────────────────────────────────    │
+│ SEI-40 · SEI-42  ·  re-engaged 2x    │
+└──────────────────────────────────────┘
+```
+
+- The state badge color comes from the active `agent_state` enum (loaded from the project's `enums/agent_state.yaml`).
+- Updates in real-time when a new status message arrives via WebSocket (`status_update` event).
+- The summary text (1-2 sentences) is shown below the state badge.
+
+The session card now also shows MULTIPLE PRs (one per repo in the `repos:` array) — single-repo display is gone. Each PR has its own status badge (CI status, review state, etc.).
+
+A small **task checklist progress bar** is rendered on the session card:
+- Parses `task-checklist.md` for the table rows.
+- Counts `done` rows / total rows.
+- Shows as a small progress bar on the session card.
+- Live updates via WebSocket when the file changes (file watcher detects change and emits `artifact_updated`).
+
 ### Agent Monitor — engagement history
 
 Per-session engagement history:
@@ -521,6 +624,55 @@ Button on Agent Monitor + Issue Detail (when session in waiting state):
 | `re_engaged` | Orange |
 | `completed` | Green |
 | `failed` | Red |
+
+### Session detail — Repos section
+
+The session detail view has a "Repos" section listing all repos from the session's `repos:` array, with their branches and PR numbers. Each repo entry shows its own CI status, review state, and links to the PR on GitHub.
+
+---
+
+## Session Artifacts UI
+
+Session detail has a tab/section per artifact in the manifest. The list is **not** a hardcoded set — it is read from the project's `templates/artifacts/manifest.yaml` (fetched via `GET /api/projects/:id/artifact-manifest`). The order of tabs comes from the manifest order.
+
+- Each artifact rendered as Markdown (using `react-markdown` + `remark-gfm`).
+- The 5 default artifacts: `plan.md`, `task-checklist.md`, `verification-checklist.md`, `recommended-testing-plan.md`, `post-completion-comments.md`.
+- `task-checklist.md` is parsed for the progress bar (count of `done` rows / total rows).
+- The `verification-checklist` progress (count of checked items / total) is shown in completion review.
+- All artifacts support `[[node-references]]` rendering as clickable links.
+- File watcher emits `artifact_updated` events; the UI invalidates the affected artifact query and re-renders.
+
+### Approval queue
+
+A dedicated **Approval Queue** view (`/p/:projectId/approvals`) lists all pending approval-gated artifacts (any artifact with `approval_gate: true` in the manifest).
+
+Each entry shows:
+- Session
+- Artifact name
+- Agent
+- Time waiting
+- Rendered Markdown content
+- Approve / Reject buttons with optional feedback text
+
+Approve → calls `POST /api/projects/:id/sessions/:sid/artifacts/:name/approve` → orchestrator triggers re-engagement with `plan_approved` trigger.
+
+Reject → calls `POST /api/projects/:id/sessions/:sid/artifacts/:name/reject` → orchestrator triggers `plan_rejected` re-engagement with the feedback as context.
+
+A notification badge appears on the nav for pending approvals.
+
+---
+
+## PM Reviews
+
+A new "PM Reviews" view (`/p/:projectId/pm-reviews`) shows pending PM PR reviews — PRs to the project repo that the PM agent is reviewing. It can also be embedded in the Agent Monitor.
+
+For each PR:
+- Title, author, link to GitHub
+- The 10 check results (pass/fail), expandable for details
+- Approve / Merge buttons (if the user has permission), or a "Re-engage agent with fixes" button
+- Failed checks include the `fix_hint` from `CheckResult`
+
+A user can manually trigger a review via `POST /api/projects/:id/pm-reviews/:pr-number/run`.
 
 ---
 
@@ -605,6 +757,23 @@ agent-projects-ui/
 │   │   │   └── hooks/
 │   │   │       ├── useMessages.ts
 │   │   │       └── useDesktopNotification.ts
+│   │   ├── artifacts/
+│   │   │   ├── ArtifactViewer.tsx
+│   │   │   ├── ArtifactList.tsx
+│   │   │   ├── ApprovalQueue.tsx
+│   │   │   ├── TaskChecklistProgress.tsx
+│   │   │   └── hooks/
+│   │   │       ├── useArtifacts.ts
+│   │   │       ├── useArtifactManifest.ts
+│   │   │       └── useApprovalQueue.ts
+│   │   ├── pm-reviews/
+│   │   │   ├── PmReviewList.tsx
+│   │   │   ├── PmReviewDetail.tsx
+│   │   │   ├── CheckResultCard.tsx
+│   │   │   └── hooks/usePmReviews.ts
+│   │   ├── orchestration/
+│   │   │   ├── OrchestrationView.tsx
+│   │   │   └── hooks/useOrchestrationPattern.ts
 │   │   └── actions/
 │   │       ├── ActionsPanel.tsx
 │   │       └── hooks/useActions.ts

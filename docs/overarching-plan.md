@@ -10,6 +10,8 @@ Three interconnected projects that together replace Linear + Notion + manual age
 | **agent-containers** | Execution layer: containerised Claude Code agents with strict egress, repo isolation | agent-project (reads issues/sessions, writes status) |
 | **agent-projects-ui** | Visibility layer: dashboard for projects, issues, graph, live agent status | agent-project (data) + agent-containers (live status) |
 
+**The primary user of `agent-project` is Claude Code with the project-manager skill loaded.** Humans interact with the system *through* the agent, not directly via the CLI. The CLI is intentionally minimal — read commands, validation, and atomic operations only — because agents create issues, nodes, and sessions by writing files directly via their `Write` tool, not by invoking CLI mutation commands. The PM skill (shipped in `templates/skills/project-manager/` and copied to the project repo on init) is the linchpin: it teaches agents how to work with the file layout, schemas, references, and the validation gate.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    agent-projects-ui                         │
@@ -25,6 +27,26 @@ Three interconnected projects that together replace Linear + Notion + manual age
 │  ← writes status/comments back to project repo ←           │
 └──────────────────────────┴──────────────────────────────────┘
 ```
+
+---
+
+## The Project Repo is the Source of Truth
+
+This is the central design principle that informs everything else in this document. Every other section should be read in light of it.
+
+**The project repo is the single source of truth for everything customisable** — skills, agent definitions, orchestration patterns, templates, enums, artifact specs, standards, and project config. If an agent reads it, it lives in the project repo.
+
+**`agent-project` ships defaults that get COPIED into the project repo on init.** The package contains canonical reference templates under `templates/` (skills, agent definitions, enums, orchestration patterns, artifact templates, etc.). `agent-project init` copies the entire `templates/` tree into the new project. After init, the project owns them — they are version-controlled in git, edited freely, and the package is no longer their source of truth.
+
+**`agent-containers` is a thin runtime that READS from the project repo.** It ships no skills, no templates, no defaults of its own. When a container launches, it clones the project repo, mounts the relevant skills from `<project>/.claude/skills/`, reads the orchestration pattern from `<project>/orchestration/`, reads enums from `<project>/enums/`, and reads artifact templates from `<project>/templates/artifacts/`. The runtime executes whatever the project repo says.
+
+**`agent-projects-ui` reads from the project repo for everything customisable** — issue templates, enums (for status colors, type icons), artifact manifests (for which artifact viewers to show), orchestration patterns (for which approval gates exist).
+
+**Everything is auditable.** Because the project repo is git, every customisation — every change to a skill, every new orchestration pattern, every enum tweak — is a commit. Two projects can run completely different agent configurations side-by-side, each fully under their own version control.
+
+This principle is what makes the system pluggable: the engine (agent-containers) stays small and stable; the configuration (the project repo) is open for any team to customise without forking the runtime.
+
+**The PM skill is the linchpin for agent-driven workflows.** Because the primary user of `agent-project` is Claude Code with the PM skill loaded (not a human typing CLI commands), the quality of the skill — its workflow references, schema documentation, examples, and anti-patterns — determines whether the whole system works. The skill ships from `agent-project/templates/skills/project-manager/` as a reference, gets copied into `<project>/.claude/skills/project-manager/` on init, and is then owned and customisable per project. Detailed skill design lives in `docs/agent-projects-plan.md`.
 
 ---
 
@@ -245,11 +267,53 @@ multi_ticket: false                   # PM handles the whole project, not indivi
 - `auto_launch_on_status` defines event-driven automation (what triggers agent launches)
 - This is the key to removing human-in-the-loop: PM watches for status transitions and auto-dispatches
 
+**PM agent project-repo PR review responsibility:**
+
+In addition to dispatching coding agents, the PM agent is responsible for reviewing PRs to the **project repo** itself. Coding agents push PRs to two destinations: the *target repos* (web-app-backend, etc.) AND the *project repo* (containing updates to issues, sessions, concept nodes, comments, and artifacts). The PM agent reviews the project-repo PRs.
+
+When a coding agent opens a PR to the project repo, the PM agent runs a checklist:
+
+1. **Schema validation** — every changed YAML file passes pydantic validation
+2. **Reference integrity** — all `[[node-id]]` references in changed files resolve to existing nodes
+3. **Status transition validity** — issue/session status transitions follow `project.yaml` rules
+4. **Required-fields check** — issues have all required frontmatter (executor, verifier, repos, etc.)
+5. **Markdown structure** — issue bodies have all required sections
+6. **Concept node freshness** — newly added/edited nodes have valid `source` (file exists, hash computed)
+7. **Artifact presence** — sessions in `completed` state have all artifacts marked `required: true` in `templates/artifacts/manifest.yaml`
+8. **No orphan additions** — new nodes are referenced by at least one issue or marked `planned`
+9. **Comment provenance** — new comments have valid author + type
+10. **Project standards** — checks defined in `templates/standards.md`
+
+The PM approves the PR only when all checks pass. If `auto_merge_on_pass` is enabled in the project's orchestration pattern, the PM can optionally merge the PR automatically. If any check fails, the PM posts a `request_changes` review with specific feedback per failed check, and the orchestrator re-engages the coding agent with the failing checks as context.
+
 **Documentation as container input:**
-- Agent definitions specify which `docs/` files are mounted into the container
-- These are mounted **read-only** — agents can read API contracts, architecture docs, etc.
-- This solves the alignment problem: agents always read the latest docs from the project repo
-- The concept graph `[[references]]` in docs and issues mean agents can navigate to the actual code
+
+Documentation can be mounted into a container at three levels, all merged together when the container launches:
+
+- **Agent level** (existing) — `agents/<id>.yaml` `context.docs` lists doc paths every container launched with that agent gets. This is the agent's base context (e.g. backend-coder always wants the API contract and architecture docs).
+- **Issue level** (NEW) — `issues/<KEY>.yaml` has a `docs:` frontmatter field for extra doc paths specific to that issue (e.g. an auth issue mounts the JWT spec and a relevant ADR).
+- **Session level** (NEW) — `sessions/<id>.yaml` has a `docs:` frontmatter field for extra doc paths specific to that session (e.g. a multi-issue session that needs a cross-service flow doc that no single issue requires).
+
+**Merge rule**: union of all three lists, deduplicated by path. All mounted **read-only** at `/workspace/docs/<path>`.
+
+```yaml
+# agents/backend-coder.yaml — base context
+context:
+  docs:
+    - docs/api-contract.yaml
+    - docs/architecture/
+
+# issues/SEI-42.yaml — extra docs for this specific issue
+docs:
+  - docs/auth/jwt-spec.md
+  - docs/decisions/DEC-003.md
+
+# sessions/wave1-agent-a.yaml — extra docs for this multi-issue session
+docs:
+  - docs/integration/cross-service-flow.md
+```
+
+This solves the alignment problem at every granularity: agents always read the latest docs from the project repo, and the operator can scope documentation precisely to where it's needed without bloating every container with everything. The concept graph `[[references]]` in docs and issues mean agents can navigate to the actual code.
 
 ### How sessions reference agents
 
@@ -263,7 +327,19 @@ name: "Agent A: Auth + User Model"
 agent: backend-coder                  # references agents/backend-coder.yaml
 issues: [SEI-40, SEI-42]
 wave: 1
-repo: SeidoAI/web-app-backend
+
+# Multi-repo: sessions can target multiple repos. All repos are equal — no
+# primary. The agent treats them symmetrically and may branch and PR in any.
+repos:
+  - repo: SeidoAI/web-app-backend
+    base_branch: test
+    branch: claude/SEI-40-auth        # set after first push
+    pr_number: 42                     # set after PR opened
+  - repo: SeidoAI/web-app-infrastructure
+    base_branch: test
+    branch: claude/SEI-40-tf-secrets
+    pr_number: 18
+
 status: waiting_for_ci                # see "Session Status Lifecycle" below
 
 # Runtime state — persisted across container restarts
@@ -271,8 +347,8 @@ runtime_state:
   claude_session_id: "sess_abc123"    # for claude --resume
   langgraph_thread_id: null           # for langgraph checkpoint resume
   workspace_volume: "vol-wave1-a"     # Docker volume preserving workspace
-  branch: "claude/SEI-40-auth"
-  pr_number: 42
+  # one runtime_state.repos entry tracks per-repo branch and PR;
+  # the canonical branch/pr_number are stored in the repos[] list above
 
 # Re-engagement history — append-only log of every container start
 engagements:
@@ -431,6 +507,128 @@ Full implementation details (entrypoint scripts, GitHub Actions workflows, conte
 
 ---
 
+## Orchestration Patterns
+
+### The concept
+
+Orchestration patterns codify *who acts when*: when does the human approve vs the PM auto-act, is there a plan gate, when does the verifier run, does a green PR auto-merge. Different projects — and even different sessions within the same project — need different patterns. Hardcoding one workflow doesn't fit reality, so orchestration is configurable.
+
+### Patterns live in the project repo
+
+Patterns are YAML files (with optional Python hook scripts as an escape hatch for complex logic), all stored under `<project>/orchestration/`. This is consistent with the broader principle: anything customisable lives in the project repo.
+
+```
+my-project/
+├── orchestration/
+│   ├── default.yaml       # project default
+│   ├── strict.yaml        # named alternative — more human gates
+│   ├── fast.yaml          # named alternative — auto-everything
+│   └── hooks/             # Python hook scripts (optional)
+│       ├── __init__.py
+│       └── custom_verifier.py
+```
+
+### Hierarchy: Project → Session
+
+Just two tiers, kept deliberately small to keep the mental model simple.
+
+- **Project default**: `project.yaml` declares which pattern is the default (e.g. `default_pattern: default`) and sets project-wide flags like `plan_approval_required` and `auto_merge_on_pass`.
+- **Session-level overrides**: a session YAML can pick a different pattern entirely OR override individual fields. Session fields *win* over project fields — straight field-level override, no deeper merging.
+
+```yaml
+# sessions/critical-prod-fix.yaml — wants extra gates for this one session
+orchestration:
+  pattern: default
+  overrides:
+    plan_approval_required: true
+    auto_merge_on_pass: false
+```
+
+### Hybrid format: declarative YAML + optional Python hooks
+
+The patterns are declarative YAML rules mapping events to actions. For complex logic that doesn't fit declarative rules, Python hook scripts under `orchestration/hooks/` act as an escape hatch — the YAML can call out to a hook by name and the hook returns a decision dict.
+
+A short example pattern (full vocabulary and worked examples in `agent-projects-plan.md`):
+
+```yaml
+# orchestration/default.yaml
+name: default
+description: PM auto-orchestrates with human gates only on plan approval
+
+events:
+  pr_opened:
+    actions:
+      - launch_agent: verifier
+      - on_verifier_pass:
+          - if: project.auto_merge_on_pass
+            then: [ merge_pr ]
+            else: [ notify_human ]
+
+  ci_failure:
+    actions:
+      - re_engage: { trigger: ci_failure, context_from: ci_logs }
+```
+
+### Where the runtime lives
+
+**Critical**: the orchestration *runtime* lives in `agent-containers/core/orchestration.py`, not in `agent-project`. The patterns and hooks live in the project repo. The runtime reads them on every event.
+
+This is exactly the same shape as the rest of the system: the project repo is the configuration; `agent-containers` is the engine that executes that configuration. The orchestrator reacts to events from the file watcher on the project repo, WebSocket messages from running containers, GitHub webhook polling, and MCP messages from agents.
+
+### PM agent vs deterministic orchestrator
+
+The deterministic orchestrator handles simple event → action flows (CI failed, re-engage; PR opened, launch verifier; verifier passed, notify human). The PM agent — a Claude-driven container — handles judgement-heavy decisions (plan review, scope changes, conflict resolution, project-repo PR review). The two work together: the orchestrator routes events deterministically and calls the PM agent when something needs reasoning.
+
+Full pattern detail, the complete action vocabulary, hook signatures, and worked examples are in `docs/agent-projects-plan.md`.
+
+---
+
+## Session Artifacts
+
+### The concept
+
+A session produces structured outputs as it runs. These are the agent's plan, its task tracking, its verification checklist, the testing plan it wants reviewers to follow, and its post-completion reflection. The defaults are five artifacts:
+
+```
+sessions/wave1-agent-a/artifacts/
+├── plan.md                      # written at session start (the agent's internal plan)
+├── task-checklist.md            # updated continuously as work progresses
+├── verification-checklist.md    # generated at planning, confirmed at completion
+├── recommended-testing-plan.md  # what reviewers/QA should test
+└── post-completion-comments.md  # final reflection: decisions, gotchas, follow-ups
+```
+
+These are written to `sessions/<id>/artifacts/` in the project repo and committed via the agent's PR to the project repo.
+
+### Customisable per project
+
+The five artifacts above are *defaults*, not a hardcoded list. Each artifact has a template in the project repo (under `templates/artifacts/`), and projects can add their own artifacts, remove ones they don't need, or reshape templates entirely. The active set is declared in `templates/artifacts/manifest.yaml`:
+
+```yaml
+artifacts:
+  - name: plan
+    file: plan.md
+    template: plan.md.j2
+    produced_at: planning
+    required: true
+    approval_gate: false           # set true to require human approval before agent proceeds
+  # ...
+```
+
+The PM agent's PR-review checklist asserts that all `required: true` artifacts are present before approving a session-completion PR. The skill instructions for coding agents tell them to read `templates/artifacts/manifest.yaml` to know what they must produce.
+
+### Plan approval gate
+
+The plan approval gate is configurable. Set `approval_gate: true` on `plan.md` (or any artifact) to make the agent stop after producing it and send a `plan_approval` message. The orchestrator only re-engages the agent once a human approval is received. Projects that prefer fully autonomous agents leave it `false`.
+
+### UI surfaces
+
+The UI surfaces every artifact in the manifest as a tab/section in the session detail view, with rendered Markdown. Artifacts with `approval_gate: true` show in a plan-approval queue. The task checklist drives a progress bar on session cards.
+
+Full detail (template format, manifest schema, session-level artifact overrides, examples of each artifact) is in `docs/agent-projects-plan.md`.
+
+---
+
 ## Agent ↔ Human Messaging
 
 ### Principle
@@ -464,7 +662,7 @@ Each container runs a tiny MCP server that exposes two tools to the agent:
   "name": "send_message",
   "description": "Send a message to the human operator via the project dashboard",
   "parameters": {
-    "type": { "enum": ["question", "plan_approval", "progress", "stuck", "escalation", "handover", "fyi"] },
+    "type": { "enum": ["question", "plan_approval", "progress", "stuck", "escalation", "handover", "fyi", "status"] },
     "priority": { "enum": ["blocking", "informational"] },
     "body": { "type": "string", "description": "Markdown-formatted message body" }
   }
@@ -495,6 +693,9 @@ Fallback for non-MCP agents: `/usr/local/bin/agent-msg` shell script (curl wrapp
 | `handover` | Giving up, passing to human | `blocking` | Stop, exit |
 | `progress` | Milestone reached | `informational` | Keep working |
 | `fyi` | Found something interesting, not blocking | `informational` | Keep working |
+| `status` | Heartbeat update of agent state + 2-sentence summary (every ~5 min of active work and on every state transition) | `informational` | Keep working |
+
+Status messages have a structured body: `{ state, summary }` where `state` is from the customisable `agent_state` enum (default values: `investigating`, `planning`, `awaiting_plan_approval`, `implementing`, `testing`, `debugging`, `refactoring`, `documenting`, `self_verifying`, `blocked`, `handed_off`, `done`). The orchestrator updates `session.current_state` from the latest status message; the UI surfaces it as a live badge on each session card. See `agent-containers.md` for the full schema.
 
 ### Response flow and re-engagement
 
@@ -590,10 +791,19 @@ From the notes:
 │  agent-container: backend-coder/SEI-42      │
 │                                             │
 │  /workspace/                                │
-│  ├── repo/          (git clone of target)   │
+│  ├── repos/         (multi-repo: clones)    │
+│  │   ├── web-app-backend/                   │
+│  │   └── web-app-infrastructure/            │
 │  ├── project/       (git clone of project)  │
-│  ├── docs/          (read-only mount)       │
-│  └── .claude/       (skills, settings)      │
+│  ├── docs/          (read-only — merged     │
+│  │                   from agent + issue +   │
+│  │                   session docs)          │
+│  ├── artifacts/     (where the agent writes │
+│  │                   plan/checklists)       │
+│  ├── config/                                │
+│  └── .claude/       (skills mounted from    │
+│                      project repo           │
+│                      .claude/skills/)       │
 │                                             │
 │  Git identity: seido-backend-bot            │
 │  Tools: git, gh, uv, node (per agent def)   │
@@ -618,18 +828,19 @@ agent-containers launch <session-id>
   1. Read session from project repo: sessions/<session-id>.yaml
   2. Read agent definition from project repo: agents/<agent-id>.yaml
   3. Configure git identity (agent's GitHub username + email + scoped token)
-  4. Clone target repo (from session.repo) into container workspace
-  5. Clone project repo into container workspace
-  6. Mount docs (from agent definition context.docs) as read-only
-  7. Copy skills (from agent definition context.skills) into .claude/
+  4. Clone all target repos (from session.repos[]) into /workspace/repos/<repo-name>/
+  5. Clone project repo into container workspace at /workspace/project/
+  6. Mount merged docs (union of agent + issue + session docs) read-only
+     into /workspace/docs/
+  7. Mount skills from <project>/.claude/skills/ into the container workspace
+     (the project repo is the source of truth — agent-containers ships none)
   8. Inject API keys (ANTHROPIC_API_KEY, scoped GITHUB_TOKEN — from host env)
   9. Configure egress firewall (Docker network rules from agent permissions)
   10. Select runtime entrypoint:
       - claude-code: start Claude Code with issue as prompt
       - langgraph: start LangGraph server with issue as input
       - custom: run user-provided entrypoint script
-  11. Open iTerm2 tab (if --iterm flag or config)
-  12. Write container metadata to ~/.agent-containers/active/<session-id>.json
+  11. Write container metadata to ~/.agent-containers/active/<session-id>.json
 ```
 
 ### Egress enforcement
@@ -718,8 +929,8 @@ def open_iterm_tab(container_id: str, session_name: str):
 
 For multiple agents, open a split layout:
 ```
-agent-containers launch-wave 1 --iterm
-# Opens iTerm2 window with one tab per agent in the wave
+agent-containers launch-wave 1 --terminal
+# Opens a tab per agent in the wave using the configured terminal launcher
 # Each tab is docker exec -it <container> bash
 ```
 
@@ -728,14 +939,13 @@ agent-containers launch-wave 1 --iterm
 ```
 agent-containers launch <session-id>
   --project-dir TEXT   Path to project repo [default: .]
-  --iterm              Open iTerm2 tab for the container
-  --detach             Run in background (no iTerm)
+  --detach             Run in background
   --dry-run            Show what would happen without launching
 
 agent-containers launch-wave <wave-number>
   --project-dir TEXT   Path to project repo
   --plan TEXT          Division plan file (if multiple plans exist)
-  --iterm              Open iTerm2 tabs for all agents in wave
+  --terminal           Open a tab per agent using the configured launcher
   --max-parallel INT   Limit concurrent containers [default: from plan]
 
 agent-containers list
@@ -758,15 +968,17 @@ agent-containers stop-all
 agent-containers attach <session-id>
   # Docker exec into the container (interactive bash)
 
-agent-containers iterm <session-id>
-  # Open iTerm2 tab for an already-running container
+agent-containers terminal <session-id>
+  # Open a terminal tab for an already-running container, using the configured launcher
 
-agent-containers iterm-all
-  # Open iTerm2 tabs for all running containers
+agent-containers terminal-all
+  # Open terminal tabs for all running containers
 
 agent-containers cleanup
   # Remove stopped containers and dangling images
 ```
+
+The terminal launcher is configurable via `~/.agent-containers/config.yaml` and supports `iterm`, `terminal` (Terminal.app), `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, or `none` (no terminal spawning — run all detached). For wave launches, `agent-containers launch-wave <wave> --terminal` opens a tab per agent using whichever launcher is configured.
 
 ### Container images
 
@@ -1076,3 +1288,7 @@ All three projects live in the same directory:
 3. **UI backend → agent-project**: Import `agent_project` as a Python library directly. Faster, type-safe, no subprocess overhead. The UI backend depends on `agent-project` as a pip dependency.
 4. **Auth for UI**: None — local dev tool, bind to localhost only.
 5. **Project discovery**: UI scans a configured root directory for projects (any directory containing `project.yaml`).
+6. **Multi-repo sessions**: All repos in a session are equal (no primary). The agent treats them symmetrically — branches and PRs in any of them. Sessions declare a `repos:` array, not a single `repo:` field.
+7. **Orchestration**: Hybrid YAML rules + Python hook scripts. Declarative YAML covers the simple event → action flows, hooks are an escape hatch for complex logic. Rules live in `<project>/orchestration/`, runtime in `agent-containers`.
+8. **Customisation tiers**: Project → Session. Just 2 levels for orchestration overrides. No agent-tier or issue-tier overrides — keeps the mental model simple.
+9. **Source of truth**: the project repo. `agent-project` ships defaults that get copied into the project on init; `agent-containers` is a thin runtime that reads from the project repo and ships no skills, no templates, no defaults of its own.

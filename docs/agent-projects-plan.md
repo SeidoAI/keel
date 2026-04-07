@@ -40,6 +40,12 @@ The single biggest problem in agent-driven development is **coherence drift**. W
 
 Nobody notices until an agent picks up a downstream ticket and builds against stale information. This creates cascading failures: wrong API contracts, mismatched schemas, broken integrations — all because the references in tickets are just prose, not live links.
 
+Beyond the integrity problem, drift directly damages agents in two ways:
+
+**Agent confusion**: When the issue, the contract, and the code disagree, the agent has to guess which is authoritative. It often picks wrong, building against stale information. The damage compounds as downstream tickets pick up the wrong version. By the time the contradiction surfaces, it's wedged into multiple PRs.
+
+**Drift fixes burn tokens**: Reconciling drift means finding every location where an old value lives — issues, comments, doc files, code, tests, terraform, schemas — and updating each one. This is exactly the kind of mechanical, repetitive search-and-replace work that LLMs are bad at: they miss instances, they update inconsistently, and they have to re-read enormous amounts of context to find each occurrence. The compute cost is high, the result is imperfect, and the next agent to read the codebase has to deal with whatever stragglers were missed. **Drift is a tax on every future agent invocation.**
+
 ### The solution: concept nodes as stable references
 
 A **concept node** is a named, versioned pointer to a concrete artifact in the codebase. Instead of prose like "the auth endpoint in the backend," issues reference `[[auth-token-endpoint]]` — a stable identifier that resolves to a specific file, line range, and content hash.
@@ -126,37 +132,101 @@ agent-projects/                          # /Users/maia/Code/seido/projects/agent
 │       │   ├── dependency_graph.py      # Issue dependency graph (from dependency_graph.py)
 │       │   ├── concept_graph.py         # Full graph: issues + nodes + edges (unified view)
 │       │   ├── status.py                # Status transitions, dashboard aggregation
-│       │   └── id_generator.py          # Auto-increment <PREFIX>-<N> keys
+│       │   ├── id_generator.py          # Auto-increment <PREFIX>-<N> keys
+│       │   ├── enum_loader.py           # NEW: dynamic enum loading from <project>/enums/
+│       │   ├── graph_cache.py           # NEW: incremental graph index cache (v2 schema)
+│       │   └── pm_review.py             # NEW: PM agent PR review checks (CheckResult API)
+│       │   #
+│       │   # NOTE: the orchestration RUNTIME lives in the agent-containers package
+│       │   # (`agent_containers/core/orchestration.py`), NOT here. The agent-project
+│       │   # package owns the data models and CLI for managing patterns; the runtime
+│       │   # that reads patterns and dispatches actions ships with agent-containers.
 │       │
 │       ├── cli/                         # Click CLI
 │       │   ├── __init__.py
 │       │   ├── main.py                  # Root group + global options
-│       │   ├── init.py                  # `agent-project init`
+│       │   ├── init.py                  # `agent-project init` (also `init --update`)
 │       │   ├── issue.py                 # `agent-project issue {create,list,show,update,validate}`
 │       │   ├── node.py                  # `agent-project node {create,list,show,check,update}`
 │       │   ├── refs.py                  # `agent-project refs {list,reverse,check}`
 │       │   ├── status.py                # `agent-project status`
 │       │   ├── graph.py                 # `agent-project graph` (dependency + concept)
-│       │   └── session.py               # `agent-project session {create,list}`
+│       │   ├── session.py               # `agent-project session {create,list}`
+│       │   ├── pm.py                    # NEW: `agent-project pm review-pr <pr-number>`
+│       │   ├── templates.py             # NEW: `agent-project templates {list,show}`
+│       │   ├── enums.py                 # NEW: `agent-project enums {list,show}`
+│       │   ├── artifacts.py             # NEW: `agent-project artifacts {list,show}`
+│       │   └── orchestrate.py           # NEW: `agent-project orchestrate evaluate <event-file>`
 │       │
-│       ├── templates/                   # Jinja2 templates for `init`
+│       ├── templates/                   # Defaults shipped with the package, copied on init
 │       │   ├── __init__.py              # Template loader
-│       │   ├── project/                 # Project scaffold files
+│       │   ├── project/
 │       │   │   ├── project.yaml.j2
 │       │   │   ├── CLAUDE.md.j2
 │       │   │   └── gitignore.j2
-│       │   ├── skills/                  # PM agent skill (adapted from linear-project-manager)
-│       │   │   ├── SKILL.md.j2
-│       │   │   └── references/          # Workflow docs (ported from current skill)
-│       │   │       ├── WORKFLOWS_CREATION.md
-│       │   │       ├── WORKFLOWS_REVIEW.md
-│       │   │       ├── WORKFLOWS_UPDATE.md
-│       │   │       ├── WORKFLOWS_TRIAGE.md
-│       │   │       ├── WORKFLOWS_VERIFICATION.md
-│       │   │       ├── WORKFLOWS_AGENT_DIVISION.md
-│       │   │       └── POLICIES.md
-│       │   └── issue_templates/         # Template for new issues
-│       │       └── default.yaml.j2
+│       │   ├── enums/                   # NEW: customisable enums
+│       │   │   ├── issue_status.yaml
+│       │   │   ├── priority.yaml
+│       │   │   ├── executor.yaml
+│       │   │   ├── verifier.yaml
+│       │   │   ├── node_type.yaml
+│       │   │   ├── node_status.yaml
+│       │   │   ├── session_status.yaml
+│       │   │   ├── re_engagement_trigger.yaml
+│       │   │   ├── message_type.yaml
+│       │   │   └── agent_state.yaml
+│       │   ├── issue_templates/
+│       │   │   ├── default.yaml.j2
+│       │   │   ├── bug.yaml.j2
+│       │   │   ├── decision.yaml.j2
+│       │   │   └── investigation.yaml.j2
+│       │   ├── comment_templates/       # NEW: comment scaffolds
+│       │   │   ├── status_change.yaml.j2
+│       │   │   ├── question.yaml.j2
+│       │   │   └── completion.yaml.j2
+│       │   ├── artifacts/               # NEW: session output templates
+│       │   │   ├── manifest.yaml        # declares the active artifact set
+│       │   │   ├── plan.md.j2
+│       │   │   ├── task-checklist.md.j2
+│       │   │   ├── verification-checklist.md.j2
+│       │   │   ├── recommended-testing-plan.md.j2
+│       │   │   └── post-completion-comments.md.j2
+│       │   ├── agent_templates/         # default agent definitions
+│       │   │   ├── backend-coder.yaml
+│       │   │   ├── frontend-coder.yaml
+│       │   │   ├── verifier.yaml
+│       │   │   └── pm.yaml
+│       │   ├── session_templates/       # NEW
+│       │   │   └── default.yaml.j2
+│       │   ├── orchestration/           # NEW: default patterns + hook scaffold
+│       │   │   ├── default.yaml
+│       │   │   ├── strict.yaml
+│       │   │   ├── fast.yaml
+│       │   │   └── hooks/
+│       │   │       └── __init__.py
+│       │   ├── skills/                  # ALL skills, copied into <project>/.claude/skills/
+│       │   │   ├── agent-messaging/     # default messaging skill (every agent gets this)
+│       │   │   │   ├── SKILL.md
+│       │   │   │   └── references/
+│       │   │   │       ├── MESSAGE_TYPES.md
+│       │   │   │       ├── EXAMPLES.md
+│       │   │   │       └── ANTI_PATTERNS.md
+│       │   │   ├── project-manager/     # PM agent skill
+│       │   │   │   ├── SKILL.md
+│       │   │   │   └── references/
+│       │   │   │       ├── WORKFLOWS_CREATION.md
+│       │   │   │       ├── WORKFLOWS_REVIEW.md
+│       │   │   │       ├── WORKFLOWS_UPDATE.md
+│       │   │   │       ├── WORKFLOWS_TRIAGE.md
+│       │   │   │       ├── WORKFLOWS_VERIFICATION.md
+│       │   │   │       ├── WORKFLOWS_AGENT_DIVISION.md
+│       │   │   │       ├── WORKFLOWS_PM_PR_REVIEW.md
+│       │   │   │       └── POLICIES.md
+│       │   │   ├── backend-development/ # default coding agent skill
+│       │   │   │   └── SKILL.md
+│       │   │   └── verification/        # default verifier skill
+│       │   │       └── SKILL.md
+│       │   └── standards.md.j2          # NEW: PM review standards (per-project)
 │       │
 │       └── output/                      # Output formatters
 │           ├── __init__.py
@@ -176,7 +246,10 @@ agent-projects/                          # /Users/maia/Code/seido/projects/agent
     │   ├── test_dependency_graph.py
     │   ├── test_concept_graph.py
     │   ├── test_status.py
-    │   └── test_id_generator.py
+    │   ├── test_id_generator.py
+    │   ├── test_enum_loader.py          # NEW
+    │   ├── test_graph_cache.py          # NEW
+    │   └── test_pm_review.py            # NEW
     └── integration/
         ├── test_init.py
         ├── test_issue_lifecycle.py
@@ -189,15 +262,27 @@ agent-projects/                          # /Users/maia/Code/seido/projects/agent
 
 ### Generated Project Directory (output of `agent-project init`)
 
+`agent-project init` copies the entire `templates/` tree from the package into the new project, with template substitution for project name, key prefix, etc. After init, the **project repo is the source of truth** — the `agent-project` package is no longer canonical for these files. The user owns them, edits them freely, and commits them to git.
+
 ```
 my-project/
 ├── project.yaml                    # ProjectConfig
 ├── CLAUDE.md                       # PM agent entry point → skill
+├── enums/                          # from templates/enums/  ← all customisable enums
+├── issue_templates/                # from templates/issue_templates/
+├── comment_templates/              # from templates/comment_templates/
+├── templates/
+│   └── artifacts/                  # from templates/artifacts/  ← session output templates + manifest
+├── agents/                         # from templates/agent_templates/
+├── session_templates/              # from templates/session_templates/
+├── orchestration/                  # from templates/orchestration/  ← patterns + Python hooks
 ├── .claude/
-│   └── skills/
-│       └── project-manager/
-│           ├── SKILL.md            # Full PM agent operating instructions
-│           └── references/         # Workflow docs (progressive disclosure)
+│   └── skills/                     # from templates/skills/  ← ALL skills (every agent reads from here)
+│       ├── agent-messaging/
+│       ├── project-manager/
+│       ├── backend-development/
+│       └── verification/
+├── standards.md                    # from templates/standards.md.j2  ← PM review standards
 ├── issues/                         # One file per issue
 │   └── .gitkeep
 ├── graph/
@@ -206,60 +291,78 @@ my-project/
 ├── docs/
 │   └── issues/                     # Per-issue artifacts (developer.md, verified.md)
 │       └── .gitkeep
-├── sessions/                       # Agent session/division plans
+├── sessions/                       # Agent session directories (see Session Artifacts section)
 │   └── .gitkeep
 └── .gitignore
 ```
 
-### Enums
+**Principle: the project repo is the source of truth.** Every Enum, schema, template, skill, orchestration pattern, and rule that ships with `agent-project` is a **default reference** that gets copied into the user's project on `init`. After that, the package is no longer canonical — the project repo is. Two projects can have completely different rules for messaging, completely different artifact sets, completely different orchestration patterns, all fully under their own control and version-controlled.
 
-```python
-class IssueStatus(StrEnum):
-    BACKLOG = "backlog"
-    TODO = "todo"
-    IN_PROGRESS = "in_progress"
-    VERIFYING = "verifying"
-    REVIEWING = "reviewing"
-    TESTING = "testing"
-    READY = "ready"
-    UPDATING = "updating"
-    DONE = "done"
-    CANCELED = "canceled"
+**`agent-project init --update`** pulls upstream changes from the package's `templates/` into the project selectively, never overwriting user edits without confirmation. This is the upgrade path for projects that want to track new defaults as the package evolves.
 
-class Executor(StrEnum):
-    AI = "ai"
-    HUMAN = "human"
-    MIXED = "mixed"
+`agent-project templates list` and `agent-project templates show <name>` let users explore what ships in the package without leaving the CLI.
 
-class Verifier(StrEnum):
-    REQUIRED = "required"
-    OPTIONAL = "optional"
-    NONE = "none"
+### Enums (customisable per project)
 
-class Priority(StrEnum):
-    URGENT = "urgent"
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
+Enums are not hardcoded Python `StrEnum` classes. They are YAML files in the project repo at `<project>/enums/<name>.yaml`, copied from packaged defaults at `templates/enums/` on `agent-project init`. After init, the project owns its enums and can add states, rename labels, recolor for the UI, or remove states it doesn't use.
 
-class NodeType(StrEnum):
-    ENDPOINT = "endpoint"        # API endpoint
-    MODEL = "model"              # Data model / schema / class
-    CONFIG = "config"            # Env var, secret, configuration value
-    TF_OUTPUT = "tf_output"      # Terraform output (cross-repo infra)
-    CONTRACT = "contract"        # API contract / OpenAPI spec section
-    DECISION = "decision"        # Architectural decision (DEC-xxx)
-    REQUIREMENT = "requirement"  # Requirement (REQ-xxx)
-    SERVICE = "service"          # A running service / deployment
-    SCHEMA = "schema"            # Database schema / migration
-    CUSTOM = "custom"            # User-defined type
+The Pydantic models load enums dynamically at startup via `core/enum_loader.py`, which reads `<project>/enums/*.yaml` if present and falls back to packaged defaults otherwise.
 
-class NodeStatus(StrEnum):
-    ACTIVE = "active"            # Points to existing, current code
-    PLANNED = "planned"          # Will exist after some issue completes
-    DEPRECATED = "deprecated"    # Exists but scheduled for removal
-    STALE = "stale"              # Content hash mismatch detected
+Example enum file:
+
+```yaml
+# enums/issue_status.yaml — copied into <project>/enums/issue_status.yaml on init
+name: IssueStatus
+description: Issue lifecycle states
+values:
+  - id: backlog
+    label: Backlog
+    color: gray
+  - id: todo
+    label: To Do
+    color: blue
+  - id: in_progress
+    label: In Progress
+    color: yellow
+  - id: verifying
+    label: Verifying
+    color: orange
+  - id: reviewing
+    label: Reviewing
+    color: purple
+  - id: testing
+    label: Testing
+    color: cyan
+  - id: ready
+    label: Ready
+    color: lime
+  - id: updating
+    label: Updating
+    color: pink
+  - id: done
+    label: Done
+    color: green
+  - id: canceled
+    label: Canceled
+    color: red
 ```
+
+The complete set of enum files shipped under `templates/enums/`:
+
+| File | Purpose |
+|------|---------|
+| `issue_status.yaml` | Issue lifecycle states |
+| `priority.yaml` | Issue priority (urgent, high, medium, low) |
+| `executor.yaml` | Who executes the issue (ai, human, mixed) |
+| `verifier.yaml` | Whether verification is required (required, optional, none) |
+| `node_type.yaml` | Concept node types (endpoint, model, config, tf_output, contract, decision, requirement, service, schema, custom) |
+| `node_status.yaml` | Concept node lifecycle (active, planned, deprecated, stale) |
+| `session_status.yaml` | Session lifecycle (planned, active, waiting_for_ci, …, completed, failed) |
+| `re_engagement_trigger.yaml` | Why a session was re-engaged (ci_failure, plan_approved, …) |
+| `message_type.yaml` | MCP message types — gains a new `status` value (see Section: Status Messages in `agent-containers.md`) |
+| `agent_state.yaml` | NEW enum for status messages — see Section: Status Messages in `agent-containers.md` for the full value list (investigating, planning, awaiting_plan_approval, implementing, testing, debugging, refactoring, documenting, self_verifying, blocked, handed_off, done) |
+
+The `AgentState` enum is brand new in this design — it powers the structured `status` message body so the UI can show "what is the agent doing right now" without parsing free-form text. Because it ships as `templates/enums/agent_state.yaml`, projects can extend it with their own states.
 
 ### Issue File Format (YAML frontmatter + Markdown body)
 
@@ -286,6 +389,9 @@ blocked_by:
   - PRJ-40
 blocks:
   - PRJ-45
+docs:
+  - docs/auth/jwt-spec.md
+  - docs/decisions/DEC-003.md
 created_at: "2026-03-26T15:00:00"
 updated_at: "2026-03-26T15:00:00"
 created_by: pm-agent
@@ -341,6 +447,8 @@ PRJ-40 (Firestore user model must land first — see [[user-model]])
 Note the `[[node-id]]` references throughout the body. These are parsed by the reference parser
 and resolved against the concept graph. They serve as live links to code locations that can be
 validated for freshness.
+
+**`Issue.docs: list[str] | None`** — optional doc paths from the project repo, mounted read-only into the container alongside agent-level and session-level docs. The agent definition (`agents/<id>.yaml`) declares its base `context.docs`; the issue can append issue-specific context (e.g. a JWT spec, an ADR); the session can append more on top. All three lists are merged (deduped by path) and mounted at `/workspace/docs/<path>` when the container launches.
 
 ### Concept Node File Format
 
@@ -508,37 +616,112 @@ Edges are not stored as separate files. They are **emergent from the data**:
 
 The `agent-project graph` command and the `concept_graph.py` module build the complete graph on demand by scanning everything. For larger projects, an auto-generated index speeds up lookups (see below).
 
-### The reference index — auto-generated lookup cache
+### The graph cache — incrementally maintained lookup index
+
+**Problem**: the implicit edge model means every render needs to recompute by scanning every issue and node file. For projects with hundreds of issues this becomes slow, especially for the UI's graph view which renders constantly. Full rebuilds (`agent-project refs rebuild`) are too expensive to run on every read.
+
+**New approach: incremental cache.** `graph/index.yaml` is committed to git as before, but it is now incrementally updated by the file watcher and CLI commands. Full rebuilds are only needed when the cache is corrupt or missing.
+
+#### Cache schema (v2)
 
 ```yaml
-# graph/index.yaml (auto-generated by `agent-project refs rebuild`)
-# This file is committed to git for fast lookups but can always be regenerated.
+# graph/index.yaml
+version: 2
+last_full_rebuild: "2026-04-07T10:00:00"
+last_incremental_update: "2026-04-07T15:33:12"
 
+# Per-file fingerprint — used to detect what's stale on incremental update
+files:
+  "issues/SEI-42.yaml":
+    mtime: 1712512392
+    sha: "abc123..."
+    references_to: [auth-token-endpoint, user-model, dec-003]
+    blocked_by: [SEI-40]
+    blocks: []
+  "graph/nodes/auth-token-endpoint.yaml":
+    mtime: 1712510000
+    sha: "def456..."
+    related: [user-model]
+
+# Computed lookup tables (the fast read paths)
 by_name:
   "POST /auth/token": auth-token-endpoint
-  "User (Firestore)": user-model
-  "JWT_SECRET": config-jwt-secret
 
 by_type:
   endpoint: [auth-token-endpoint, refresh-endpoint]
-  model: [user-model, business-model]
-  config: [config-jwt-secret, config-firebase-project-id]
-  tf_output: [tf-api-url]
-  contract: [contract-auth-token]
-  decision: [dec-003-session-tokens]
+  model: [user-model]
 
-# Reverse references: which issues reference each node
 referenced_by:
-  auth-token-endpoint: [PRJ-42, PRJ-45, PRJ-51]
-  user-model: [PRJ-40, PRJ-42]
-  config-jwt-secret: [PRJ-42]
+  auth-token-endpoint: [SEI-42, SEI-45]
+  user-model: [SEI-40, SEI-42]
 
-# Staleness status (updated by `agent-project node check`)
+# Edges (computed once, served fast)
+edges:
+  - from: SEI-42
+    to: auth-token-endpoint
+    type: references
+  - from: SEI-42
+    to: SEI-40
+    type: blocked_by
+  - from: auth-token-endpoint
+    to: user-model
+    type: related
+
 stale_nodes: []
-last_checked: "2026-03-26T18:00:00"
+last_freshness_check: "2026-04-07T15:00:00"
 ```
 
-This index is rebuilt by `agent-project refs rebuild`. CLI commands like `agent-project refs reverse <node-id>` read from it for speed. If the index is missing or outdated, commands fall back to full scan.
+#### Incremental update algorithm
+
+`agent_project/core/graph_cache.py`:
+
+```python
+def update_cache_for_file(dir, rel_path):
+    """Called by file watcher on file change."""
+    cache = load_index(dir)
+
+    # Remove old edges from this file
+    cache.edges = [e for e in cache.edges if e.source_file != rel_path]
+    cache.files.pop(rel_path, None)
+
+    # If file still exists, parse and re-add
+    full_path = dir / rel_path
+    if full_path.exists():
+        if rel_path.startswith("issues/"):
+            issue = load_issue(dir, key_from_path(rel_path))
+            cache.files[rel_path] = fingerprint(full_path, issue)
+            cache.edges.extend(issue_edges(issue))
+        elif rel_path.startswith("graph/nodes/"):
+            node = load_node(dir, id_from_path(rel_path))
+            cache.files[rel_path] = fingerprint(full_path, node)
+            cache.edges.extend(node_edges(node))
+
+    # Rebuild lookup tables (cheap — they're derived from files dict + edges)
+    cache.by_name = build_by_name(cache.files)
+    cache.by_type = build_by_type(cache.files)
+    cache.referenced_by = build_referenced_by(cache.edges)
+
+    cache.last_incremental_update = now()
+    save_index(dir, cache)
+```
+
+#### Who triggers updates
+
+1. **CLI write paths** — `issue create`, `issue update`, `node create`, etc. call `update_cache_for_file()` after saving the file
+2. **File watcher (UI backend)** — `watchdog` triggers `update_cache_for_file()` for any file in `issues/`, `graph/nodes/`, `sessions/`
+3. **Manual** — `agent-project refs rebuild` does a full rebuild from scratch
+
+#### Reads are now O(1)
+
+`agent-project graph`, the UI's `/api/projects/:id/graph` endpoint, and all `refs *` commands read directly from `graph/index.yaml` without rescanning the project. The result: O(1) graph reads instead of O(N) for N issues + nodes.
+
+#### Concurrency
+
+A single SQLite write-ahead lock file (`graph/.index.lock`) prevents concurrent writes from corrupting the cache. Reads are unaffected (cache is just YAML).
+
+#### Edge model unchanged
+
+The implicit edge philosophy stays — edges are still derived from `[[references]]` in bodies and `blocked_by`/`related` in frontmatter. The cache is purely a performance layer; deleting it always rebuilds correctly. The cache is never the source of truth — it's a derived view of the underlying files.
 
 ### ProjectConfig (`project.yaml`)
 
@@ -634,7 +817,22 @@ name: "Agent A: Auth + User Model"
 agent: backend-coder                  # references agents/backend-coder.yaml
 issues: [PRJ-40, PRJ-42]
 wave: 1
-repo: SeidoAI/web-app-backend
+
+# Multi-repo: every repo the session can branch and PR in. All equal, all writable.
+repos:
+  - repo: SeidoAI/web-app-backend
+    base_branch: test
+    branch: claude/SEI-40-auth          # set after first push
+    pr_number: 42                       # set after PR opened
+  - repo: SeidoAI/web-app-infrastructure
+    base_branch: test
+    branch: claude/SEI-40-tf-secrets
+    pr_number: 18
+
+# Optional session-level extra docs, merged with agent + issue docs
+docs:
+  - docs/integration/cross-service-flow.md
+
 estimated_size: medium-large
 blocked_by_sessions: []
 key_files:
@@ -647,13 +845,33 @@ grouping_rationale: Same repo, tight dependency chain, overlapping files
 #   ... → waiting_for_review → re_engaged → active → ... → completed
 status: waiting_for_ci
 
-# Runtime state — persisted across container restarts
+# Latest agent state from the most recent `status` message (see Section: Status messages).
+# Updated by the orchestration runtime each time a status message arrives.
+current_state: implementing
+
+# Orchestration override — pick a different pattern, or override individual fields.
+# Project default lives in project.yaml; session can override either way.
+orchestration:
+  pattern: default                    # references orchestration/default.yaml in project repo
+  overrides:
+    plan_approval_required: true
+    auto_merge_on_pass: false
+
+# Artifact overrides for this session — add or remove artifacts beyond the project default
+# manifest at templates/artifacts/manifest.yaml.
+artifact_overrides:
+  - name: architecture-diff
+    file: architecture-diff.md
+    template: architecture-diff.md.j2
+    produced_at: completion
+    required: true
+
+# Runtime state — persisted across container restarts. Multi-repo: branch + PR live in
+# the per-repo RepoBinding above; the runtime_state holds session-wide handles.
 runtime_state:
   claude_session_id: "sess_abc123"    # for claude --resume
   langgraph_thread_id: null           # for langgraph checkpoint resume
   workspace_volume: "vol-wave1-a"     # Docker volume name
-  branch: "claude/PRJ-40-auth"
-  pr_number: 42
 
 # Re-engagement history — append-only log
 engagements:
@@ -668,6 +886,26 @@ engagements:
     outcome: fix_pushed
 ---
 ```
+
+**Schema notes:**
+
+- **`repos: list[RepoBinding]`** replaces the old single `repo: str`. All repos are equal — there is no primary. The agent treats them symmetrically, can branch in any, and opens PRs against any. The session tracks one PR per repo. The `RepoBinding` model lives in `models/session.py`:
+
+  ```python
+  class RepoBinding(BaseModel):
+      repo: str                            # GitHub slug
+      base_branch: str
+      branch: str | None = None
+      pr_number: int | None = None
+  ```
+
+- **`docs: list[str] | None`** — session-level extra docs. Merged with the agent definition's `context.docs` and every issue's `docs` field, deduped by path, and mounted read-only at `/workspace/docs/<path>` in the container.
+
+- **`current_state: str | None`** — the latest agent state from a `status` message (see the Status Messages section in `agent-containers.md`). The orchestration runtime writes this back to the session YAML each time a new status message arrives so the UI can render it without subscribing to the live stream.
+
+- **`orchestration: { pattern: str, overrides: dict }`** — overrides for the project's default orchestration pattern. The hierarchy is **Project → Session** (just two tiers). `project.yaml` declares `orchestration.default_pattern` plus global flags; the session can either pick a different named pattern (`pattern: strict`) or override individual fields (`overrides: {plan_approval_required: true}`). Session-level fields win — straight field-level override, no deeper merging.
+
+- **`artifact_overrides: list[ArtifactSpec]`** — per-session artifact overrides on top of the project's `templates/artifacts/manifest.yaml`. Use this to add session-specific artifacts (e.g. `architecture-diff.md`) or to mark something not required for one session.
 
 **SessionStatus enum:**
 
@@ -732,7 +970,13 @@ New session directory structure:
 sessions/
 ├── wave1-agent-a.yaml               # session definition + runtime state + engagements
 └── wave1-agent-a/
-    └── messages.yaml                 # message log (committed on session complete)
+    ├── messages.yaml                 # message log (committed on session complete)
+    └── artifacts/                    # the agent's structured outputs (see Session Artifacts)
+        ├── plan.md
+        ├── task-checklist.md
+        ├── verification-checklist.md
+        ├── recommended-testing-plan.md
+        └── post-completion-comments.md
 ```
 
 New CLI command:
@@ -742,6 +986,142 @@ agent-project session finalize <session-id>
   # Writes messages.yaml to session directory and commits to project repo.
   # Called by UI backend when session completes.
 ```
+
+---
+
+## Session Artifacts
+
+Sessions produce structured Markdown outputs in addition to their message log. Five artifacts ship as defaults; **the set is customisable per project** via `templates/artifacts/manifest.yaml`. Projects can add, remove, or reshape artifacts. All artifacts are written by the agent to `sessions/<id>/artifacts/` in the project repo and committed via the agent's PR.
+
+### The five default artifacts
+
+**1. `plan.md`** — equivalent of Claude Code's plan output. Free-form Markdown produced by the agent during its planning phase. May reference `[[concept-nodes]]`. This is the candidate for plan approval gating.
+
+**2. `task-checklist.md`** — explicit Markdown table the agent maintains as it works:
+
+```markdown
+# Task Checklist — wave1-agent-a
+
+| # | Task | Status | Comments |
+|---|------|--------|----------|
+| 1 | Add JWT validation middleware | done | Used `python-jose`. See [[auth-token-endpoint]]. |
+| 2 | Wire middleware into auth router | done | — |
+| 3 | Add unit tests for valid/invalid/expired tokens | in_progress | Discovered an existing test fixture I can reuse. |
+| 4 | Update OpenAPI contract | blocked | Waiting for contract decision from human (msg #003). |
+| 5 | Add migration for `last_login` field | done | Outside scope but trivial; flagged in comment. |
+```
+
+Status values: `pending | in_progress | done | blocked | skipped`. Comments capture decisions, deviations, problems, external dependencies (in or out), or anything noteworthy.
+
+**3. `verification-checklist.md`** — Markdown checklist the agent generates during planning and ticks off at the end:
+
+```markdown
+# Verification Checklist — wave1-agent-a
+
+- [x] All acceptance criteria from SEI-40 met
+- [x] All acceptance criteria from SEI-42 met
+- [x] Unit tests pass locally (`uv run pytest`)
+- [x] Lint passes (`make lint`)
+- [x] No hardcoded secrets
+- [x] Concept nodes created/updated for new artifacts
+- [x] developer.md and verified.md drafts written
+```
+
+**4. `recommended-testing-plan.md`** — written near the end. Tells the human reviewer (and any downstream verifier agent) what should be tested manually or in higher environments, beyond what CI covers. Includes scenarios, edge cases, environment requirements, suggested commands.
+
+```markdown
+# Recommended Testing Plan — wave1-agent-a
+
+## Manual / exploratory checks
+1. Log in with a valid Firebase account; confirm JWT issued and 1-hour expiry
+2. Replay an expired JWT; confirm 403 with the standard error envelope
+3. Hit `/auth/token` from the frontend SPA on test env (not just curl)
+
+## Environment-specific
+- Verify `JWT_SECRET` is set in test env via `gcloud secrets versions list`
+- Confirm rate limiting kicks in after 5 attempts/minute (manual)
+
+## Regression watchlist
+- Existing `/auth/refresh` should still work — not touched in this PR but shares middleware
+```
+
+**5. `post-completion-comments.md`** — written at the very end. The agent's reflective notes: decisions made, things deferred, surprises encountered, follow-ups for later. Used by the PM agent when triaging follow-up issues, and by humans during review.
+
+```markdown
+# Post-Completion Comments — wave1-agent-a
+
+## Decisions
+- Chose `python-jose` over `pyjwt` because it has built-in JWE support that we'll need for SEI-58.
+- Used a constant-time comparison helper from `secrets` module instead of `==`.
+
+## Deferred
+- Did not implement `/auth/refresh` — that's SEI-48 and out of scope here.
+- Did not migrate the `last_login` field on existing users; needs a one-off backfill script (suggest opening a follow-up issue).
+
+## Surprises
+- The existing `auth_middleware.py` had a stale comment claiming JWTs were stored in localStorage. They are not. Updated the comment.
+
+## Follow-ups (suggested for PM)
+- Open issue: backfill `last_login` for existing users
+- Open issue: deprecate the unused `legacy_auth.py` module
+```
+
+### The artifact manifest
+
+`templates/artifacts/manifest.yaml` declares the active artifact set and when each is produced:
+
+```yaml
+# templates/artifacts/manifest.yaml
+artifacts:
+  - name: plan
+    file: plan.md
+    template: plan.md.j2
+    produced_at: planning           # planning | implementing | completion
+    required: true
+    approval_gate: false            # set true to enable plan approval
+
+  - name: task-checklist
+    file: task-checklist.md
+    template: task-checklist.md.j2
+    produced_at: planning           # initial table created at planning, updated through implementing
+    required: true
+
+  - name: verification-checklist
+    file: verification-checklist.md
+    template: verification-checklist.md.j2
+    produced_at: planning           # generated then confirmed at completion
+    required: true
+
+  - name: recommended-testing-plan
+    file: recommended-testing-plan.md
+    template: recommended-testing-plan.md.j2
+    produced_at: completion
+    required: true
+
+  - name: post-completion-comments
+    file: post-completion-comments.md
+    template: post-completion-comments.md.j2
+    produced_at: completion
+    required: true
+```
+
+Schema fields per artifact entry: `name`, `file`, `template`, `produced_at`, `required`, `approval_gate`.
+
+Projects can:
+- Add new artifacts (e.g. `architecture-diff.md`, `performance-notes.md`)
+- Remove ones they don't need (set `required: false` or delete the entry)
+- Reshape templates entirely
+- Add their own `produced_at` phases if their workflow has more stages
+
+Sessions can override via the `artifact_overrides` field on the session YAML — adding extra artifacts or marking some as not required for that specific session.
+
+### Plan approval gate
+
+Set `approval_gate: true` on the `plan` artifact (or any artifact) to make the agent stop after producing it and send a `plan_approval` message. The orchestrator only re-engages once approval is received. This is the mechanism by which a project (or single session) opts into human-in-the-loop plan review.
+
+### PM agent enforcement
+
+The PM agent's PR review (see "PM PR Review" section below) checks that all artifacts marked `required: true` in `templates/artifacts/manifest.yaml` are present before approving a session-completion PR. The skill instructions for coding agents tell them to read `templates/artifacts/manifest.yaml` to know what they must produce.
 
 ---
 
@@ -901,6 +1281,224 @@ This is what the UI will visualize later.
 - Generate `<PREFIX>-<N>` (e.g., `SEI-42`)
 - Atomically increment counter
 
+### `core/enum_loader.py` — Dynamic Enum Loading
+- `load_enums(project_dir) -> dict[str, Enum]` — read every YAML file under `<project>/enums/`, build a `StrEnum` for each, fall back to packaged defaults from `templates/enums/` for any enum not present in the project
+- Pydantic models import their enums via this loader at module init time so projects can extend `IssueStatus`, `AgentState`, `MessageType`, etc., without forking the package
+
+### `core/graph_cache.py` — Incremental Graph Index
+- See the "Graph cache" section below for the v2 schema and the `update_cache_for_file` algorithm
+- `load_index(dir) -> GraphIndex`, `save_index(dir, cache)`, `update_cache_for_file(dir, rel_path)`, `full_rebuild(dir)`
+- Uses a SQLite write-ahead lock file (`graph/.index.lock`) to keep concurrent writes from corrupting the cache
+
+### `core/pm_review.py` — PM Agent PR Review Checks
+- See the "PM PR Review" section below for the full check list
+- Each check is a function returning `CheckResult(name, passed, details, fix_hint)`
+- Run by `agent-project pm review-pr <pr-number>` against the diff of a project-repo PR
+
+---
+
+## Orchestration Patterns
+
+Orchestration patterns codify *who acts when*: PM auto-launches vs human approves, plan gate enabled or not, verifier required or skipped, auto-merge on green, etc. Different projects and sessions need different patterns. The patterns themselves are project-owned YAML (with optional Python hook scripts as an escape hatch), version-controlled in the project repo.
+
+**Important: the orchestration runtime lives in `agent-containers`, not `agent-project`.** The runtime is the engine that reads patterns and dispatches actions on every event. The `agent-project` package owns the data models, the templates that ship as defaults, and the CLI for managing patterns. This matches the broader principle: the project repo is the configuration; `agent-containers` is the engine that executes that configuration. The runtime reads from the project repo on every event.
+
+### File layout
+
+```
+my-project/
+├── orchestration/
+│   ├── default.yaml          # project default pattern (used unless overridden)
+│   ├── strict.yaml           # named alternative (max human gates)
+│   ├── fast.yaml             # named alternative (auto-everything)
+│   └── hooks/                # Python hook scripts (optional escape hatch)
+│       ├── __init__.py
+│       └── custom_verifier.py
+```
+
+These are copied from `templates/orchestration/` on `agent-project init`. After init the project owns them — edit, add, remove freely.
+
+### YAML rule format
+
+```yaml
+# orchestration/default.yaml
+name: default
+description: Standard project default — PM auto-orchestrates with human gates only on plan approval
+
+events:
+  session_started:
+    actions:
+      - require_artifact: plan.md
+      - if: project.plan_approval_required
+        then:
+          - send_message: { type: plan_approval, priority: blocking }
+          - wait_for: human_response
+        else:
+          - continue
+
+  plan_approved:
+    actions:
+      - re_engage: { trigger: plan_approved }
+
+  ci_failure:
+    actions:
+      - re_engage: { trigger: ci_failure, context_from: ci_logs }
+
+  pr_opened:
+    actions:
+      - launch_agent: verifier
+      - on_verifier_pass:
+          - if: project.auto_merge_on_pass
+            then: [ merge_pr ]
+            else: [ notify_human ]
+      - on_verifier_fail:
+          - re_engage: { trigger: verifier_rejection, context_from: verifier_review }
+
+  human_review_changes:
+    actions:
+      - re_engage: { trigger: human_review_changes, context_from: pr_comments }
+
+  status_message_received:
+    actions:
+      - update_session_status_summary: { from: message }
+
+  artifact_updated:
+    when: artifact == "task-checklist.md"
+    actions:
+      - publish_to_ui
+
+# Optional: call out to a Python hook for complex logic
+hooks:
+  pre_re_engage: hooks.custom_verifier.maybe_skip_verifier
+```
+
+### Built-in actions (the action vocabulary)
+
+| Action | Effect |
+|--------|--------|
+| `re_engage` | Calls `agent-project session re-engage` + `agent-containers launch` |
+| `launch_agent` | Spawns a new container for a named agent (e.g. verifier) |
+| `send_message` | Posts to UI message inbox |
+| `wait_for` | Pauses the orchestrator until an event happens |
+| `merge_pr` | `gh pr merge` |
+| `notify_human` | UI desktop notification |
+| `require_artifact` | Asserts the agent has produced a named artifact |
+| `update_session_status_summary` | Writes status state + summary back to session.yaml |
+| `publish_to_ui` | Broadcasts an event over WebSocket |
+| `if/then/else` | Conditional branch on `project.<field>` or `session.<field>` |
+
+### Hook scripts (Python escape hatch)
+
+Hooks live in `<project>/orchestration/hooks/*.py` and are invoked by name from the YAML. Signature:
+
+```python
+# orchestration/hooks/custom_verifier.py
+from agent_project.orchestration import Event, Context
+
+def maybe_skip_verifier(event: Event, ctx: Context) -> dict:
+    """Skip verifier for trivial PRs (e.g. only docs changed)."""
+    if all(f.endswith('.md') for f in ctx.pr_files):
+        return {"skip": True}
+    return {"skip": False}
+```
+
+The hook receives the event and a context object (session, PR, message, etc.) and returns a dict the orchestrator merges into its decision state.
+
+### Hierarchy: Project → Session
+
+Just two tiers — no agent-tier or issue-tier overrides. This keeps the mental model simple: there is a project default, and any session may override it.
+
+Project default (in `project.yaml`):
+
+```yaml
+# project.yaml
+orchestration:
+  default_pattern: default       # references orchestration/default.yaml
+  plan_approval_required: false  # global default
+  auto_merge_on_pass: false      # global default
+```
+
+Session override: a session can pick a different pattern OR override individual fields.
+
+```yaml
+# sessions/wave1-agent-a.yaml
+orchestration:
+  pattern: strict                # use orchestration/strict.yaml instead
+  # OR override individual fields:
+  overrides:
+    plan_approval_required: true
+    auto_merge_on_pass: false
+```
+
+Session-level fields *win* over project-level fields. No deeper merging — straight field-level override.
+
+### Example session that overrides
+
+```yaml
+# sessions/critical-prod-fix.yaml — wants extra gates
+orchestration:
+  pattern: default
+  overrides:
+    plan_approval_required: true     # require human approval before code
+    auto_merge_on_pass: false        # no auto-merge even if CI green
+```
+
+### Where the orchestration runtime runs
+
+The runtime module (`agent_containers/core/orchestration.py`) reacts to events from:
+- File watcher on the project repo (issue/session/artifact changes)
+- WebSocket messages (agent status updates from running containers)
+- GitHub webhook polling (CI status, PR reviews)
+- MCP messages from agents (plan ready, status updates, blocking questions)
+
+It exposes:
+- `load_pattern(project_dir, name)` — reads `<project>/orchestration/<name>.yaml`
+- `merge_overrides(pattern, session)` — applies session-level overrides on top of project default
+- `evaluate_event(pattern, event, ctx)` — looks up matching event in the YAML, evaluates conditions, returns action list
+- `run_action(action, ctx)` — executes a built-in action (re_engage, launch_agent, etc.)
+- `call_hook(hook_name, event, ctx)` — invokes a Python hook from `<project>/orchestration/hooks/`
+
+The PM agent is a Claude-driven container that can also call into the orchestrator (via the agent-project CLI or directly) for higher-level reasoning. The deterministic orchestrator handles the simple event → action flows; the PM agent handles judgement-heavy decisions (plan review, scope changes, conflict resolution).
+
+`agent-project orchestrate evaluate <event-file>` lets users dry-run an event against the project's patterns from the command line — useful for debugging.
+
+---
+
+## PM PR Review
+
+Coding agents push PRs to *target repos* (web-app-backend, etc.) AND PRs to the *project repo* (containing updates to issues, sessions, nodes, comments, artifacts). The PM agent's job is to review the project-repo PRs.
+
+### What the PM agent checks
+
+When a coding agent opens a PR to the project repo, the PM agent runs the following checks via `core/pm_review.py`. Each check is a function returning `CheckResult(name, passed, details, fix_hint)`.
+
+1. **Schema validation** — every changed YAML file passes pydantic validation (using the project's loaded enums)
+2. **Reference integrity** — all `[[node-id]]` references in changed files resolve to existing nodes
+3. **Status transition validity** — issue/session status transitions match `project.yaml` rules
+4. **Required-fields check** — issues have all required frontmatter (executor, verifier, repo, etc.)
+5. **Markdown structure** — issue bodies have all required sections (Context, Acceptance criteria, etc.)
+6. **Concept node freshness** — newly added/edited nodes have valid `source` (file exists, hash computed)
+7. **Artifact presence** — sessions in `completed` state have all artifacts marked `required: true` in `templates/artifacts/manifest.yaml` (default set: `plan.md`, `task-checklist.md`, `verification-checklist.md`, `recommended-testing-plan.md`, `post-completion-comments.md`)
+8. **No orphan additions** — new nodes are referenced by at least one issue or marked `planned`
+9. **Comment provenance** — new comments have valid author + type
+10. **Project standards** — rules in `<project>/standards.md` (free-form Markdown rules — generated from `templates/standards.md.j2` on init)
+
+The artifact-presence check (#7) reads `templates/artifacts/manifest.yaml` from the project repo, so it automatically respects per-project customisation: if a project removed `recommended-testing-plan.md` from its manifest, the PM does not require it.
+
+If all pass: PM posts an approval review on the PR. If `auto_merge_on_pass` is enabled in orchestration, the PM merges.
+
+If any fail: PM posts a `request_changes` review with specific feedback per check, and the orchestrator re-engages the coding agent with the failing checks as context.
+
+### CLI
+
+```
+agent-project pm review-pr <pr-number>
+  --repo TEXT          Project repo (GitHub slug) [required]
+  --format TEXT        rich/json [default: rich]
+  # Runs all 10 checks against the diff. Prints results. Returns nonzero on failures.
+  # The PM agent (containerised or not) calls this.
+```
+
 ---
 
 ## CLI Commands
@@ -913,6 +1511,8 @@ agent-project init <name>
   --base-branch TEXT   Default base branch [default: test]
   --repos TEXT         Comma-separated repo list (GitHub slugs)
   --no-git             Skip git init
+  --update             Pull upstream template changes into an existing project
+                       without overwriting user edits (interactive on conflict)
 
 agent-project issue create
   --title TEXT         Issue title (required)
@@ -1051,6 +1651,51 @@ agent-project session update <session-id>
   --claude-session TEXT  Update Claude session ID
   --langgraph-thread TEXT  Update LangGraph thread ID
   --volume TEXT        Update Docker volume name
+```
+
+### PM PR review
+
+```
+agent-project pm review-pr <pr-number>
+  --repo TEXT          Project repo (GitHub slug) [required]
+  --format TEXT        rich/json [default: rich]
+  # Runs all 10 PM checks against the project-repo PR diff. Prints results.
+  # Returns nonzero on failures. Used by the PM agent and CI.
+```
+
+### Orchestration
+
+```
+agent-project orchestrate evaluate <event-file>
+  --pattern TEXT       Pattern name (default: project's default_pattern)
+  --session TEXT       Session ID (for override evaluation)
+  # Dry-run an event against the project's orchestration patterns.
+  # Reads <event-file> as JSON, prints the resulting action list.
+```
+
+### Templates, enums, artifacts
+
+```
+agent-project templates list
+  # List all template files shipped with the package and their target locations
+  # in the project repo.
+
+agent-project templates show <name>
+  # Print the contents of a packaged template (e.g. plan.md.j2).
+
+agent-project enums list
+  # List the active enums in this project (loaded from <project>/enums/ if present,
+  # else from packaged defaults).
+
+agent-project enums show <name>
+  # Print the values of an enum (e.g. issue_status, agent_state).
+
+agent-project artifacts list <session-id>
+  # List the artifacts produced (or expected) for a session, based on the
+  # active manifest.yaml + any session-level artifact_overrides.
+
+agent-project artifacts show <session-id> <artifact-name>
+  # Print the contents of a session artifact.
 ```
 
 ---
