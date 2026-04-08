@@ -1,0 +1,55 @@
+[project]
+name = "agent-project"
+version = "0.1.0"
+description = "Git-native project management with concept graph for AI agents"
+requires-python = ">=3.10,<3.14"
+license = { file = "LICENSE" }
+authors = [{ name = "Seido AI Ltd" }]
+dependencies = [
+    "pydantic>=2.0,<3.0",
+    "click>=8.1,<9.0",
+    "pyyaml>=6.0,<7.0",
+    "rich>=13.0,<14.0",
+    "jinja2>=3.1,<4.0",
+]
+
+[project.scripts]
+agent-project = "agent_project.cli.main:cli"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0,<9.0",
+    "ruff>=0.4.6,<1.0",
+    "codespell>=2.2,<3.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_project"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "C", "B", "UP", "RUF"]
+ignore = ["E501", "C901", "B006"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent_project"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.codespell]
+skip = "uv.lock,.venv,*.lock"
