@@ -23,6 +23,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from agent_project.cli._profiling import profileable
 from agent_project.core.validator import (
     CheckResult,
     ValidationReport,
@@ -58,6 +59,7 @@ console = Console()
     is_flag=True,
     help="Auto-fix the defined subset of issues (timestamps, UUIDs, etc.).",
 )
+@profileable
 def validate_cmd(
     project_dir: Path, strict: bool, output_format: str, fix: bool
 ) -> None:

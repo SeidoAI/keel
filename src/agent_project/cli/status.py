@@ -20,6 +20,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from agent_project.cli._profiling import profileable
 from agent_project.core import graph_cache
 from agent_project.core.dependency_graph import build_dependency_graph
 from agent_project.core.store import (
@@ -195,6 +196,7 @@ def _render_json(summary: StatusSummary) -> str:
     show_default=True,
     help="Output format.",
 )
+@profileable
 def status_cmd(project_dir: Path, output_format: str) -> None:
     """Dashboard summary of issues, blocked, stale refs, critical path."""
     resolved = project_dir.expanduser().resolve()

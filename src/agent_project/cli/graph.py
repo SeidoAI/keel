@@ -17,6 +17,7 @@ from pathlib import Path
 
 import click
 
+from agent_project.cli._profiling import profileable
 from agent_project.core.concept_graph import build_full_graph
 from agent_project.core.dependency_graph import (
     build_dependency_graph,
@@ -65,6 +66,7 @@ from agent_project.core.store import (
     default=None,
     help="Comma-separated issue statuses to include (default: all).",
 )
+@profileable
 def graph_cmd(
     project_dir: Path,
     graph_type: str,
