@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_project.core.reference_parser import extract_references, replace_references
+from keel.core.reference_parser import extract_references, replace_references
 
 
 class TestExtractReferences:

@@ -1,4 +1,4 @@
-# Pre-commit hooks for agent-project.
+# Pre-commit hooks for keel.
 #
 # Install once per clone:
 #     make pre-commit-install
@@ -40,8 +40,8 @@ repos:
         args: [--allow-multiple-documents]
         exclude: |
           (?x)^(
-            src/agent_project/templates/.*\.j2|
-            src/agent_project/templates/skills/project-manager/examples/.*\.yaml|
-            src/agent_project/templates/agent_templates/.*\.yaml
+            src/keel/templates/.*\.j2|
+            src/keel/templates/skills/project-manager/examples/.*\.yaml|
+            src/keel/templates/agent_templates/.*\.yaml
           )$
       - id: check-added-large-files

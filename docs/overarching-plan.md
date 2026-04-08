@@ -6,23 +6,23 @@ Three interconnected projects that together replace Linear + Notion + manual age
 
 | Project | What it does | Depends on |
 |---------|-------------|------------|
-| **agent-project** | Data layer: issues, concept graph, dependencies, status — all as files in git | Nothing (foundation) |
-| **agent-containers** | Execution layer: containerised Claude Code agents with strict egress, repo isolation | agent-project (reads issues/sessions, writes status) |
-| **agent-projects-ui** | Visibility layer: dashboard for projects, issues, graph, live agent status | agent-project (data) + agent-containers (live status) |
+| **keel** | Data layer: issues, concept graph, dependencies, status — all as files in git | Nothing (foundation) |
+| **agent-containers** | Execution layer: containerised Claude Code agents with strict egress, repo isolation | keel (reads issues/sessions, writes status) |
+| **keel-ui** | Visibility layer: dashboard for projects, issues, graph, live agent status | keel (data) + agent-containers (live status) |
 
-**The primary user of `agent-project` is Claude Code with the project-manager skill loaded.** Humans interact with the system *through* the agent, not directly via the CLI. The CLI is intentionally minimal — read commands, validation, and atomic operations only — because agents create issues, nodes, and sessions by writing files directly via their `Write` tool, not by invoking CLI mutation commands. The PM skill (shipped in `templates/skills/project-manager/` and copied to the project repo on init) is the linchpin: it teaches agents how to work with the file layout, schemas, references, and the validation gate.
+**The primary user of `keel` is Claude Code with the project-manager skill loaded.** Humans interact with the system *through* the agent, not directly via the CLI. The CLI is intentionally minimal — read commands, validation, and atomic operations only — because agents create issues, nodes, and sessions by writing files directly via their `Write` tool, not by invoking CLI mutation commands. The PM skill (shipped in `templates/skills/project-manager/` and copied to the project repo on init) is the linchpin: it teaches agents how to work with the file layout, schemas, references, and the validation gate.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    agent-projects-ui                         │
+│                    keel-ui                         │
 │  React 19 · React Flow · Kanban · Agent Monitor · Terminal  │
 │                                                             │
 │  reads from ↓                              reads from ↓     │
 ├──────────────────────────┬──────────────────────────────────┤
-│     agent-project        │       agent-containers           │
+│     keel        │       agent-containers           │
 │  Git-native PM data      │  Docker execution environments   │
 │  Issues · Nodes · Graph  │  Claude Code · Egress policies   │
-│  CLI: agent-project      │  CLI: agent-containers           │
+│  CLI: keel      │  CLI: agent-containers           │
 │                          │                                  │
 │  ← writes status/comments back to project repo ←           │
 └──────────────────────────┴──────────────────────────────────┘
@@ -36,23 +36,23 @@ This is the central design principle that informs everything else in this docume
 
 **The project repo is the single source of truth for everything customisable** — skills, agent definitions, orchestration patterns, templates, enums, artifact specs, standards, and project config. If an agent reads it, it lives in the project repo.
 
-**`agent-project` ships defaults that get COPIED into the project repo on init.** The package contains canonical reference templates under `templates/` (skills, agent definitions, enums, orchestration patterns, artifact templates, etc.). `agent-project init` copies the entire `templates/` tree into the new project. After init, the project owns them — they are version-controlled in git, edited freely, and the package is no longer their source of truth.
+**`keel` ships defaults that get COPIED into the project repo on init.** The package contains canonical reference templates under `templates/` (skills, agent definitions, enums, orchestration patterns, artifact templates, etc.). `keel init` copies the entire `templates/` tree into the new project. After init, the project owns them — they are version-controlled in git, edited freely, and the package is no longer their source of truth.
 
 **`agent-containers` is a thin runtime that READS from the project repo.** It ships no skills, no templates, no defaults of its own. When a container launches, it clones the project repo, mounts the relevant skills from `<project>/.claude/skills/`, reads the orchestration pattern from `<project>/orchestration/`, reads enums from `<project>/enums/`, and reads artifact templates from `<project>/templates/artifacts/`. The runtime executes whatever the project repo says.
 
-**`agent-projects-ui` reads from the project repo for everything customisable** — issue templates, enums (for status colors, type icons), artifact manifests (for which artifact viewers to show), orchestration patterns (for which approval gates exist).
+**`keel-ui` reads from the project repo for everything customisable** — issue templates, enums (for status colors, type icons), artifact manifests (for which artifact viewers to show), orchestration patterns (for which approval gates exist).
 
 **Everything is auditable.** Because the project repo is git, every customisation — every change to a skill, every new orchestration pattern, every enum tweak — is a commit. Two projects can run completely different agent configurations side-by-side, each fully under their own version control.
 
 This principle is what makes the system pluggable: the engine (agent-containers) stays small and stable; the configuration (the project repo) is open for any team to customise without forking the runtime.
 
-**The PM skill is the linchpin for agent-driven workflows.** Because the primary user of `agent-project` is Claude Code with the PM skill loaded (not a human typing CLI commands), the quality of the skill — its workflow references, schema documentation, examples, and anti-patterns — determines whether the whole system works. The skill ships from `agent-project/templates/skills/project-manager/` as a reference, gets copied into `<project>/.claude/skills/project-manager/` on init, and is then owned and customisable per project. Detailed skill design lives in `docs/agent-projects-plan.md`.
+**The PM skill is the linchpin for agent-driven workflows.** Because the primary user of `keel` is Claude Code with the PM skill loaded (not a human typing CLI commands), the quality of the skill — its workflow references, schema documentation, examples, and anti-patterns — determines whether the whole system works. The skill ships from `keel/templates/skills/project-manager/` as a reference, gets copied into `<project>/.claude/skills/project-manager/` on init, and is then owned and customisable per project. Detailed skill design lives in `docs/keel-plan.md`.
 
 ---
 
 ## How They Interact
 
-### 1. agent-project → agent-containers
+### 1. keel → agent-containers
 
 The project repo defines **what** work to do. agent-containers reads it to know **how** to execute.
 
@@ -63,7 +63,7 @@ The project repo defines **what** work to do. agent-containers reads it to know 
 
 Agent definitions live in `agents/` directory — see "Agent Definitions" section below for the full schema. Sessions reference agents by ID.
 
-### 2. agent-containers → agent-project
+### 2. agent-containers → keel
 
 Agents write back to the project repo via git (PRs):
 - Status transitions (issue status updated in YAML)
@@ -73,11 +73,11 @@ Agents write back to the project repo via git (PRs):
 
 All changes happen via PRs to the project repo — the PM agent reviews them.
 
-### 3. agent-project + agent-containers → agent-projects-ui
+### 3. keel + agent-containers → keel-ui
 
 The UI reads from two sources:
 
-**From git (agent-project data):**
+**From git (keel data):**
 - Issue list, statuses, priorities, dependencies
 - Concept graph nodes and edges
 - Agent session definitions and wave plans
@@ -91,7 +91,7 @@ The UI reads from two sources:
 
 ---
 
-## Agent Definitions (lives in agent-project)
+## Agent Definitions (lives in keel)
 
 Agents are defined in the project repo under `agents/`. This is distinct from sessions (which assign issues to agents) — agent definitions describe **what kind of agent** something is, what runtime it uses, and what permissions it has.
 
@@ -210,7 +210,7 @@ resources:
 tools:
   - git
   - gh
-  - agent-project                     # PM agent uses the project CLI
+  - keel                     # PM agent uses the project CLI
 
 context:
   skills:
@@ -416,7 +416,7 @@ The UI is the human's primary interface for the entire platform. Key control flo
 - Open iTerm to any container
 - Approve/reject PRs (calls `gh pr merge` or `gh pr close`)
 - Edit issue status (drag-and-drop on Kanban)
-- Launch validation (`agent-project validate`)
+- Launch validation (`keel validate`)
 - View and approve PM agent plans
 - Delete branches, cleanup containers
 
@@ -548,7 +548,7 @@ orchestration:
 
 The patterns are declarative YAML rules mapping events to actions. For complex logic that doesn't fit declarative rules, Python hook scripts under `orchestration/hooks/` act as an escape hatch — the YAML can call out to a hook by name and the hook returns a decision dict.
 
-A short example pattern (full vocabulary and worked examples in `agent-projects-plan.md`):
+A short example pattern (full vocabulary and worked examples in `keel-plan.md`):
 
 ```yaml
 # orchestration/default.yaml
@@ -571,7 +571,7 @@ events:
 
 ### Where the runtime lives
 
-**Critical**: the orchestration *runtime* lives in `agent-containers/core/orchestration.py`, not in `agent-project`. The patterns and hooks live in the project repo. The runtime reads them on every event.
+**Critical**: the orchestration *runtime* lives in `agent-containers/core/orchestration.py`, not in `keel`. The patterns and hooks live in the project repo. The runtime reads them on every event.
 
 This is exactly the same shape as the rest of the system: the project repo is the configuration; `agent-containers` is the engine that executes that configuration. The orchestrator reacts to events from the file watcher on the project repo, WebSocket messages from running containers, GitHub webhook polling, and MCP messages from agents.
 
@@ -579,7 +579,7 @@ This is exactly the same shape as the rest of the system: the project repo is th
 
 The deterministic orchestrator handles simple event → action flows (CI failed, re-engage; PR opened, launch verifier; verifier passed, notify human). The PM agent — a Claude-driven container — handles judgement-heavy decisions (plan review, scope changes, conflict resolution, project-repo PR review). The two work together: the orchestrator routes events deterministically and calls the PM agent when something needs reasoning.
 
-Full pattern detail, the complete action vocabulary, hook signatures, and worked examples are in `docs/agent-projects-plan.md`.
+Full pattern detail, the complete action vocabulary, hook signatures, and worked examples are in `docs/keel-plan.md`.
 
 ---
 
@@ -625,7 +625,7 @@ The plan approval gate is configurable. Set `approval_gate: true` on `plan.md` (
 
 The UI surfaces every artifact in the manifest as a tab/section in the session detail view, with rendered Markdown. Artifacts with `approval_gate: true` show in a plan-approval queue. The task checklist drives a progress bar on session cards.
 
-Full detail (template format, manifest schema, session-level artifact overrides, examples of each artifact) is in `docs/agent-projects-plan.md`.
+Full detail (template format, manifest schema, session-level artifact overrides, examples of each artifact) is in `docs/keel-plan.md`.
 
 ---
 
@@ -702,7 +702,7 @@ Status messages have a structured body: `{ state, summary }` where `state` is fr
 When human responds to a blocking message:
 1. Human types response in UI → `POST /api/messages/:id/respond`
 2. UI backend stores response in SQLite
-3. UI backend calls `agent-project session re-engage <id> --trigger human_response --context "..."`
+3. UI backend calls `keel session re-engage <id> --trigger human_response --context "..."`
 4. `agent-containers launch <id>` restarts the container
 5. Agent resumes, calls `check_messages` MCP tool, reads the response
 
@@ -745,13 +745,13 @@ Messages live in SQLite for real-time delivery. When a session completes or fail
     body: "Go with Option A."
 ```
 
-Full implementation details (MCP server code, skill protocol, UI components) in `docs/agent-containers.md` and `docs/agent-projects-ui.md`.
+Full implementation details (MCP server code, skill protocol, UI components) in `docs/agent-containers.md` and `docs/keel-ui.md`.
 
 ---
 
-## Project 1: agent-project (Data Layer)
+## Project 1: keel (Data Layer)
 
-**Status:** Detailed plan exists at `docs/agent-projects-plan.md`
+**Status:** Detailed plan exists at `docs/keel-plan.md`
 
 **Summary:** Git-native PM with concept graph. Installable Python package with CLI.
 
@@ -762,7 +762,7 @@ Full implementation details (MCP server code, skill protocol, UI components) in 
 - `sessions/` — agent session definitions (wave-based parallelism)
 - `.claude/skills/project-manager/` — PM agent skill for generated repos
 
-**CLI:** `agent-project init`, `issue`, `node`, `refs`, `status`, `graph`, `session`
+**CLI:** `keel init`, `issue`, `node`, `refs`, `status`, `graph`, `session`
 
 ---
 
@@ -994,7 +994,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
     dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg) && \
     apt-get update && apt-get install -y gh
-RUN pip install agent-project
+RUN pip install keel
 RUN mkdir -p /workspace/{repo,project,config,docs}
 WORKDIR /workspace/repo
 ```
@@ -1051,7 +1051,7 @@ agent-containers/
 
 ---
 
-## Project 3: agent-projects-ui (Visibility Layer)
+## Project 3: keel-ui (Visibility Layer)
 
 ### The problems this solves
 
@@ -1081,7 +1081,7 @@ The UI is a **local development tool** (not a deployed web app). It runs on loca
 
 ```
 ┌──────────────────────────────────┐
-│   agent-projects-ui (React)      │
+│   keel-ui (React)      │
 │   localhost:3000                  │
 │                                  │
 │   ├── Project Switcher           │
@@ -1135,7 +1135,7 @@ Why a backend API instead of reading git directly from the frontend:
 - Columns = statuses from project.yaml (configurable)
 - Cards = issues, showing: key, title, priority badge, executor badge, agent name
 - Cards colored by staleness (red border if referencing stale nodes)
-- Drag-and-drop to change status (calls `agent-project issue update`)
+- Drag-and-drop to change status (calls `keel issue update`)
 - Filter by: executor, label, parent epic, assignee
 - Active agent indicator on cards (green dot if a container is working on this issue)
 
@@ -1170,13 +1170,13 @@ Why a backend API instead of reading git directly from the frontend:
   - Delete branch + cleanup (`gh` + `git`)
   - Launch agent session (`agent-containers launch`)
   - Approve plan (merge PR via `gh pr merge`)
-  - Run validation (`agent-project validate`)
-  - Rebuild graph index (`agent-project refs rebuild`)
+  - Run validation (`keel validate`)
+  - Rebuild graph index (`keel refs rebuild`)
 
 ### Package structure
 
 ```
-agent-projects-ui/
+keel-ui/
 ├── package.json
 ├── vite.config.ts
 ├── tsconfig.json
@@ -1202,7 +1202,7 @@ agent-projects-ui/
 ├── backend/                         # Lightweight Python API
 │   ├── pyproject.toml
 │   ├── src/
-│   │   └── agent_projects_api/
+│   │   └── keels_api/
 │   │       ├── main.py              # FastAPI app
 │   │       ├── routes/
 │   │       │   ├── project.py
@@ -1223,21 +1223,21 @@ agent-projects-ui/
 ## Build Order and Dependencies
 
 ```
-Phase 1: agent-project (data layer)
+Phase 1: keel (data layer)
   ├── Python package: models, parser, store, validator, graph, CLI
   ├── Templates: project scaffold, PM agent skill, issue templates
-  └── Deliverable: `pip install agent-project` works, `agent-project init` generates projects
+  └── Deliverable: `pip install keel` works, `keel init` generates projects
 
-Phase 2: agent-containers (execution layer)  ← depends on agent-project
+Phase 2: agent-containers (execution layer)  ← depends on keel
   ├── Base Docker image with Claude Code + tools
   ├── Python package: container lifecycle, egress, workspace setup, CLI
   ├── iTerm2 integration
   └── Deliverable: `agent-containers launch <session>` runs an autonomous agent
 
-Phase 3: agent-projects-ui (visibility layer)  ← depends on both
+Phase 3: keel-ui (visibility layer)  ← depends on both
   ├── Backend API (FastAPI, wraps git + docker + github)
   ├── React frontend (kanban, graph, agent monitor)
-  └── Deliverable: `agent-projects-ui` starts local dashboard
+  └── Deliverable: `keel-ui` starts local dashboard
 
 Each phase is independently useful:
   - Phase 1 alone: manage projects via CLI + git
@@ -1252,16 +1252,16 @@ Each phase is independently useful:
 All three projects live in the same directory:
 
 ```
-/Users/maia/Code/seido/projects/agent-projects/
+/Users/maia/Code/seido/projects/keels/
 ├── docs/
 │   ├── overarching-plan.md          # This document (high-level)
-│   ├── agent-projects-plan.md       # Detailed plan for agent-project
-│   ├── agent-projects-ui.md         # Detailed plan for UI (to be written)
+│   ├── keel-plan.md       # Detailed plan for keel
+│   ├── keel-ui.md         # Detailed plan for UI (to be written)
 │   └── agent-containers.md          # Detailed plan for containers (to be written)
 │
-├── agent-project/                   # Python package: data layer
+├── keel/                   # Python package: data layer
 │   ├── pyproject.toml
-│   ├── src/agent_project/
+│   ├── src/keel/
 │   └── tests/
 │
 ├── agent-containers/                # Python package: execution layer
@@ -1270,12 +1270,12 @@ All three projects live in the same directory:
 │   ├── docker/
 │   └── tests/
 │
-└── agent-projects-ui/               # React + Python: visibility layer
+└── keel-ui/               # React + Python: visibility layer
     ├── package.json                 # Frontend
     ├── src/                         # React app
     ├── backend/                     # FastAPI backend
     │   ├── pyproject.toml
-    │   └── src/agent_projects_api/
+    │   └── src/keels_api/
     └── tests/
 ```
 
@@ -1285,10 +1285,10 @@ All three projects live in the same directory:
 
 1. **Container runtime**: Any Docker-compatible runtime (Docker Desktop, OrbStack, Colima, Podman). We code against the `docker` CLI which is identical across all runtimes — zero overhead to support all of them. Recommend OrbStack for macOS (lighter than Docker Desktop).
 2. **Remote execution**: Local Docker only for Phase 2. Cloud execution (Cloud Run, remote Docker) is a future extension.
-3. **UI backend → agent-project**: Import `agent_project` as a Python library directly. Faster, type-safe, no subprocess overhead. The UI backend depends on `agent-project` as a pip dependency.
+3. **UI backend → keel**: Import `keel` as a Python library directly. Faster, type-safe, no subprocess overhead. The UI backend depends on `keel` as a pip dependency.
 4. **Auth for UI**: None — local dev tool, bind to localhost only.
 5. **Project discovery**: UI scans a configured root directory for projects (any directory containing `project.yaml`).
 6. **Multi-repo sessions**: All repos in a session are equal (no primary). The agent treats them symmetrically — branches and PRs in any of them. Sessions declare a `repos:` array, not a single `repo:` field.
 7. **Orchestration**: Hybrid YAML rules + Python hook scripts. Declarative YAML covers the simple event → action flows, hooks are an escape hatch for complex logic. Rules live in `<project>/orchestration/`, runtime in `agent-containers`.
 8. **Customisation tiers**: Project → Session. Just 2 levels for orchestration overrides. No agent-tier or issue-tier overrides — keeps the mental model simple.
-9. **Source of truth**: the project repo. `agent-project` ships defaults that get copied into the project on init; `agent-containers` is a thin runtime that reads from the project repo and ships no skills, no templates, no defaults of its own.
+9. **Source of truth**: the project repo. `keel` ships defaults that get copied into the project on init; `agent-containers` is a thin runtime that reads from the project repo and ships no skills, no templates, no defaults of its own.

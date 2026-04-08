@@ -3,43 +3,6 @@ revision = 3
 requires-python = ">=3.10, <3.14"
 
 [[package]]
-name = "agent-project"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "click" },
-    { name = "jinja2" },
-    { name = "pydantic" },
-    { name = "pyyaml" },
-    { name = "rich" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "codespell" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.1,<9.0" },
-    { name = "jinja2", specifier = ">=3.1,<4.0" },
-    { name = "pydantic", specifier = ">=2.0,<3.0" },
-    { name = "pyyaml", specifier = ">=6.0,<7.0" },
-    { name = "rich", specifier = ">=13.0,<14.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "codespell", specifier = ">=2.2,<3.0" },
-    { name = "pre-commit", specifier = ">=3.0,<5.0" },
-    { name = "pytest", specifier = ">=8.0,<9.0" },
-    { name = "ruff", specifier = ">=0.4.6,<1.0" },
-]
-
-[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -145,6 +108,43 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d", size = 245115, upload-time = "2025-03-05T20:05:02.478Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67", size = 134899, upload-time = "2025-03-05T20:05:00.369Z" },
+]
+
+[[package]]
+name = "keel"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "click" },
+    { name = "jinja2" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "rich" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "codespell" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "click", specifier = ">=8.1,<9.0" },
+    { name = "jinja2", specifier = ">=3.1,<4.0" },
+    { name = "pydantic", specifier = ">=2.0,<3.0" },
+    { name = "pyyaml", specifier = ">=6.0,<7.0" },
+    { name = "rich", specifier = ">=13.0,<14.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "codespell", specifier = ">=2.2,<3.0" },
+    { name = "pre-commit", specifier = ">=3.0,<5.0" },
+    { name = "pytest", specifier = ">=8.0,<9.0" },
+    { name = "ruff", specifier = ">=0.4.6,<1.0" },
 ]
 
 [[package]]

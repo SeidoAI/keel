@@ -6,7 +6,7 @@ from uuid import UUID
 
 import pytest
 
-from agent_project.core.uuid_helpers import coerce_uuid, generate_uuid, is_valid_uuid
+from keel.core.uuid_helpers import coerce_uuid, generate_uuid, is_valid_uuid
 
 
 def test_generate_uuid_returns_uuid4() -> None:

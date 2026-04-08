@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from agent_project.core.node_store import (
+from keel.core.node_store import (
     delete_node,
     list_nodes,
     load_node,
     node_exists,
     save_node,
 )
-from agent_project.models import ConceptNode, NodeSource
+from keel.models import ConceptNode, NodeSource
 
 
 @pytest.fixture

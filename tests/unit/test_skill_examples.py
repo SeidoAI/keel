@@ -19,12 +19,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agent_project.core.parser import parse_frontmatter_body
-from agent_project.models.comment import Comment
-from agent_project.models.issue import Issue
-from agent_project.models.node import ConceptNode
-from agent_project.models.session import AgentSession
-from agent_project.templates import get_templates_dir
+from keel.core.parser import parse_frontmatter_body
+from keel.models.comment import Comment
+from keel.models.issue import Issue
+from keel.models.node import ConceptNode
+from keel.models.session import AgentSession
+from keel.templates import get_templates_dir
 
 EXAMPLES_DIR = get_templates_dir() / "skills" / "project-manager" / "examples"
 
@@ -322,8 +322,8 @@ def test_verification_skill_is_read_only() -> None:
 
 
 def test_backend_development_skill_mentions_validation_gate() -> None:
-    """The backend skill must point at `agent-project validate` as the gate."""
+    """The backend skill must point at `keel validate` as the gate."""
     skill = (SKILLS_DIR / "backend-development" / "SKILL.md").read_text(
         encoding="utf-8"
     )
-    assert "agent-project validate" in skill
+    assert "keel validate" in skill

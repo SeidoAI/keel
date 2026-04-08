@@ -1,4 +1,4 @@
-"""Integration tests for `agent-project scaffold-for-creation`.
+"""Integration tests for `keel scaffold-for-creation`.
 
 Verifies both output formats against:
 - A freshly-init'd v0 project (minimal state, no optional templates)
@@ -16,7 +16,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from agent_project.cli.main import cli
+from keel.cli.main import cli
 
 
 @pytest.fixture
@@ -194,7 +194,7 @@ class TestScaffoldText:
         result = runner.invoke(
             cli, ["scaffold-for-creation", "--project-dir", str(target)]
         )
-        assert "agent-project validate --strict --format=json" in result.output
+        assert "keel validate --strict --format=json" in result.output
         assert "Exit 0 = clean" in result.output
 
     def test_id_allocation_instructions_present(
@@ -205,7 +205,7 @@ class TestScaffoldText:
         result = runner.invoke(
             cli, ["scaffold-for-creation", "--project-dir", str(target)]
         )
-        assert "agent-project next-key --type issue" in result.output
+        assert "keel next-key --type issue" in result.output
         assert "uuid4" in result.output
         assert "Do NOT hand-write UUIDs" in result.output
 

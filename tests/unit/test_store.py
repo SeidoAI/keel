@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agent_project.core.store import (
+from keel.core.store import (
     ProjectNotFoundError,
     issue_exists,
     list_issues,
@@ -19,7 +19,7 @@ from agent_project.core.store import (
     save_issue,
     save_project,
 )
-from agent_project.models import Comment, Issue, ProjectConfig, RepoEntry
+from keel.models import Comment, Issue, ProjectConfig, RepoEntry
 
 
 @pytest.fixture

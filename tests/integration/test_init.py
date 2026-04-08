@@ -1,4 +1,4 @@
-"""Integration tests for `agent-project init`.
+"""Integration tests for `keel init`.
 
 These tests exercise the CLI end-to-end via Click's `CliRunner`: they
 invoke the actual command against a tmp directory and assert on the
@@ -15,8 +15,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from agent_project.cli.main import cli
-from agent_project.core.validator import validate_project
+from keel.cli.main import cli
+from keel.core.validator import validate_project
 
 
 @pytest.fixture
@@ -100,42 +100,123 @@ class TestInitBasics:
         target = tmp_path / "p"
         runner.invoke(cli, _init_args(target))
         gi = (target / ".gitignore").read_text()
-        assert ".agent-project.lock" in gi
+        assert ".keel.lock" in gi
         assert "graph/.index.lock" in gi
 
-    def test_non_interactive_missing_name_fails(
+    def test_non_interactive_missing_name_uses_target_basename(
         self, runner: CliRunner, tmp_path: Path
     ) -> None:
+        """In non-interactive mode, missing --name defaults to the target
+        directory basename rather than erroring out (matches the interactive
+        prompt default)."""
+        target = tmp_path / "web-app"
         result = runner.invoke(
             cli,
             [
                 "init",
-                str(tmp_path / "p"),
+                str(target),
                 "--key-prefix",
                 "TST",
                 "--non-interactive",
                 "--no-git",
             ],
         )
-        assert result.exit_code != 0
-        assert "--name" in result.output
+        assert result.exit_code == 0, result.output
+        raw = yaml.safe_load((target / "project.yaml").read_text())
+        assert raw["name"] == "web-app"
 
-    def test_non_interactive_missing_key_prefix_fails(
+    def test_non_interactive_auto_extracts_key_prefix(
         self, runner: CliRunner, tmp_path: Path
     ) -> None:
+        """In non-interactive mode, missing --key-prefix is auto-extracted
+        from the project name rather than erroring out."""
+        target = tmp_path / "p"
+        result = runner.invoke(
+            cli,
+            [
+                "init",
+                str(target),
+                "--name",
+                "my-project-cool",
+                "--non-interactive",
+                "--no-git",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        raw = yaml.safe_load((target / "project.yaml").read_text())
+        assert raw["key_prefix"] == "MPC"
+
+    def test_non_interactive_extraction_failure_raises(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """When the name starts with a digit, extraction fails and the
+        user must pass --key-prefix explicitly."""
         result = runner.invoke(
             cli,
             [
                 "init",
                 str(tmp_path / "p"),
                 "--name",
-                "p",
+                "2024-retro",
                 "--non-interactive",
                 "--no-git",
             ],
         )
         assert result.exit_code != 0
+        assert "Could not auto-extract" in result.output
         assert "--key-prefix" in result.output
+
+    def test_default_base_branch_is_main(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """When --base-branch is omitted, the default is 'main'."""
+        target = tmp_path / "p"
+        result = runner.invoke(
+            cli,
+            [
+                "init",
+                str(target),
+                "--name",
+                "p",
+                "--key-prefix",
+                "P",
+                "--non-interactive",
+                "--no-git",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        raw = yaml.safe_load((target / "project.yaml").read_text())
+        assert raw["base_branch"] == "main"
+
+    def test_init_copies_all_ten_pm_slash_commands(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Every initialized project ships with the 10 /pm-* slash commands
+        at .claude/commands/."""
+        target = tmp_path / "p"
+        result = runner.invoke(cli, _init_args(target))
+        assert result.exit_code == 0, result.output
+
+        commands_dir = target / ".claude" / "commands"
+        assert commands_dir.is_dir(), f"Missing {commands_dir}"
+
+        expected = {
+            "pm-scope.md",
+            "pm-update.md",
+            "pm-triage.md",
+            "pm-review.md",
+            "pm-status.md",
+            "pm-graph.md",
+            "pm-validate.md",
+            "pm-handoff.md",
+            "pm-rescope.md",
+            "pm-close.md",
+        }
+        actual = {p.name for p in commands_dir.glob("*.md")}
+        assert expected == actual, (
+            f"Expected {expected}, got {actual}. "
+            f"Missing: {expected - actual}. Extra: {actual - expected}."
+        )
 
     def test_invalid_key_prefix_rejected(
         self, runner: CliRunner, tmp_path: Path

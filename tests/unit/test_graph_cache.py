@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from agent_project.core.graph_cache import (
+from keel.core.graph_cache import (
     CACHE_VERSION,
     INDEX_REL_PATH,
     ensure_fresh,
@@ -26,16 +26,16 @@ from agent_project.core.graph_cache import (
     save_index,
     update_cache_for_file,
 )
-from agent_project.core.node_store import save_node
-from agent_project.core.store import save_issue, save_project
-from agent_project.models import (
+from keel.core.node_store import save_node
+from keel.core.store import save_issue, save_project
+from keel.models import (
     ConceptNode,
     Issue,
     NodeSource,
     ProjectConfig,
     RepoEntry,
 )
-from agent_project.models.graph import GraphIndex
+from keel.models.graph import GraphIndex
 
 # ============================================================================
 # Helpers

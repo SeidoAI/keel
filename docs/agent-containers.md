@@ -2,7 +2,7 @@
 
 ## Context
 
-This is the execution layer of the agent development platform. See `overarching-plan.md` for how it fits with agent-project (data) and agent-projects-ui (visibility).
+This is the execution layer of the agent development platform. See `overarching-plan.md` for how it fits with keel (data) and keel-ui (visibility).
 
 Core responsibility: launch containerised agents that work autonomously, with strict egress, persisted state, and automated re-engagement when feedback arrives.
 
@@ -265,7 +265,7 @@ jobs:
         if: steps.parse.outputs.is_agent == 'true'
         run: |
           # Find the session for this issue key in the project repo
-          # Call agent-project session re-engage
+          # Call keel session re-engage
           # Call agent-containers launch to restart the agent
 
           # For now, post to PR as a structured comment
@@ -324,7 +324,7 @@ jobs:
         run: |
           echo "Re-engaging agent for ${{ steps.parse.outputs.issue_key }}"
           echo "Review: ${{ steps.review.outputs.body }}"
-          # agent-project session re-engage <session-id> --trigger human_review_changes --context "..."
+          # keel session re-engage <session-id> --trigger human_review_changes --context "..."
           # agent-containers launch <session-id>
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -342,7 +342,7 @@ Event: CI failure on agent branch
     1. Read CI failure output from GitHub API
     2. Find session for this issue key
     3. Write re-engagement context file
-    4. Call: agent-project session re-engage <id> --trigger ci_failure --context-file <path>
+    4. Call: keel session re-engage <id> --trigger ci_failure --context-file <path>
     5. Call: agent-containers launch <id>
     6. Update session status: re_engaged
 
@@ -352,7 +352,7 @@ Event: Verifier submits "request-changes" review
     2. Read verified.md if created (FAIL result)
     3. Find session for this issue key
     4. Write re-engagement context with failed criteria
-    5. Call: agent-project session re-engage <id> --trigger verifier_rejection --context-file <path>
+    5. Call: keel session re-engage <id> --trigger verifier_rejection --context-file <path>
     6. Call: agent-containers launch <id>
 
 Event: Human submits "request-changes" review
@@ -360,7 +360,7 @@ Event: Human submits "request-changes" review
     1. Read review comments from GitHub API
     2. Find session for this issue key
     3. Write re-engagement context with review comments
-    4. Call: agent-project session re-engage <id> --trigger human_review_changes --context-file <path>
+    4. Call: keel session re-engage <id> --trigger human_review_changes --context-file <path>
     5. Call: agent-containers launch <id>
 
 Event: Deploy to test fails
@@ -369,7 +369,7 @@ Event: Deploy to test fails
     2. Find all sessions whose PRs were in this deploy
     3. For each: write re-engagement context, re-engage, re-launch
 
-Event: agent-project node check finds stale nodes
+Event: keel node check finds stale nodes
   PM action:
     1. Find sessions referencing stale nodes (via graph index)
     2. For active/waiting sessions: write stale_reference context
@@ -404,7 +404,7 @@ Volume: vol-wave1-agent-a
 
 ### Multi-repo cloning
 
-Sessions declare an array of repos via `session.repos[*]` (see the Session model in `agent-projects-plan.md`). All repos are equal — there is no primary. Each one is cloned into `/workspace/repos/<repo-name>/`, and each gets the same agent git identity configured. The agent can branch and PR in any of them.
+Sessions declare an array of repos via `session.repos[*]` (see the Session model in `keel-plan.md`). All repos are equal — there is no primary. Each one is cloned into `/workspace/repos/<repo-name>/`, and each gets the same agent git identity configured. The agent can branch and PR in any of them.
 
 ### Document mounting from issues, sessions, and agent definitions
 
@@ -476,7 +476,7 @@ docker volume rm vol-wave1-agent-a  # only after session marked completed
 
 `agent-containers` ships **no skills**. Every skill an agent reads comes from the project repo's `.claude/skills/` directory at container launch time. There is no "packaged default skill" baked into the runtime image.
 
-How skills get into the project repo: the `agent-project` package ships them as defaults under `templates/skills/`. `agent-project init` copies the entire `templates/skills/` tree into the new project's `.claude/skills/`. After init, the project owns them — they are committed to git, version-controlled, auditable, and freely editable per project. Two projects can have completely different rules for messaging, both fully under their own control.
+How skills get into the project repo: the `keel` package ships them as defaults under `templates/skills/`. `keel init` copies the entire `templates/skills/` tree into the new project's `.claude/skills/`. After init, the project owns them — they are committed to git, version-controlled, auditable, and freely editable per project. Two projects can have completely different rules for messaging, both fully under their own control.
 
 ### `setup_skills()` — workspace.py
 
@@ -500,7 +500,7 @@ def setup_skills(workspace_dir: Path, project_dir: Path, agent: AgentDefinition)
         if not src.exists():
             raise ConfigError(
                 f"Skill '{skill_name}' not found at {src}. "
-                f"Run 'agent-project init' to install default skills, "
+                f"Run 'keel init' to install default skills, "
                 f"or add it manually to .claude/skills/."
             )
         copy_tree(src, workspace_skills_dir / skill_name)
@@ -511,7 +511,7 @@ def setup_skills(workspace_dir: Path, project_dir: Path, agent: AgentDefinition)
 - **Default for every agent**: `["agent-messaging"]` — loaded regardless of what the agent definition says, so every container can talk to the human via the MCP messaging server.
 - **Per-agent**: whatever is listed in `agent.context.skills` — typical examples are `backend-development`, `frontend-development`, `verification`, `project-manager`.
 
-If a required skill is missing from `<project>/.claude/skills/`, `setup_skills()` raises a `ConfigError` with a hint to run `agent-project init`. The container does not start with missing skills.
+If a required skill is missing from `<project>/.claude/skills/`, `setup_skills()` raises a `ConfigError` with a hint to run `keel init`. The container does not start with missing skills.
 
 ---
 
@@ -623,7 +623,7 @@ Unlike other message types where `body` is free Markdown, `status` has a structu
 }
 ```
 
-- **`state`** — drawn from the `AgentState` enum. The enum is defined in `agent-project` and is customisable per project via `<project>/enums/agent_state.yaml`. Default states: `investigating`, `planning`, `awaiting_plan_approval`, `implementing`, `testing`, `debugging`, `refactoring`, `documenting`, `self_verifying`, `blocked`, `handed_off`, `done`.
+- **`state`** — drawn from the `AgentState` enum. The enum is defined in `keel` and is customisable per project via `<project>/enums/agent_state.yaml`. Default states: `investigating`, `planning`, `awaiting_plan_approval`, `implementing`, `testing`, `debugging`, `refactoring`, `documenting`, `self_verifying`, `blocked`, `handed_off`, `done`.
 - **`summary`** — 1-2 sentences, plain text. Captures what just happened and what's next.
 - **Priority** — always `informational`. A status message never blocks the agent — it sends and keeps working.
 
@@ -846,10 +846,10 @@ When a coding agent opens a PR to the project repo, the PM agent runs the follow
 
 ### Invocation
 
-The PM agent invokes the agent-project CLI:
+The PM agent invokes the keel CLI:
 
 ```
-agent-project pm review-pr <pr-number> --repo <project-repo>
+keel pm review-pr <pr-number> --repo <project-repo>
 ```
 
 This command runs all checks against the diff, prints results, and returns a non-zero exit code on any failure. The PM agent (containerised or not) calls it directly.
@@ -894,13 +894,13 @@ agent-containers/
 │       │   └── docker_cli.py        # Docker CLI wrapper (subprocess-based)
 │       └── templates/                # Jinja2 templates for shell scripts ONLY.
 │                                     # No skills, no agent defaults — those live in the
-│                                     # project repo (shipped via the agent-project package).
+│                                     # project repo (shipped via the keel package).
 │           ├── entrypoint-claude.sh.j2
 │           ├── entrypoint-langgraph.sh.j2
 │           └── entrypoint-custom.sh.j2
 ├── mcp_server/                       # Runtime binary that runs INSIDE the container.
 │   └── agent_messaging.py            #   The skill that teaches its use ships in the
-│                                     #   agent-project templates, NOT here.
+│                                     #   keel templates, NOT here.
 ├── scripts/
 │   └── agent-msg                    # Fallback shell script (curl wrapper)
 ├── docker/

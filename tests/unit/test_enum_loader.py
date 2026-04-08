@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from agent_project.core.enum_loader import load_enums
+from keel.core.enum_loader import load_enums
 
 
 def write_enum(project_dir: Path, name: str, values: list[dict]) -> None:

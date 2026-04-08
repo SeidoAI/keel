@@ -14,8 +14,8 @@ from typing import Any
 import pytest
 import yaml
 
-from agent_project.core.parser import serialize_frontmatter_body
-from agent_project.core.validator import (
+from keel.core.parser import serialize_frontmatter_body
+from keel.core.validator import (
     ValidationReport,
     validate_project,
 )

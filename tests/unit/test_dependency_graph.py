@@ -9,12 +9,12 @@ Covers:
 
 from __future__ import annotations
 
-from agent_project.core.dependency_graph import (
+from keel.core.dependency_graph import (
     build_dependency_graph,
     to_dot,
     to_mermaid,
 )
-from agent_project.models import Issue
+from keel.models import Issue
 
 
 def make_issue(key: str, blocked_by: list[str] | None = None, **kw: object) -> Issue:

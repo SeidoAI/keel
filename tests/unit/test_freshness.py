@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_project.core.freshness import (
+from keel.core.freshness import (
     HASH_PREFIX,
     _read_local,
     _slice_lines,
@@ -20,13 +20,13 @@ from agent_project.core.freshness import (
     fetch_content,
     hash_content,
 )
-from agent_project.models import (
+from keel.models import (
     ConceptNode,
     NodeSource,
     ProjectConfig,
     RepoEntry,
 )
-from agent_project.models.graph import FreshnessStatus
+from keel.models.graph import FreshnessStatus
 
 
 class TestHashContent:

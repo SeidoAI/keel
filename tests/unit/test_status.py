@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from agent_project.core.status import (
+from keel.core.status import (
     is_status_reachable,
     is_transition_allowed,
     reachable_statuses,
 )
-from agent_project.models import ProjectConfig
+from keel.models import ProjectConfig
 
 
 def make_project(transitions: dict[str, list[str]]) -> ProjectConfig:

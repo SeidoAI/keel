@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_project.core.id_generator import format_key, is_valid_key, parse_key
+from keel.core.id_generator import format_key, is_valid_key, parse_key
 
 
 class TestFormatKey:

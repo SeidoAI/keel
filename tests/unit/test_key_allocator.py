@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agent_project.core.key_allocator import KeyAllocationError, allocate_keys
+from keel.core.key_allocator import KeyAllocationError, allocate_keys
 
 
 @pytest.fixture

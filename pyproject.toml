@@ -1,5 +1,5 @@
 [project]
-name = "agent-project"
+name = "keel"
 version = "0.1.0"
 description = "Git-native project management with concept graph for AI agents"
 requires-python = ">=3.10,<3.14"
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agent-project = "agent_project.cli.main:cli"
+keel = "keel.cli.main:cli"
 
 [dependency-groups]
 dev = [
@@ -29,7 +29,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_project"]
+packages = ["src/keel"]
 
 [tool.ruff]
 line-length = 88
@@ -41,7 +41,7 @@ select = ["E", "F", "W", "I", "C", "B", "UP", "RUF"]
 ignore = ["E501", "C901", "B006"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agent_project"]
+known-first-party = ["keel"]
 
 [tool.ruff.format]
 quote-style = "double"

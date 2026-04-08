@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_project.core.concept_graph import (
+from keel.core.concept_graph import (
     build_full_graph,
     orphan_issues,
     orphan_nodes,
 )
-from agent_project.core.graph_cache import full_rebuild
-from agent_project.core.node_store import save_node
-from agent_project.core.store import save_issue, save_project
-from agent_project.models import (
+from keel.core.graph_cache import full_rebuild
+from keel.core.node_store import save_node
+from keel.core.store import save_issue, save_project
+from keel.models import (
     ConceptNode,
     Issue,
     ProjectConfig,

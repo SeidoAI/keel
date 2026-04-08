@@ -16,7 +16,7 @@ from uuid import UUID
 
 import pytest
 
-from agent_project.models import (
+from keel.models import (
     AgentSession,
     ArtifactSpec,
     Comment,
