@@ -26,4 +26,3 @@ Constraints:
 - Rotated quarterly by the infra team
 - Different value per environment — `test`, `staging`, `prod`
 - Never logged, never passed over the wire
-

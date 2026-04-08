@@ -1,0 +1,47 @@
+# Pre-commit hooks for agent-project.
+#
+# Install once per clone:
+#     make pre-commit-install
+#
+# Run on all files (not just staged):
+#     make pre-commit-run
+#
+# Pinned versions are bumped manually when the in-project tooling moves
+# in pyproject.toml. NO pytest hook — too slow per commit; gate via CI
+# or `make check`.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Keep this in sync with the ruff version in pyproject.toml so the
+    # hook formatting matches `make format` exactly.
+    rev: v0.15.9
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        # Match the scope of `make lint`: src/ and tests/ only.
+        # Docs use product names (iTerm, etc.) that codespell flags.
+        files: ^(src|tests)/
+        args: [--skip=uv.lock]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        # Many shipped templates and examples are frontmatter+body files
+        # (delimited with `---`), which the YAML parser interprets as
+        # multi-document. Allow that, and skip Jinja2 templates entirely.
+        args: [--allow-multiple-documents]
+        exclude: |
+          (?x)^(
+            src/agent_project/templates/.*\.j2|
+            src/agent_project/templates/skills/project-manager/examples/.*\.yaml|
+            src/agent_project/templates/agent_templates/.*\.yaml
+          )$
+      - id: check-added-large-files

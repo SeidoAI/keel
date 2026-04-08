@@ -1,4 +1,4 @@
-.PHONY: install sync test lint format check clean build
+.PHONY: install sync test lint format check clean build pre-commit-install pre-commit-run
 
 # ==============================================================================
 # Installation
@@ -50,3 +50,15 @@ build:
 clean:
 	rm -rf .pytest_cache .ruff_cache dist build *.egg-info
 	find . -type d -name __pycache__ -exec rm -rf {} +
+
+# ==============================================================================
+# Pre-commit
+# ==============================================================================
+
+# Install pre-commit git hook (one-time per clone)
+pre-commit-install:
+	uv run pre-commit install
+
+# Run all pre-commit hooks across the whole repo (not just staged files)
+pre-commit-run:
+	uv run pre-commit run --all-files
