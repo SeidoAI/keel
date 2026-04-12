@@ -70,6 +70,15 @@ keel validate --strict --format=json
 ```
 
 Parse the JSON. Fix every error. Re-run. Repeat until `exit_code == 0`.
+
+When validating after a targeted edit, use selectors to save tokens:
+
+```bash
+keel validate --strict --format=json --select SEI-42+
+```
+
+This validates only SEI-42 and its downstream dependents. Use `+SEI-42`
+for upstream. Use `SEI-42+2` to limit to 2 hops.
 The command also rebuilds the graph cache as a side effect — no separate
 rebuild step needed.
 
@@ -107,6 +116,84 @@ and costs you an iteration:
    or confirmed already exist in the project.
 
 Full list with bad/good examples: `references/ANTI_PATTERNS.md`.
+
+## Default issue workflow
+
+Unless the project has customized its status enum, the default
+issue lifecycle is:
+
+```
+backlog → todo → in_progress → verifying → reviewing → testing → ready → updating → done
+                                                                                   ↘ canceled
+```
+
+The `keel brief` output shows this prominently as `ISSUE WORKFLOW`.
+The validator checks that every issue's status is reachable from
+`backlog` via the transitions defined in `project.yaml`. If you
+set a status that has no path from `backlog`, validation will fail
+with `status/unreachable`.
+
+## Before modifying any concept node
+
+Run:
+
+```bash
+keel refs reverse <node-id>
+```
+
+This shows every artifact that holds a `[[node-id]]` reference to
+the given node. If you change the node's content, every referrer's
+content hash becomes stale and validation will flag `freshness/stale`
+until the referrer is updated or re-acknowledged.
+
+## The concept graph as working memory
+
+When you need to understand what's connected to a given entity, use:
+
+```bash
+keel graph --format=json
+```
+
+This returns the full concept graph — every node and edge — as
+structured JSON. Parse the `nodes` and `edges` arrays to answer
+questions like "what depends on the auth endpoint?" or "which
+issues reference this decision?" without reading individual files.
+This is your primary structural query tool.
+
+## Delegation model
+
+You are a project manager. You do NOT execute implementation plans.
+
+After completing a scoping or triage workflow, your output is:
+1. A session plan (following the step-by-step template in
+   `examples/artifacts/plan.md`)
+2. Issues assigned to the session
+3. Relevant docs and skill references identified
+
+This output is delegated to an execution agent (currently a human
+or a separate Claude Code session; in the future, a container).
+The execution agent receives the plan and runs it.
+
+After the execution agent completes:
+1. Run `keel validate --strict --format=json`
+2. Review the validation report
+3. If errors: create fix issues or re-delegate
+4. If clean: update issue statuses, close the session
+
+You never write implementation code. You never run test suites.
+You never modify source files outside of project management
+artifacts (issues, nodes, sessions, plans).
+
+## Red flags — rationalizations to catch yourself making
+
+| Agent thought | Reality |
+|---|---|
+| "The validate errors are just warnings, I'll fix them later" | The gate is non-negotiable. Warnings are errors when `--strict` is set. Fix them now. |
+| "The ref is broken but the target node will exist soon" | Create the target node first, then the referrer. The graph only has one state at a time. |
+| "I'll skip `keel refs reverse` — I know nothing references this" | You don't know. You're forgetful. Run the command. |
+| "This issue is basically done, I'll mark it done" | Run `keel validate --strict` first. If it fails, the issue is not done. |
+| "I don't need a plan for this small change" | You do. The plan template exists for a reason. Fill it out, even if it's 3 steps. |
+| "I'll execute this plan myself — it's simpler than delegating" | You are a project manager. You scope, plan, validate, and review. You do not execute. Delegate to an execution agent. |
 
 ## Where to read next
 

@@ -124,6 +124,22 @@ class ValidationReport:
     cache_rebuilt: bool = False
     duration_ms: int = 0
 
+    @property
+    def category_summary(self) -> dict[str, dict[str, int]]:
+        """Group findings by category (the prefix before ``/``)."""
+        cats: dict[str, dict[str, int]] = {}
+        for finding in [*self.errors, *self.warnings, *self.fixed]:
+            cat = finding.code.split("/")[0] if "/" in finding.code else finding.code
+            if cat not in cats:
+                cats[cat] = {"errors": 0, "warnings": 0, "fixed": 0}
+            if finding.severity == "error":
+                cats[cat]["errors"] += 1
+            elif finding.severity == "warning":
+                cats[cat]["warnings"] += 1
+            elif finding.severity == "fixed":
+                cats[cat]["fixed"] += 1
+        return cats
+
     def to_json(self) -> dict[str, Any]:
         return {
             "version": self.version,
@@ -135,6 +151,7 @@ class ValidationReport:
                 "cache_rebuilt": self.cache_rebuilt,
                 "duration_ms": self.duration_ms,
             },
+            "categories": self.category_summary,
             "errors": [e.to_json() for e in self.errors],
             "warnings": [w.to_json() for w in self.warnings],
             "fixed": [f.to_json() for f in self.fixed],

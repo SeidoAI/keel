@@ -75,21 +75,40 @@ Write in dependency order so early files can be referenced by later ones:
 3. **Concrete issues** → `issues/<KEY>.yaml`. Reference the epics as `parent`, reference concept nodes via `[[node-id]]` in the body.
 4. **Sessions** → `sessions/<id>.yaml`. Reference the issue keys you just created.
 
-Copy the schema from the closest example file. Fill in the real values.
-Do not invent fields; do not skip required fields.
+Copy the schema from the closest example file. For fields you haven't
+resolved yet, use deliberate placeholders:
 
-### 7. Validate, iterate, validate
+- **Status fields you're unsure about:** use `backlog` (always valid)
+- **References you'll resolve later:** use `[[__PLACEHOLDER__]]` — the
+  validator will flag these as `ref/dangling`, which is the point
+- **Body sections you haven't filled:** write `TODO: <what goes here>`
+
+This is **intentional**. You are scaffolding a failing-first structure.
+The next step drives these to green.
+
+### 7. Red-green validation cycle
+
+This is the Keel equivalent of TDD's red-green cycle. The scaffold
+from step 6 is *designed to fail validation*. Your job is to drive
+the errors to zero.
+
 ```bash
 keel validate --strict --format=json
 ```
-Parse the JSON. For each error, map it to a file and fix it. Re-run.
-Repeat until `exit_code == 0`.
 
-Common issues on first pass:
-- Dangling `[[refs]]` (you referenced something you didn't create)
-- Wrong status (you used a status value not in `enums/issue_status.yaml`)
-- Missing body section (your issue body doesn't have all required headings)
-- Sequence drift (you allocated keys out of order — run `validate --fix`)
+Parse the JSON. The errors are grouped by category. Walk them in order:
+
+1. **`schema/*` errors**: fill in placeholder fields with real values
+2. **`ref/dangling` errors**: either create the target node or replace
+   the `[[__PLACEHOLDER__]]` ref with a real `[[node-id]]`
+3. **`body/*` errors**: fill in missing body sections
+4. **`enum/*` errors**: fix invalid enum values
+
+After each batch of fixes (3-5 files), re-run validate. You WILL see
+the error count decrease. Repeat until `exit_code == 0`.
+
+You don't know an artifact set is complete unless you've seen validate
+fail on the gaps and filled them one by one.
 
 ### 8. Confirm the shape
 ```bash
@@ -113,6 +132,15 @@ branch named something like `pm/initial-scoping`.
 - Referencing nodes that don't exist yet (or worse: inventing node ids
   inline and never creating the node files).
 - Skipping the validation gate because "the files look right".
+
+## Red flags — scoping-specific rationalizations
+
+| Agent thought | Reality |
+|---|---|
+| "I'll create all the issues first and validate at the end" | Validate after every batch of 3-5 files. Errors compound; catching them early is cheaper. |
+| "This concept doesn't need a node — it's obvious" | If two issues reference the same concept, it needs a node. The drift detector can't track what isn't a node. |
+| "I'll write the plan later — let me get the issues down first" | The plan is the first artifact. It shapes every issue. Write it first, in the step-by-step template. |
+| "The planning docs are ambiguous so I'll make my best guess" | Stop. Ask the user for clarification. A wrong assumption in scoping cascades into every issue. |
 
 ## See also
 

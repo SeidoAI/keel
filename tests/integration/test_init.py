@@ -188,10 +188,10 @@ class TestInitBasics:
         raw = yaml.safe_load((target / "project.yaml").read_text())
         assert raw["base_branch"] == "main"
 
-    def test_init_copies_all_ten_pm_slash_commands(
+    def test_init_copies_all_pm_slash_commands(
         self, runner: CliRunner, tmp_path: Path
     ) -> None:
-        """Every initialized project ships with the 10 /pm-* slash commands
+        """Every initialized project ships with the /pm-* slash commands
         at .claude/commands/."""
         target = tmp_path / "p"
         result = runner.invoke(cli, _init_args(target))
@@ -201,6 +201,8 @@ class TestInitBasics:
         assert commands_dir.is_dir(), f"Missing {commands_dir}"
 
         expected = {
+            "pm-agenda.md",
+            "pm-plan.md",
             "pm-scope.md",
             "pm-update.md",
             "pm-triage.md",

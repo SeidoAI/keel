@@ -64,6 +64,13 @@ keel validate --strict --format=json
 ```
 Every new issue, every new comment, every new node must pass the gate.
 
+## Red flags — triage-specific rationalizations
+
+| Agent thought | Reality |
+|---|---|
+| "This inbound is low-priority, I'll ignore it" | You don't ignore inbounds. Create a comment on the relevant issue acknowledging it, even if you defer the work. |
+| "I'll create the issue now and figure out the scope later" | Triage means decide scope *now*. A scopeless issue is PM debt. |
+
 ## See also
 
 - `WORKFLOWS_INCREMENTAL_UPDATE.md` for the mechanics of small edits.

@@ -87,9 +87,11 @@ Four principles. Each one is a deliberate choice.
 
 **4. Validation is the gate.** Every agent loop ends with `keel validate --strict --format=json`. The same command rebuilds the graph cache incrementally. The loop is: write files → validate → fix → validate → commit.
 
+**Why in-repo.** Project artifacts — decisions, contracts, issue history — have long tails. You need to know why a decision was made three years from now. External SaaS trackers lose that history when companies migrate tools, pivot pricing, or shut down. Keel issues are git commits: readable with `cat` in 20 years, diffable with `git log`, portable with `git clone`. The project's history is as durable as its code.
+
 ## Slash commands
 
-After `keel init`, every project ships with 10 `/pm-*` slash commands at
+After `keel init`, every project ships with `/pm-*` slash commands at
 `.claude/commands/`. Type `/pm` in Claude Code to see them all at once.
 
 | Command | What it does |
@@ -101,6 +103,8 @@ After `keel init`, every project ships with 10 `/pm-*` slash commands at
 | `/pm-status` | PM-flavoured project summary with next-step recommendations |
 | `/pm-graph` | Analyse the dependency graph: critical path, parallelizable work, cycles |
 | `/pm-validate` | Run the validator, interpret errors, propose and apply fixes |
+| `/pm-agenda` | Interpreted summary of everything in flight with recommendations |
+| `/pm-plan` | Preview what init would produce, with interpretation |
 | `/pm-handoff <issue>` | Create a session for an issue and hand off to a coding agent |
 | `/pm-rescope <intent>` | Expand an existing project with new scope |
 | `/pm-close <issue>` | Mark an issue done and write a closing comment |
@@ -122,6 +126,10 @@ keel templates                List and instantiate Jinja2 templates
 keel enums                    List active enum values
 keel artifacts                List session artifact manifest
 keel brief                    Dump project context (agents use this internally)
+keel agenda                   Aggregated view of everything in flight
+keel plan                     Preview what init would produce (dry-run)
+keel refresh                  Rebuild the graph cache from filesystem
+keel view                     Serve a read-only HTML project viewer
 keel completion <shell>       Print bash/zsh/fish tab completion install snippet
 ```
 

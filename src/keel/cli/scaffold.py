@@ -296,6 +296,12 @@ def _render_text(data: ScaffoldData) -> str:
     lines.append(f"  next node id: {data.next_node_id}")
     lines.append("")
 
+    # Workflow — prominent display of the issue lifecycle
+    issue_statuses = data.enums.get("issue_status", [])
+    if issue_statuses:
+        lines.append(f"ISSUE WORKFLOW: {' → '.join(issue_statuses)}")
+        lines.append("")
+
     # Enums
     lines.append("ACTIVE ENUMS (from enums/):")
     for name in sorted(data.enums.keys()):

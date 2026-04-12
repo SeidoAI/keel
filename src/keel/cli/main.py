@@ -11,6 +11,7 @@ import logging
 import click
 
 from keel import __version__
+from keel.cli.agenda import agenda_cmd
 from keel.cli.artifacts import artifacts_cmd
 from keel.cli.completion import completion_cmd
 from keel.cli.enums import enums_cmd
@@ -18,11 +19,14 @@ from keel.cli.graph import graph_cmd
 from keel.cli.init import init_cmd
 from keel.cli.next_key import next_key_cmd
 from keel.cli.node import node_cmd
+from keel.cli.plan import plan_cmd
+from keel.cli.refresh import refresh_cmd
 from keel.cli.refs import refs_cmd
 from keel.cli.scaffold import brief_cmd, scaffold_cmd
 from keel.cli.status import status_cmd
 from keel.cli.templates import templates_cmd
 from keel.cli.validate import validate_cmd
+from keel.cli.view import view_cmd
 
 # Verbose count → logging level. -v = INFO, -vv = DEBUG, default = WARNING.
 LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
@@ -68,19 +72,23 @@ def cli(ctx: click.Context, verbose: int) -> None:
     _configure_logging(verbose)
 
 
+cli.add_command(agenda_cmd)
 cli.add_command(init_cmd)
 cli.add_command(brief_cmd)
 cli.add_command(scaffold_cmd)  # hidden alias — prefer `brief`
 cli.add_command(next_key_cmd)
+cli.add_command(plan_cmd)
 cli.add_command(validate_cmd)
 cli.add_command(status_cmd)
 cli.add_command(graph_cmd)
+cli.add_command(refresh_cmd)
 cli.add_command(refs_cmd)
 cli.add_command(node_cmd)
 cli.add_command(templates_cmd)
 cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)
 cli.add_command(completion_cmd)
+cli.add_command(view_cmd)
 
 
 if __name__ == "__main__":

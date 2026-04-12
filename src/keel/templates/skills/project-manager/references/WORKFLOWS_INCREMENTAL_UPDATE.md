@@ -81,6 +81,13 @@ one commit per logical edit is fine.
 3. Check that all `[[references]]` to this node resolve
 4. Validate
 
+## Red flags — update-specific rationalizations
+
+| Agent thought | Reality |
+|---|---|
+| "It's just one field change, I don't need to validate" | You do. One field change can break a reference chain. Always validate. |
+| "I'll update the status without checking `refs reverse`" | Run `keel refs reverse <id>` first. Status changes on a heavily-referenced entity may need downstream updates. |
+
 ## See also
 
 - `WORKFLOWS_INITIAL_SCOPING.md` for bulk creation.

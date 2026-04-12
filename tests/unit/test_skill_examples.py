@@ -198,10 +198,10 @@ def test_artifact_examples_present() -> None:
 def test_artifact_plan_has_expected_sections() -> None:
     path = EXAMPLES_DIR / "artifacts" / "plan.md"
     content = path.read_text(encoding="utf-8")
-    # A well-formed plan has Goal, Approach, and Out of scope
-    assert "## Goal" in content
-    assert "## Approach" in content
-    assert "## Out of scope" in content
+    # A well-formed plan has Context, Steps, and Verification
+    assert "## Context" in content
+    assert "## Steps" in content
+    assert "## Verification" in content
 
 
 # ============================================================================

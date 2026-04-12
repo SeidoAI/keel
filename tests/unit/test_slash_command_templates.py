@@ -25,6 +25,8 @@ from keel.templates import get_templates_dir
 COMMANDS_DIR = get_templates_dir() / "commands"
 
 EXPECTED_COMMANDS: tuple[str, ...] = (
+    "pm-agenda",
+    "pm-plan",
     "pm-scope",
     "pm-update",
     "pm-triage",
@@ -72,7 +74,7 @@ def test_command_file_exists(command_name: str) -> None:
     assert path.is_file(), f"Missing command file: {path}"
 
 
-def test_exactly_ten_commands_present() -> None:
+def test_expected_commands_present() -> None:
     found = sorted(p.stem for p in COMMANDS_DIR.glob("*.md"))
     assert sorted(EXPECTED_COMMANDS) == found, (
         f"Expected exactly {len(EXPECTED_COMMANDS)} command files, got {len(found)}"

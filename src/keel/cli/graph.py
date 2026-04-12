@@ -66,6 +66,18 @@ from keel.core.store import (
     default=None,
     help="Comma-separated issue statuses to include (default: all).",
 )
+@click.option(
+    "--upstream",
+    "upstream_id",
+    default=None,
+    help="Show only nodes upstream of (depended on by) this ID.",
+)
+@click.option(
+    "--downstream",
+    "downstream_id",
+    default=None,
+    help="Show only nodes downstream of (depending on) this ID.",
+)
 @profileable
 def graph_cmd(
     project_dir: Path,
@@ -73,6 +85,8 @@ def graph_cmd(
     output_format: str,
     output: Path | None,
     status_filter: str | None,
+    upstream_id: str | None,
+    downstream_id: str | None,
 ) -> None:
     """Render the dependency or concept graph for a project.
 
@@ -87,7 +101,13 @@ def graph_cmd(
     except ProjectNotFoundError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    rendered = _render(resolved, graph_type, output_format, status_filter)
+    if upstream_id and downstream_id:
+        raise click.ClickException("Cannot specify both --upstream and --downstream.")
+
+    rendered = _render(
+        resolved, graph_type, output_format, status_filter,
+        upstream_id=upstream_id, downstream_id=downstream_id,
+    )
 
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -96,11 +116,74 @@ def graph_cmd(
         click.echo(rendered, nl=False)
 
 
+def _bfs_reachable(
+    start_id: str,
+    adjacency: dict[str, set[str]],
+) -> set[str]:
+    """BFS from start_id over an adjacency map, returning all reachable IDs
+    (including start_id itself)."""
+    visited: set[str] = set()
+    queue = [start_id]
+    while queue:
+        current = queue.pop(0)
+        if current in visited:
+            continue
+        visited.add(current)
+        for neighbour in adjacency.get(current, set()):
+            if neighbour not in visited:
+                queue.append(neighbour)
+    return visited
+
+
+def _filter_graph_by_direction(
+    result: object,
+    upstream_id: str | None,
+    downstream_id: str | None,
+) -> None:
+    """Mutate a FullGraphResult in-place to keep only the upstream or
+    downstream subgraph of the given ID."""
+    if not upstream_id and not downstream_id:
+        return
+
+    nodes = result.nodes  # type: ignore[attr-defined]
+    edges = result.edges  # type: ignore[attr-defined]
+    all_ids = {n.id for n in nodes}
+    target_id = upstream_id or downstream_id
+
+    if target_id not in all_ids:
+        raise click.ClickException(f"Node '{target_id}' not found in graph.")
+
+    if upstream_id:
+        # upstream = nodes that this ID depends on (follow edges backwards)
+        # edge: from_id -> to_id means from_id depends on / references to_id
+        # So "upstream of X" = follow to_id from X outward
+        adj: dict[str, set[str]] = {}
+        for e in edges:
+            adj.setdefault(e.from_id, set()).add(e.to_id)
+        keep = _bfs_reachable(upstream_id, adj)
+    else:
+        # downstream = nodes that depend on this ID (follow edges forward)
+        # "downstream of X" = follow from_id towards X
+        # i.e., reverse adjacency: who points TO the target?
+        adj = {}
+        for e in edges:
+            adj.setdefault(e.to_id, set()).add(e.from_id)
+        keep = _bfs_reachable(downstream_id, adj)  # type: ignore[arg-type]
+
+    result.nodes = [n for n in nodes if n.id in keep]  # type: ignore[attr-defined]
+    result.edges = [  # type: ignore[attr-defined]
+        e for e in edges if e.from_id in keep and e.to_id in keep
+    ]
+
+
 def _render(
     project_dir: Path,
     graph_type: str,
     output_format: str,
     status_filter: str | None,
+    *,
+    upstream_id: str | None = None,
+    downstream_id: str | None = None,
 ) -> str:
     if graph_type == "deps":
         issues = list_issues(project_dir)
@@ -126,6 +209,7 @@ def _render(
         result.edges = [
             e for e in result.edges if e.from_id in kept_ids and e.to_id in kept_ids
         ]
+    _filter_graph_by_direction(result, upstream_id, downstream_id)
     if output_format == "json":
         return (
             json.dumps(result.model_dump(mode="json", by_alias=True), indent=2) + "\n"

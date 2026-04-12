@@ -100,6 +100,13 @@ git checkout main
 git branch -D <pr-branch>
 ```
 
+## Red flags — review-specific rationalizations
+
+| Agent thought | Reality |
+|---|---|
+| "The PR passes validate so it must be correct" | Validate is necessary but not sufficient. Check that the changes match the issue scope and the concept graph is coherent. |
+| "I'll approve this with a note to fix the warnings later" | Do not approve with warnings. Request changes. Warnings in `--strict` mode are errors. |
+
 ## See also
 
 - `VALIDATION.md` — full error codes and their meaning

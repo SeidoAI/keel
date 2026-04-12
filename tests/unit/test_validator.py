@@ -686,3 +686,61 @@ class TestJsonOutput:
             assert "code" in e
             assert "severity" in e
             assert "message" in e
+
+    def test_json_has_categories(self, empty_project: Path) -> None:
+        write_issue(empty_project, "OTHER-1")  # triggers id/wrong_prefix
+        report = validate_project(empty_project)
+        out = report.to_json()
+        assert "categories" in out
+        cats = out["categories"]
+        assert isinstance(cats, dict)
+        # id/wrong_prefix should produce an "id" category
+        assert "id" in cats
+        assert cats["id"]["errors"] >= 1
+        # every category has the three keys
+        for _cat, counts in cats.items():
+            assert set(counts.keys()) == {"errors", "warnings", "fixed"}
+            assert all(isinstance(v, int) for v in counts.values())
+
+
+class TestCategorySummary:
+    """Tests for the category_summary property on ValidationReport."""
+
+    def test_empty_report_has_no_categories(self) -> None:
+        report = ValidationReport()
+        assert report.category_summary == {}
+
+    def test_single_error_counted(self) -> None:
+        from keel.core.validator import CheckResult
+
+        report = ValidationReport(
+            errors=[CheckResult(code="ref/dangling", severity="error", message="x")]
+        )
+        cats = report.category_summary
+        assert "ref" in cats
+        assert cats["ref"]["errors"] == 1
+        assert cats["ref"]["warnings"] == 0
+        assert cats["ref"]["fixed"] == 0
+
+    def test_mixed_severities_and_categories(self) -> None:
+        from keel.core.validator import CheckResult
+
+        report = ValidationReport(
+            errors=[
+                CheckResult(code="ref/dangling", severity="error", message="a"),
+                CheckResult(code="ref/parent", severity="error", message="b"),
+                CheckResult(code="schema/invalid", severity="error", message="c"),
+            ],
+            warnings=[
+                CheckResult(code="ref/related", severity="warning", message="d"),
+                CheckResult(code="freshness/stale", severity="warning", message="e"),
+            ],
+            fixed=[
+                CheckResult(code="timestamp/missing", severity="fixed", message="f"),
+            ],
+        )
+        cats = report.category_summary
+        assert cats["ref"] == {"errors": 2, "warnings": 1, "fixed": 0}
+        assert cats["schema"] == {"errors": 1, "warnings": 0, "fixed": 0}
+        assert cats["freshness"] == {"errors": 0, "warnings": 1, "fixed": 0}
+        assert cats["timestamp"] == {"errors": 0, "warnings": 0, "fixed": 1}

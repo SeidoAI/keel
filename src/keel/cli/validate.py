@@ -59,9 +59,15 @@ console = Console()
     is_flag=True,
     help="Auto-fix the defined subset of issues (timestamps, UUIDs, etc.).",
 )
+@click.option(
+    "--select",
+    "select_expr",
+    default=None,
+    help="Selector: ID+ (downstream), +ID (upstream), ID+N (N hops), tag:NAME.",
+)
 @profileable
 def validate_cmd(
-    project_dir: Path, strict: bool, output_format: str, fix: bool
+    project_dir: Path, strict: bool, output_format: str, fix: bool, select_expr: str | None,
 ) -> None:
     """Run the validation gate.
 
@@ -72,12 +78,63 @@ def validate_cmd(
     resolved = project_dir.expanduser().resolve()
     report = validate_project(resolved, strict=strict, fix=fix)
 
+    if select_expr:
+        _filter_report_by_selector(report, resolved, select_expr)
+
     if output_format == "json":
         click.echo(json.dumps(report.to_json(), indent=2))
     else:
         _render_text(report)
 
     sys.exit(report.exit_code)
+
+
+def _filter_report_by_selector(
+    report: ValidationReport, project_dir: Path, select_expr: str
+) -> None:
+    """Filter a validation report in-place to only findings matching
+    the selector's entity set."""
+    from keel.core.selectors import resolve_selector
+
+    try:
+        result = resolve_selector(select_expr, project_dir)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    selected_ids = result.ids
+
+    def _matches(finding: CheckResult) -> bool:
+        """True if the finding relates to a selected entity."""
+        if not finding.file:
+            return True  # project-level findings always included
+        # Extract entity ID from file path: issues/SEI-1.yaml → SEI-1
+        # graph/nodes/user-model.yaml → user-model
+        stem = finding.file.rsplit("/", 1)[-1]
+        if stem.endswith(".yaml"):
+            stem = stem[:-5]
+        return stem in selected_ids
+
+    report.errors = [f for f in report.errors if _matches(f)]
+    report.warnings = [f for f in report.warnings if _matches(f)]
+    report.fixed = [f for f in report.fixed if _matches(f)]
+    # Recompute exit code
+    if report.errors:
+        report.exit_code = 2
+    elif report.warnings:
+        report.exit_code = 1
+    else:
+        report.exit_code = 0
+
+
+def _group_by_category(
+    findings: list[CheckResult],
+) -> dict[str, list[CheckResult]]:
+    """Group findings by the category prefix (the part before ``/``)."""
+    groups: dict[str, list[CheckResult]] = {}
+    for f in findings:
+        cat = f.code.split("/")[0] if "/" in f.code else f.code
+        groups.setdefault(cat, []).append(f)
+    return dict(sorted(groups.items()))
 
 
 def _render_text(report: ValidationReport) -> None:
@@ -101,22 +158,35 @@ def _render_text(report: ValidationReport) -> None:
         f"cache rebuilt: {str(report.cache_rebuilt).lower()}[/dim]"
     )
 
+    # Category summary
+    cats = report.category_summary
+    if cats:
+        parts = [f"{cat}: {c['errors']}E/{c['warnings']}W" for cat, c in sorted(cats.items()) if c["errors"] or c["warnings"]]
+        if parts:
+            console.print(f"  [dim]categories: {', '.join(parts)}[/dim]")
+
     if report.fixed:
         console.print(f"\n[bold cyan]Fixed ({len(report.fixed)}):[/bold cyan]")
-        for fix in report.fixed:
-            _render_finding(fix, severity_color="cyan")
+        for cat, items in _group_by_category(report.fixed).items():
+            console.print(f"  [bold cyan]\\[{cat}][/bold cyan] ({len(items)})")
+            for fix in items:
+                _render_finding(fix, severity_color="cyan")
 
     if report.errors:
         console.print(f"\n[bold red]Errors ({len(report.errors)}):[/bold red]")
-        for err in report.errors:
-            _render_finding(err, severity_color="red")
+        for cat, items in _group_by_category(report.errors).items():
+            console.print(f"  [bold red]\\[{cat}][/bold red] ({len(items)})")
+            for err in items:
+                _render_finding(err, severity_color="red")
 
     if report.warnings:
         console.print(
             f"\n[bold yellow]Warnings ({len(report.warnings)}):[/bold yellow]"
         )
-        for warn in report.warnings:
-            _render_finding(warn, severity_color="yellow")
+        for cat, items in _group_by_category(report.warnings).items():
+            console.print(f"  [bold yellow]\\[{cat}][/bold yellow] ({len(items)})")
+            for warn in items:
+                _render_finding(warn, severity_color="yellow")
 
 
 def _render_finding(finding: CheckResult, severity_color: str) -> None:
