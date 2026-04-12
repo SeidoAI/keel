@@ -74,12 +74,19 @@ def test_issue_examples_have_required_body_sections() -> None:
             assert heading in body, f"{path.name} missing required heading {heading!r}"
 
 
-def test_epic_issue_example_has_basic_sections() -> None:
-    """Epic issues need Context and Acceptance criteria but not the full set."""
+def test_epic_issue_example_has_epic_sections() -> None:
+    """Epic issues need Context, Child issues, and Acceptance criteria."""
+    required_epic_headings = (
+        "## Context",
+        "## Child issues",
+        "## Acceptance criteria",
+    )
     for path in _all_example_files("issue-epic"):
         body = path.read_text(encoding="utf-8")
-        assert "## Context" in body, f"{path.name} missing ## Context"
-        assert "## Acceptance criteria" in body, f"{path.name} missing ## Acceptance criteria"
+        for heading in required_epic_headings:
+            assert heading in body, (
+                f"{path.name} missing required epic heading {heading!r}"
+            )
 
 
 def test_issue_examples_have_stop_and_ask_guidance() -> None:
@@ -261,6 +268,7 @@ def test_all_reference_docs_present() -> None:
         "COMMIT_CONVENTIONS.md",
         "ANTI_PATTERNS.md",
         "POLICIES.md",
+        "SUBAGENT_DELEGATION.md",
     }
     found = {p.name for p in references_dir.glob("*.md")}
     missing = expected - found

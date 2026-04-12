@@ -105,6 +105,9 @@ class ScaffoldData:
     issue_by_status: dict[str, int] = field(default_factory=dict)
     node_count: int = 0
     session_count: int = 0
+    # Phase and node IDs for agent context
+    phase: str = "scoping"
+    node_ids: list[str] = field(default_factory=list)
 
 
 # ============================================================================
@@ -231,19 +234,35 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
     next_issue, next_session, next_node = _collect_next_ids(project)
 
     # Entity counts
-    issue_files = list((project_dir / "issues").glob("*.yaml")) if (project_dir / "issues").is_dir() else []
-    node_files = list((project_dir / "graph" / "nodes").glob("*.yaml")) if (project_dir / "graph" / "nodes").is_dir() else []
-    session_dirs = [d for d in (project_dir / "sessions").iterdir() if d.is_dir()] if (project_dir / "sessions").is_dir() else []
+    issue_files = (
+        list((project_dir / "issues").glob("*.yaml"))
+        if (project_dir / "issues").is_dir()
+        else []
+    )
+    node_files = (
+        list((project_dir / "graph" / "nodes").glob("*.yaml"))
+        if (project_dir / "graph" / "nodes").is_dir()
+        else []
+    )
+    session_dirs = (
+        [d for d in (project_dir / "sessions").iterdir() if d.is_dir()]
+        if (project_dir / "sessions").is_dir()
+        else []
+    )
 
     issue_by_status: dict[str, int] = {}
     for f in issue_files:
         try:
             from keel.core.parser import parse_frontmatter_body
+
             fm, _ = parse_frontmatter_body(f.read_text(encoding="utf-8"))
             s = fm.get("status", "unknown")
             issue_by_status[s] = issue_by_status.get(s, 0) + 1
         except Exception:
             issue_by_status["parse_error"] = issue_by_status.get("parse_error", 0) + 1
+
+    # Collect existing node IDs for agent context
+    node_ids = sorted(f.stem for f in node_files)
 
     return ScaffoldData(
         project_name=project.name,
@@ -263,6 +282,8 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
         issue_by_status=issue_by_status,
         node_count=len(node_files),
         session_count=len(session_dirs),
+        phase=project.phase.value,
+        node_ids=node_ids,
         validation_gate={
             "command": "keel validate --strict",
             "exit_codes": {
@@ -299,6 +320,7 @@ def _render_text(data: ScaffoldData) -> str:
 
     # Project
     lines.append(f"PROJECT: {data.project_name} ({data.key_prefix})")
+    lines.append(f"Phase: {data.phase}")
     if data.description:
         lines.append(f"Description: {data.description}")
     lines.append(f"Base branch: {data.base_branch}")
@@ -315,9 +337,13 @@ def _render_text(data: ScaffoldData) -> str:
 
     # Entity counts
     if data.issue_count or data.node_count or data.session_count:
-        status_str = ", ".join(f"{s}={c}" for s, c in sorted(data.issue_by_status.items()))
+        status_str = ", ".join(
+            f"{s}={c}" for s, c in sorted(data.issue_by_status.items())
+        )
         lines.append("EXISTING ENTITIES:")
-        lines.append(f"  issues: {data.issue_count}" + (f" ({status_str})" if status_str else ""))
+        lines.append(
+            f"  issues: {data.issue_count}" + (f" ({status_str})" if status_str else "")
+        )
         lines.append(f"  concept nodes: {data.node_count}")
         lines.append(f"  sessions: {data.session_count}")
         lines.append("")
@@ -384,9 +410,17 @@ def _render_text(data: ScaffoldData) -> str:
             lines.append(f"  {path}")
     lines.append("")
 
+    # Node IDs
+    if data.node_ids:
+        lines.append(f"CONCEPT NODES ({len(data.node_ids)}):")
+        lines.append(f"  {', '.join(data.node_ids)}")
+        lines.append("")
+
     # Validation gate
     lines.append("VALIDATION GATE (run after every batch of writes):")
     lines.append(f"  {data.validation_gate['command']}")
+    lines.append("  Formats: --format text (default) | summary | compact | json")
+    lines.append("  --count for just the error count")
     lines.append("  Exit 0 = clean, 1 = warnings, 2 = errors")
     lines.append("  Always rebuilds graph/index.yaml as a side effect.")
     lines.append("")

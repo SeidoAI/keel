@@ -192,7 +192,7 @@ def _render_json(summary: StatusSummary) -> str:
     "--format",
     "output_format",
     type=click.Choice(["rich", "json"]),
-    default="json",
+    default="rich",
     show_default=True,
     help="Output format.",
 )

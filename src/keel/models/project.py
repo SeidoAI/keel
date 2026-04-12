@@ -7,9 +7,25 @@ used by `keel next-key`.
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class ProjectPhase(str, Enum):
+    """Workflow phases for phase-aware validation.
+
+    The validator enforces different requirements depending on the current
+    phase.  The PM agent advances the phase by editing ``project.yaml``
+    directly; the validator blocks transitions that don't meet the
+    phase-specific requirements.
+    """
+
+    scoping = "scoping"
+    scoped = "scoped"
+    executing = "executing"
+    reviewing = "reviewing"
 
 
 class RepoEntry(BaseModel):
@@ -86,6 +102,9 @@ class ProjectConfig(BaseModel):
 
     next_issue_number: int = 1
     next_session_number: int = 1
+
+    # Workflow phase — drives phase-aware validation checks.
+    phase: ProjectPhase = ProjectPhase.scoping
 
     created_at: datetime | None = None
 

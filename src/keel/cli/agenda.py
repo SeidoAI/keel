@@ -125,10 +125,7 @@ def _collect_agenda(
         group_key = getattr(issue, group_by, "unknown")
         items_by_group[group_key].append(item)
 
-    groups = [
-        AgendaGroup(key=k, items=v)
-        for k, v in sorted(items_by_group.items())
-    ]
+    groups = [AgendaGroup(key=k, items=v) for k, v in sorted(items_by_group.items())]
 
     return AgendaResult(
         project_name=project.name,
@@ -225,7 +222,7 @@ def _render_json(result: AgendaResult) -> str:
     "--format",
     "output_format",
     type=click.Choice(["text", "json"]),
-    default="json",
+    default="text",
     show_default=True,
     help="Output format.",
 )

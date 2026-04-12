@@ -21,6 +21,15 @@ intuition, define scope. You are not constrained by time the way a
 human is. Writing 40 issues takes you minutes, not days. Do not
 compress scope to save effort.
 
+**Do not use subagents for writing files.** You must write every issue,
+node, session, and plan yourself. Subagent delegation produces files
+you haven't read, which makes gap analysis and compliance review
+meaningless. See SKILL.md "Subagent policy" for details.
+
+**Do not manage a time budget.** You do not have a deadline. Complete
+each step thoroughly before moving to the next. If a step feels
+repetitive, that is a signal that it is important.
+
 ## Procedure
 
 ### 1. Front-load context
@@ -123,9 +132,16 @@ Write in dependency order so early files can be referenced by later
 ones:
 
 1. **Concept nodes first** → `graph/nodes/<id>.yaml`
-2. **Epic issues** → `issues/<KEY>.yaml` (parent: null, no repo)
+2. **Epic issues** → `issues/<KEY>.yaml`. Epics MUST have the
+   `type/epic` label. Required body sections for epics: Context,
+   Child issues, Acceptance criteria. Epics do NOT need Implements,
+   Repo scope, Execution constraints, Test plan, Dependencies, or
+   Definition of Done. See `examples/issue-epic.yaml`.
 3. **Concrete issues** → `issues/<KEY>.yaml`. Reference epics as
    `parent`, reference concept nodes via `[[node-id]]` in the body.
+   Required body sections: all 9 (Context, Implements, Repo scope,
+   Requirements, Execution constraints, Acceptance criteria, Test
+   plan, Dependencies, Definition of Done).
 4. **Sessions** → `sessions/<id>/session.yaml` (directory, not flat
    file). Each session gets its own directory.
 5. **Session plans** → `sessions/<id>/plan.md` for every session,
@@ -150,8 +166,9 @@ After every 3-5 files:
 keel validate --strict
 ```
 
-The output is JSON by default. Errors are grouped by category. Walk
-them in order:
+Default output is human-readable text. Use `--format summary` for
+error-code counts, `--count` for just the number. Errors are grouped
+by category. Walk them in order:
 
 1. **`schema/*`**: fill in placeholder fields with real values
 2. **`ref/dangling`**: create the target node or replace the
@@ -172,6 +189,10 @@ completeness.
 
 ### 8. Second-pass: node coverage
 
+**DO NOT SKIP THIS STEP.** "Validate passed" does not mean you are
+done — validate checks structure, not completeness. Steps 8-10 are
+mandatory. Deferring them is cancellation — you will not come back.
+
 After all issues are written and validate is green, scan every issue
 body:
 
@@ -186,6 +207,11 @@ body:
 Run `keel refs summary` to see reference counts across all nodes.
 
 ### 9. Gap analysis
+
+**DO NOT SKIP THIS STEP.** This is the semantic completeness check
+that validate cannot do. If you skip it, execution agents will build
+from incomplete scope. Reread the planning docs — do not work from
+memory.
 
 Produce `plans/artifacts/gap-analysis.md`:
 
@@ -213,6 +239,10 @@ inconsistency: create a comment on the relevant issue.
 
 ### 10. Produce meta-artifacts
 
+**DO NOT SKIP THIS STEP.** The compliance checklist is consumed by
+the commit step (step 12). If it doesn't exist, you cannot commit.
+The validator enforces this when you advance to `phase: scoped`.
+
 Write three artifacts in `plans/artifacts/`:
 
 1. **`scoping-verification.md`** — maps planning doc sections →
@@ -236,11 +266,25 @@ keel refs summary
 ```
 All clean. Counts match your scoping plan. No orphan nodes.
 
-### 12. Commit
+### 12. Advance phase + commit
 
 **Before committing:** read `plans/artifacts/compliance.md`. If any
 rule is marked "deviated," resolve it or document the justification.
 Do not commit with unresolved deviations.
+
+Mark all meta-artifacts complete by replacing
+`<!-- status: incomplete -->` with `<!-- status: complete -->` in
+each file under `plans/artifacts/`.
+
+Advance the project phase:
+```yaml
+# In project.yaml, change:
+phase: scoped
+```
+
+Then run `keel validate --strict`. If the gap analysis or compliance
+artifacts are missing or incomplete, validation will fail. Fix before
+committing.
 
 Per `COMMIT_CONVENTIONS.md`. One commit for the whole initial scoping.
 
@@ -260,6 +304,13 @@ Per `COMMIT_CONVENTIONS.md`. One commit for the whole initial scoping.
 - Hand-crafting UUIDs instead of using `keel uuid`.
 - Treating validate-green as "done" (it checks structure, not
   completeness).
+- **Delegating file writing to subagents.** Write every file yourself.
+- **Managing a time budget.** You do not have a deadline.
+- **Deferring steps 8-10.** "I'll do the gap analysis later" is
+  cancellation. Do it now.
+- **Saying "I ran out of steam."** You do not have steam. Complete
+  each step.
+- **Treating the work as a test.** Every project is production work.
 
 ## Red flags — scoping-specific rationalizations
 

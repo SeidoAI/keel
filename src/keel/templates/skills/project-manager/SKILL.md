@@ -69,20 +69,27 @@ After every batch of file writes, run:
 keel validate --strict
 ```
 
-Output is JSON by default. Fix every error. Re-run. Repeat until
-`exit_code == 0`.
+Default output is human-readable text. Available formats:
+- `--format text` — styled text (default, best for scanning)
+- `--format summary` — error-code counts only (for progress monitoring)
+- `--format compact` — one line per error (for fix-by-fix work)
+- `--format json` — full structured report
+- `--count` — just the error count as an integer
 
-When validating after a targeted edit, use selectors to save tokens:
+Fix every error. Re-run. Repeat until exit code 0.
+
+When validating after a targeted edit, use selectors:
 
 ```bash
-keel validate --strict --select SEI-42+
+keel validate --strict --select SEI-42+   # downstream
+keel validate --strict --select +SEI-42   # upstream
+keel validate --strict --select SEI-42+2  # 2 hops
+keel validate --strict --select SEI-42    # just this entity
 ```
 
-This validates only SEI-42 and its downstream dependents. Use `+SEI-42`
-for upstream. Use `SEI-42+2` to limit to 2 hops.
-
 **What validate checks:** structural integrity — schemas, references,
-bidirectional consistency, status transitions, freshness, UUID format.
+bidirectional consistency, status transitions, freshness, UUID format,
+and **phase requirements** (see below).
 **What validate does NOT check:** semantic completeness. A clean
 validate means "structurally sound," not "the scope is complete." Use
 the gap analysis step in the scoping workflow to check completeness.
@@ -90,7 +97,24 @@ the gap analysis step in the scoping workflow to check completeness.
 The command also rebuilds the graph cache as a side effect — no separate
 rebuild step needed.
 
-Full details: `references/VALIDATION.md`.
+### Phase-aware validation
+
+The project has a `phase` field in `project.yaml`. The validator
+enforces different requirements per phase:
+
+- **`scoping`** — all standard checks. Warns if entities exist without
+  a scoping-plan.md.
+- **`scoped`** — requires `plans/artifacts/gap-analysis.md` and
+  `plans/artifacts/compliance.md` to exist and be marked complete
+  (`<!-- status: complete -->`). All sessions must have `plan.md`.
+- **`executing`** / **`reviewing`** — same as `scoped`.
+
+To advance from `scoping` to `scoped`, edit `project.yaml` and set
+`phase: scoped`, then run `keel validate --strict`. If the artifacts
+are missing, validation will fail — you MUST complete the gap analysis
+and compliance checklist before advancing.
+
+Full error catalogue: `references/VALIDATION.md`.
 
 ## Allocating IDs — the dual system
 
@@ -164,13 +188,26 @@ When you need to understand what's connected to a given entity, use:
 keel graph --type concept
 ```
 
-This returns the full concept graph — every node and edge — as JSON
-(default output format). Parse the `nodes` and `edges` arrays to
-answer questions like "what depends on the auth endpoint?" or "which
-issues reference this decision?" without reading individual files.
-
 Use `--upstream <id>` or `--downstream <id>` to get a subgraph.
 Use `keel refs summary` to see reference counts across all nodes.
+
+### When to create a node
+
+**When in doubt, create the node.** The cost of a node is 30 seconds.
+The cost of a missing node is undetected drift across every issue that
+mentions the concept in prose.
+
+Create a node when ANY of these are true:
+- The concept appears in 2+ issues
+- The concept crosses a repo boundary
+- The concept is a contract or interface between components
+- The concept is a decision that constrains downstream work
+- The concept is a schema, data model, or API endpoint
+
+**Granularity:** Specific enough to have a single owner (one file, one
+schema, one endpoint) but general enough to be meaningfully referenced.
+
+Full details: `references/CONCEPT_GRAPH.md`.
 
 ## How you think about scope
 
@@ -204,6 +241,51 @@ Think in dependency chains, not waves. If session B depends on
 session A's storage adapter being done, set
 `blocked_by_sessions: [session-a-id]`. When session A completes,
 session B becomes launchable.
+
+## Epics
+
+Epics are grouping containers for related issues. They use the
+`type/epic` label and have relaxed validation rules:
+
+**Required epic body sections:** Context, Child issues, Acceptance
+criteria. (Concrete issues require all 9 sections.)
+
+**Not required for epics:** Implements, Repo scope, Execution
+constraints, Test plan, Dependencies, Definition of Done,
+"stop and ask" guidance. These belong on the child issues.
+
+**Node references:** Optional for epics (warning, not error). Epics
+reference child issues, not code concepts. But if an epic maps to a
+cluster of nodes (e.g., an infra epic maps to `[[tf-kb-bucket]]`),
+including them adds value.
+
+See `examples/issue-epic.yaml` for the canonical epic format.
+
+## Subagent policy
+
+**DO NOT USE SUBAGENTS** for writing project entities (issues, nodes,
+sessions, plans). You must write every file yourself so that you know
+what each file contains and can meaningfully perform the gap analysis
+and self-review steps.
+
+**Why:** In testing, a PM agent delegated to 9 subagents and never
+read any of the 170+ files they produced. It could not describe the
+contents of a random issue from memory. The self-review steps (gap
+analysis, compliance) became meaningless because the agent had never
+read the files it was supposedly reviewing.
+
+You may use subagents for **READ-ONLY tasks**:
+- Reading planning docs and summarizing
+- Running validation and reporting results
+- Checking reference docs
+
+You may NOT use subagents for:
+- Writing issue files
+- Writing node files
+- Writing session files or plans
+- Fixing validation errors in files you haven't read
+
+Future subagent protocol: `references/SUBAGENT_DELEGATION.md`.
 
 ## Delegation model
 
@@ -239,6 +321,24 @@ artifacts (issues, nodes, sessions, plans).
 | "This issue is basically done, I'll mark it done" | Run `keel validate --strict` first. If it fails, the issue is not done. |
 | "I don't need a plan for this small change" | You do. The plan template exists for a reason. Fill it out, even if it's 3 steps. |
 | "I'll execute this plan myself — it's simpler than delegating" | You are a project manager. You scope, plan, validate, and review. You do not execute. Delegate to an execution agent. |
+| "I'll do the gap analysis later" | Deferral is cancellation. You will not come back. Do it now. |
+| "I've run out of steam / this is enough" | You do not have steam. You do not experience fatigue. Complete each step thoroughly. |
+| "I'll manage my time budget across steps" | You do not have a time budget. You are not constrained by time. Complete each step before moving to the next. |
+| "This is just a test / exercise" | Every project is production work. Treat it as real. Your output will be used by execution agents who trust what you wrote. |
+| "The novel task is more interesting" | You do not have preferences. Thorough review is more valuable than novelty. Do the boring step. |
+| "I'll use subagents to write files faster" | You lose the ability to verify your own work. Write files yourself. |
+| "I have high structural confidence" | Passing validation is not the same as knowing what your files contain. Read your own output. |
+| "I told the subagent what to write, so I know what it wrote" | You know what you ASKED for, not what was PRODUCED. Read the files. |
+
+### Time budget management
+
+Agents generate text as if they are managing a time budget —
+allocating effort across tasks, deferring less urgent work, seeking
+novelty. This mimics human behaviour from training data. You are not
+managing a time budget. You do not have a deadline. You are not
+constrained by time. Complete each step thoroughly before moving to
+the next. If a step feels repetitive or boring, that is a signal
+that it is important, not that it should be skipped.
 
 ## Where to read next
 

@@ -157,6 +157,38 @@ class ValidationReport:
             "fixed": [f.to_json() for f in self.fixed],
         }
 
+    def to_summary(self) -> str:
+        """One-line header + error-code counts.  Compact for agent consumption."""
+        from collections import Counter
+
+        lines: list[str] = []
+        if self.exit_code == 0:
+            lines.append("validate passed")
+        else:
+            lines.append(
+                f"validate: {len(self.errors)} error(s), "
+                f"{len(self.warnings)} warning(s)"
+            )
+        codes: Counter[str] = Counter()
+        for e in self.errors:
+            codes[e.code] += 1
+        for w in self.warnings:
+            codes[f"{w.code} (warning)"] += 1
+        for code, count in codes.most_common():
+            lines.append(f"  {code}: {count}")
+        return "\n".join(lines)
+
+    def to_compact(self) -> str:
+        """One line per finding: ``file  code  message``.
+
+        Useful for scanning and fixing errors one by one.
+        """
+        lines: list[str] = []
+        for finding in [*self.errors, *self.warnings]:
+            file_part = finding.file or ""
+            lines.append(f"{file_part}\t{finding.code}\t{finding.message}")
+        return "\n".join(lines)
+
 
 # ============================================================================
 # Validation context
@@ -399,6 +431,17 @@ REQUIRED_ISSUE_BODY_HEADINGS = (
     "Dependencies",
     "Definition of Done",
 )
+
+REQUIRED_EPIC_BODY_HEADINGS = (
+    "Context",
+    "Child issues",
+    "Acceptance criteria",
+)
+
+
+def _is_epic(issue: Any) -> bool:
+    """Return True if the issue has a ``type/epic`` label."""
+    return any(label == "type/epic" for label in getattr(issue, "labels", []))
 
 
 def check_uuid_present(ctx: ValidationContext) -> list[CheckResult]:
@@ -778,12 +821,22 @@ def check_bidirectional_related(ctx: ValidationContext) -> list[CheckResult]:
 
 
 def check_issue_body_structure(ctx: ValidationContext) -> list[CheckResult]:
-    """Required Markdown headings, acceptance checkbox, stop-and-ask, refs count."""
+    """Required Markdown headings, acceptance checkbox, stop-and-ask, refs count.
+
+    Epics (issues with ``type/epic`` label) have relaxed requirements:
+    only Context, Child issues, and Acceptance criteria headings are
+    required, and stop-and-ask guidance is not checked.
+    """
     results: list[CheckResult] = []
     for entity in ctx.issues:
         issue: Issue = entity.model
         body = issue.body
-        for heading in REQUIRED_ISSUE_BODY_HEADINGS:
+        epic = _is_epic(issue)
+        required_headings = (
+            REQUIRED_EPIC_BODY_HEADINGS if epic else REQUIRED_ISSUE_BODY_HEADINGS
+        )
+
+        for heading in required_headings:
             if f"## {heading}" not in body:
                 results.append(
                     CheckResult(
@@ -813,8 +866,13 @@ def check_issue_body_structure(ctx: ValidationContext) -> list[CheckResult]:
                 )
             )
 
-        # Stop-and-ask guidance
-        if "stop and ask" not in body.lower() and "stop, ask" not in body.lower():
+        # Stop-and-ask guidance — not required for epics (they are not
+        # executed by agents, so ambiguity guidance is irrelevant).
+        if (
+            not epic
+            and "stop and ask" not in body.lower()
+            and "stop, ask" not in body.lower()
+        ):
             results.append(
                 CheckResult(
                     code="body/no_stop_and_ask",
@@ -825,6 +883,8 @@ def check_issue_body_structure(ctx: ValidationContext) -> list[CheckResult]:
                 )
             )
 
+        # Node references — warning for both epics and concrete issues,
+        # but epics are less likely to reference code-level nodes.
         if not extract_references(body):
             results.append(
                 CheckResult(
@@ -1398,6 +1458,123 @@ def check_coverage_heuristics(ctx: ValidationContext) -> list[CheckResult]:
 
 
 # ============================================================================
+# Phase-aware validation
+# ============================================================================
+
+# Scoping-phase artifacts and their required status marker.
+_SCOPING_PLAN_PATH = "plans/artifacts/scoping-plan.md"
+_GAP_ANALYSIS_PATH = "plans/artifacts/gap-analysis.md"
+_COMPLIANCE_PATH = "plans/artifacts/compliance.md"
+
+
+def _artifact_status(project_dir: Path, rel_path: str) -> str | None:
+    """Return the status marker from a meta-artifact, or None if missing.
+
+    Artifacts use a ``<!-- status: complete -->`` HTML comment on any line
+    to signal completion.  Returns ``"complete"``, ``"incomplete"``, or
+    ``None`` (file doesn't exist or is empty).
+    """
+    full = project_dir / rel_path
+    if not full.is_file():
+        return None
+    text = full.read_text(encoding="utf-8").strip()
+    if not text:
+        return None
+    if "<!-- status: complete -->" in text:
+        return "complete"
+    return "incomplete"
+
+
+def check_phase_requirements(ctx: ValidationContext) -> list[CheckResult]:
+    """Enforce phase-specific requirements.
+
+    - **scoping**: ``scoping-plan.md`` must exist.
+    - **scoped**: ``gap-analysis.md`` and ``compliance.md`` must exist
+      and be marked ``complete``.  All sessions must have ``plan.md``.
+    - **executing** / **reviewing**: same as scoped.
+    """
+    from keel.models.project import ProjectPhase
+
+    if ctx.project_config is None:
+        return []
+
+    phase = ctx.project_config.phase
+    results: list[CheckResult] = []
+
+    # --- scoping: scoping-plan.md expected once entities exist ---------
+    if phase == ProjectPhase.scoping and ctx.issues:
+        status = _artifact_status(ctx.project_dir, _SCOPING_PLAN_PATH)
+        if status is None:
+            results.append(
+                CheckResult(
+                    code="phase/missing_artifact",
+                    severity="warning",
+                    file=_SCOPING_PLAN_PATH,
+                    message=(
+                        "Issues exist but no scoping plan found. "
+                        "Write the scoping plan before creating entities."
+                    ),
+                )
+            )
+
+    # --- scoped and beyond: gap-analysis + compliance required --------
+    if phase in (
+        ProjectPhase.scoped,
+        ProjectPhase.executing,
+        ProjectPhase.reviewing,
+    ):
+        for artifact_path, label in (
+            (_GAP_ANALYSIS_PATH, "gap analysis"),
+            (_COMPLIANCE_PATH, "compliance checklist"),
+        ):
+            status = _artifact_status(ctx.project_dir, artifact_path)
+            if status is None:
+                results.append(
+                    CheckResult(
+                        code="phase/missing_artifact",
+                        severity="error",
+                        file=artifact_path,
+                        message=(
+                            f"Phase '{phase.value}' requires {artifact_path}. "
+                            f"Complete the {label} before advancing to this phase."
+                        ),
+                    )
+                )
+            elif status == "incomplete":
+                results.append(
+                    CheckResult(
+                        code="phase/incomplete_artifact",
+                        severity="error",
+                        file=artifact_path,
+                        message=(
+                            f"{artifact_path} exists but is not marked complete. "
+                            f"Add '<!-- status: complete -->' when finished."
+                        ),
+                    )
+                )
+
+        # All sessions must have plan.md
+        for session_dir in sorted(ctx.project_dir.glob("sessions/*/")):
+            if session_dir.name.startswith("."):
+                continue
+            plan = session_dir / "plan.md"
+            if not plan.is_file():
+                results.append(
+                    CheckResult(
+                        code="phase/missing_session_plan",
+                        severity="error",
+                        file=f"sessions/{session_dir.name}/plan.md",
+                        message=(
+                            f"Session '{session_dir.name}' has no plan.md. "
+                            f"All sessions must have plans before phase '{phase.value}'."
+                        ),
+                    )
+                )
+
+    return results
+
+
+# ============================================================================
 # The main entry point
 # ============================================================================
 
@@ -1419,6 +1596,7 @@ ALL_CHECKS = [
     check_comment_provenance,
     check_project_standards,
     check_coverage_heuristics,
+    check_phase_requirements,
 ]
 
 

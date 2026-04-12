@@ -145,11 +145,10 @@ class TestValidate:
     def test_clean_project_exits_zero(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         init_project(runner, target)
-        # Default output is now JSON
+        # Default output is text
         result = runner.invoke(cli, ["validate", "--project-dir", str(target)])
         assert result.exit_code == 0
-        payload = json.loads(result.output)
-        assert payload["exit_code"] == 0
+        assert "passed" in result.output
 
     def test_text_format(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
@@ -172,10 +171,20 @@ class TestValidate:
         assert result.exit_code == 2
         assert "id/wrong_prefix" in result.output
 
-    def test_json_format_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
+    def test_text_format_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         init_project(runner, target)
         result = runner.invoke(cli, ["validate", "--project-dir", str(target)])
+        assert result.exit_code == 0
+        # Default is now text, not JSON
+        assert "passed" in result.output
+
+    def test_json_format_explicit(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "p"
+        init_project(runner, target)
+        result = runner.invoke(
+            cli, ["validate", "--project-dir", str(target), "--format", "json"]
+        )
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["version"] == 1
@@ -236,11 +245,10 @@ class TestStatus:
     def test_empty_project(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         init_project(runner, target)
-        # Default is JSON now
+        # Default is rich now
         result = runner.invoke(cli, ["status", "--project-dir", str(target)])
         assert result.exit_code == 0
-        payload = json.loads(result.output)
-        assert payload["total_issues"] == 0
+        assert "0 issues" in result.output or "total_issues" not in result.output
 
     def test_populated_project(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
@@ -254,10 +262,20 @@ class TestStatus:
         assert "2 blocked" in result.output
         assert "critical path: 3" in result.output
 
-    def test_json_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
+    def test_rich_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
         result = runner.invoke(cli, ["status", "--project-dir", str(target)])
+        assert result.exit_code == 0
+        # Default is now rich, not JSON
+        assert "3 issues" in result.output
+
+    def test_json_format_explicit(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "p"
+        populate_project(runner, target)
+        result = runner.invoke(
+            cli, ["status", "--project-dir", str(target), "--format", "json"]
+        )
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["total_issues"] == 3
@@ -312,7 +330,15 @@ class TestGraph:
         runner.invoke(cli, ["validate", "--project-dir", str(target)])
         result = runner.invoke(
             cli,
-            ["graph", "--project-dir", str(target), "--type", "concept", "--format", "mermaid"],
+            [
+                "graph",
+                "--project-dir",
+                str(target),
+                "--type",
+                "concept",
+                "--format",
+                "mermaid",
+            ],
         )
         assert result.exit_code == 0
         assert result.output.startswith("graph LR")

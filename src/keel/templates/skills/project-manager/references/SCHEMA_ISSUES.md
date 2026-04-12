@@ -28,9 +28,10 @@ body file. The canonical example is `examples/issue-fully-formed.yaml` —
 | `updated_at` | ISO datetime | yes | When the issue was last touched. |
 | `created_by` | string | no | Author handle. |
 
-## Required body sections
+## Required body sections — concrete issues
 
-The validator checks that these Markdown headings are present:
+The validator checks that these Markdown headings are present for
+concrete issues (any issue WITHOUT the `type/epic` label):
 
 1. `## Context` — what this issue is about, why it's needed, which
    concept nodes are involved (reference via `[[node-id]]`).
@@ -45,15 +46,35 @@ The validator checks that these Markdown headings are present:
 
 If any heading is missing, the validator emits `body/missing_heading`.
 
+## Required body sections — epic issues
+
+Epic issues (issues with `labels: [type/epic]`) have relaxed
+requirements. The validator checks only these headings:
+
+1. `## Context` — what this epic covers and why it exists.
+2. `## Child issues` — table or list of child issue keys.
+3. `## Acceptance criteria` — checkbox items, at least one.
+
+Epics do NOT require: Implements, Repo scope, Execution constraints,
+Test plan, Dependencies, or Definition of Done. These belong on the
+child issues, not the grouping container.
+
+Epics are also NOT checked for "stop and ask" guidance (they are not
+executed by agents). Node references (`[[node-id]]`) are optional
+for epics (warning, not error).
+
+See `examples/issue-epic.yaml` for the canonical epic format.
+
 ## Other body rules
 
 - **At least one `[[reference]]`** — if an issue has zero concept node
   references, the validator warns (`body/no_references`). This is a
-  strong signal of a coherence gap.
-- **"Stop and ask" guidance** — the body must contain the phrase "stop
-  and ask" (or "stop, ask") somewhere. The validator checks for this.
+  strong signal of a coherence gap. For epics this is a warning only.
+- **"Stop and ask" guidance** — concrete issues must contain the phrase
+  "stop and ask" (or "stop, ask") somewhere. Not required for epics.
 - **At least one acceptance checkbox** — under `## Acceptance criteria`,
-  there must be at least one `- [ ]` or `- [x]` item.
+  there must be at least one `- [ ]` or `- [x]` item. Applies to both
+  concrete issues and epics.
 
 ## File path
 

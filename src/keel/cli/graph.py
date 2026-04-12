@@ -105,8 +105,12 @@ def graph_cmd(
         raise click.ClickException("Cannot specify both --upstream and --downstream.")
 
     rendered = _render(
-        resolved, graph_type, output_format, status_filter,
-        upstream_id=upstream_id, downstream_id=downstream_id,
+        resolved,
+        graph_type,
+        output_format,
+        status_filter,
+        upstream_id=upstream_id,
+        downstream_id=downstream_id,
     )
 
     if output is not None:

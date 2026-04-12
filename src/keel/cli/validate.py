@@ -10,8 +10,10 @@ result:
 
 Output formats:
 - `text` (default): human-readable rendering with rich styling
-- `json`: the full report serialised to the spec's JSON schema, for
-  agents that parse errors programmatically
+- `json`: the full report serialised to the spec's JSON schema
+- `summary`: error-code counts (compact, for progress monitoring)
+- `compact`: one line per error (for fix-by-fix work)
+- `--count`: just the error count as an integer
 """
 
 from __future__ import annotations
@@ -49,10 +51,16 @@ console = Console()
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["text", "json"]),
-    default="json",
+    type=click.Choice(["text", "json", "summary", "compact"]),
+    default="text",
     show_default=True,
-    help="Output format.",
+    help="Output format: text (human-readable), json (structured), summary (code counts), compact (one line per error).",
+)
+@click.option(
+    "--count",
+    "count_only",
+    is_flag=True,
+    help="Print only the error count (integer) and exit.",
 )
 @click.option(
     "--fix",
@@ -67,7 +75,12 @@ console = Console()
 )
 @profileable
 def validate_cmd(
-    project_dir: Path, strict: bool, output_format: str, fix: bool, select_expr: str | None,
+    project_dir: Path,
+    strict: bool,
+    output_format: str,
+    count_only: bool,
+    fix: bool,
+    select_expr: str | None,
 ) -> None:
     """Run the validation gate.
 
@@ -81,8 +94,14 @@ def validate_cmd(
     if select_expr:
         _filter_report_by_selector(report, resolved, select_expr)
 
-    if output_format == "json":
+    if count_only:
+        click.echo(len(report.errors))
+    elif output_format == "json":
         click.echo(json.dumps(report.to_json(), indent=2))
+    elif output_format == "summary":
+        click.echo(report.to_summary())
+    elif output_format == "compact":
+        click.echo(report.to_compact())
     else:
         _render_text(report)
 
@@ -161,7 +180,11 @@ def _render_text(report: ValidationReport) -> None:
     # Category summary
     cats = report.category_summary
     if cats:
-        parts = [f"{cat}: {c['errors']}E/{c['warnings']}W" for cat, c in sorted(cats.items()) if c["errors"] or c["warnings"]]
+        parts = [
+            f"{cat}: {c['errors']}E/{c['warnings']}W"
+            for cat, c in sorted(cats.items())
+            if c["errors"] or c["warnings"]
+        ]
         if parts:
             console.print(f"  [dim]categories: {', '.join(parts)}[/dim]")
 

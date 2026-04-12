@@ -109,6 +109,7 @@ class TestAgendaCollection:
         write_issue(project, "TST-1")
         result = _collect_agenda(project, "status", None)
         from dataclasses import asdict
+
         out = json.loads(json.dumps(asdict(result)))
         assert out["project_name"] == "test-project"
         assert out["total_issues"] == 1

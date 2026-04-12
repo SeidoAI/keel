@@ -51,6 +51,7 @@ def _from_cache(cache: GraphIndex, project_dir: Path) -> FullGraphResult:
         if issue_path.is_file():
             try:
                 from keel.core.parser import parse_frontmatter_body
+
                 fm, _ = parse_frontmatter_body(issue_path.read_text(encoding="utf-8"))
                 label = fm.get("title")
             except Exception:

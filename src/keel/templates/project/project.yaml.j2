@@ -80,4 +80,9 @@ orchestration:
 next_issue_number: 1
 next_session_number: 1
 
+# Workflow phase — the validator enforces phase-specific requirements.
+# Phases: scoping → scoped → executing → reviewing
+# The PM agent advances this after completing each phase's requirements.
+phase: scoping
+
 created_at: "{{ created_at }}"

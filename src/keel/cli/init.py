@@ -69,6 +69,7 @@ VERBATIM_TEMPLATE_MAPPINGS: tuple[tuple[str, str], ...] = (
     ("issue_templates", "issue_templates"),
     ("comment_templates", "comment_templates"),
     ("artifacts", "templates/artifacts"),
+    ("scoping-artifacts", "plans/artifacts"),
     ("agent_templates", "agents"),
     ("session_templates", "session_templates"),
     ("orchestration", "orchestration"),
@@ -442,6 +443,10 @@ def init_cmd(
     target_dir = target.expanduser().resolve()
     target_dir.mkdir(parents=True, exist_ok=True)
 
+    # --force implies --non-interactive — scripted use shouldn't prompt.
+    if force:
+        non_interactive = True
+
     existing_project_yaml = target_dir / "project.yaml"
     if existing_project_yaml.exists() and not force:
         raise InitError(
@@ -556,9 +561,7 @@ def init_cmd(
     console.print("  claude")
     console.print()
     console.print("Then in Claude Code, start scoping with:")
-    console.print(
-        "  [cyan]/pm-scope[/cyan] Describe what you want built."
-    )
+    console.print("  [cyan]/pm-scope[/cyan] Describe what you want built.")
     console.print()
     console.print(
         "[dim]Drop raw planning docs in [/dim][cyan]./plans/[/cyan]"

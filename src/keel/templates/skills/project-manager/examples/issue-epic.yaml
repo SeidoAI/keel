@@ -17,14 +17,19 @@ updated_at: "2026-04-07T10:00:00"
 Top-level epic grouping all backend infrastructure work: storage
 adapter, API endpoints, middleware, and database migrations.
 
-Child issues: SEI-8 (storage adapter), SEI-9 (KB CRUD endpoints),
-SEI-10 (mutation endpoint), SEI-11 (wiki endpoints), SEI-12
-(billing middleware).
+Concept nodes: [[storage-adapter]], [[kb-api-contract]].
 
-## Requirements
-- All child issues completed and passing validation
-- Integration tests across all backend endpoints
+## Child issues
+
+| Key | Title | Status |
+|---|---|---|
+| SEI-8 | Storage adapter implementation | backlog |
+| SEI-9 | KB CRUD endpoints | backlog |
+| SEI-10 | Unified mutation endpoint | backlog |
+| SEI-11 | Wiki endpoints | backlog |
+| SEI-12 | Billing middleware | backlog |
 
 ## Acceptance criteria
 - [ ] All child issues in `done` status
 - [ ] `keel validate --strict` exits 0 with no backend issues open
+- [ ] Integration tests across all backend endpoints pass

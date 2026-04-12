@@ -33,9 +33,7 @@ def _build_page(project_dir: Path) -> str:
     graph = build_full_graph(project_dir)
     dep_graph = build_dependency_graph(issues)
 
-    graph_json = json.dumps(
-        graph.model_dump(mode="json", by_alias=True), indent=2
-    )
+    graph_json = json.dumps(graph.model_dump(mode="json", by_alias=True), indent=2)
     issues_json = json.dumps(
         [
             {
@@ -52,10 +50,11 @@ def _build_page(project_dir: Path) -> str:
     )
     critical_path_json = json.dumps(dep_graph.critical_path)
 
-    return _HTML_TEMPLATE.replace("{{PROJECT_NAME}}", project.name).replace(
-        "{{GRAPH_DATA}}", graph_json
-    ).replace("{{ISSUES_DATA}}", issues_json).replace(
-        "{{CRITICAL_PATH}}", critical_path_json
+    return (
+        _HTML_TEMPLATE.replace("{{PROJECT_NAME}}", project.name)
+        .replace("{{GRAPH_DATA}}", graph_json)
+        .replace("{{ISSUES_DATA}}", issues_json)
+        .replace("{{CRITICAL_PATH}}", critical_path_json)
     )
 
 
@@ -84,7 +83,9 @@ class _SinglePageHandler(SimpleHTTPRequestHandler):
     help="Path to the project root.",
 )
 @click.option("--port", default=7777, show_default=True, help="Port to serve on.")
-@click.option("--open", "open_browser", is_flag=True, help="Open browser automatically.")
+@click.option(
+    "--open", "open_browser", is_flag=True, help="Open browser automatically."
+)
 def view_cmd(project_dir: Path, port: int, open_browser: bool) -> None:
     """Serve a read-only HTML view of the project.
 

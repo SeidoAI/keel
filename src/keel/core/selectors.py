@@ -90,15 +90,18 @@ def resolve_selector(
             raise ValueError(f"Node '{target}' not found in graph.")
         return _resolve_downstream(target, graph, max_depth, expr)
 
+    # Bare ID — validate just this entity, no expansion
+    if expr in all_ids:
+        return SelectorResult(ids={expr}, selector_expr=expr)
+
     raise ValueError(
         f"Invalid selector: {expr!r}. "
-        f"Expected: ID+ (downstream), +ID (upstream), ID+N (N hops), tag:NAME"
+        f"Expected: ID (single entity), ID+ (downstream), +ID (upstream), "
+        f"ID+N (N hops), tag:NAME"
     )
 
 
-def _resolve_upstream(
-    target: str, graph: FullGraphResult, expr: str
-) -> SelectorResult:
+def _resolve_upstream(target: str, graph: FullGraphResult, expr: str) -> SelectorResult:
     """Upstream = target + everything target references transitively."""
     adj: dict[str, set[str]] = {}
     for e in graph.edges:
@@ -118,9 +121,7 @@ def _resolve_downstream(
     return SelectorResult(ids=ids, selector_expr=expr)
 
 
-def _resolve_tag(
-    tag: str, graph: FullGraphResult, expr: str
-) -> SelectorResult:
+def _resolve_tag(tag: str, graph: FullGraphResult, expr: str) -> SelectorResult:
     """Tag selector — match nodes by type or issues by label-like matching.
 
     Since Issue objects aren't in the graph model, we match GraphNode.type.

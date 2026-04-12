@@ -135,19 +135,32 @@ always use `--strict` so warnings and errors are treated the same.
 The only exception is when you've already fixed all errors and want
 to see warnings as warnings (rare).
 
-### Running `validate` without `--format=json`
+### Parsing validate output with inline scripts
 
-Without `--format=json`, you get human-readable text that's harder to
-parse programmatically. Use `--format=json` so you can loop over
-errors, map them to files, and fix them without fuzzy string matching.
+Do not write Python one-liners to parse validate JSON output. Use
+the built-in format options instead:
+- `--format summary` for error-code counts
+- `--format compact` for one line per error
+- `--count` for just the error count
+- `--format text` (default) for human-readable output
+
+### Delegating file writing to subagents
+
+Do not use subagents to write issues, nodes, sessions, or plans. You
+must write every file yourself so that you can meaningfully review
+your own output in the gap analysis step. A PM agent that delegates
+writing has "high structural confidence, low semantic confidence" —
+it knows validation passed but can't describe what any given file
+contains.
 
 ## Concept graph mistakes
 
 ### Creating nodes for everything
 
-Don't create a node for every function or variable. The rule is
-**referenced by 2+ issues OR crossing a repo boundary**. A helper
-function used in one place is inline prose, not a node.
+Don't create a node for every function or variable. But **when in
+doubt, create the node.** The cost of a node is 30 seconds. The
+cost of a missing node is undetected drift. For a coherence tool,
+recall matters more than precision.
 
 ### Creating nodes for nothing
 

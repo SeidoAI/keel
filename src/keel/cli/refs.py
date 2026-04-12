@@ -296,6 +296,83 @@ def _render_refs_check(report: RefsCheckReport) -> None:
 
 
 # ============================================================================
+# refs summary
+# ============================================================================
+
+
+@refs_cmd.command("summary")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    show_default=True,
+)
+def refs_summary(project_dir: Path, output_format: str) -> None:
+    """Per-node reference counts across the project."""
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    nodes = list_nodes(resolved)
+    issues = list_issues(resolved)
+    node_ids = {n.id for n in nodes}
+
+    # Count referrers per node
+    ref_counts: dict[str, list[str]] = {nid: [] for nid in sorted(node_ids)}
+    for issue in issues:
+        for ref in set(extract_references(issue.body)):
+            if ref in ref_counts:
+                ref_counts[ref].append(issue.id)
+    for node in nodes:
+        for ref in set(extract_references(node.body)):
+            if ref in ref_counts and ref != node.id:
+                ref_counts[ref].append(node.id)
+        for related in node.related:
+            if related in ref_counts and related != node.id:
+                if node.id not in ref_counts[related]:
+                    ref_counts[related].append(node.id)
+
+    if output_format == "json":
+        click.echo(
+            json.dumps(
+                {
+                    nid: {"count": len(refs), "referrers": sorted(refs)}
+                    for nid, refs in sorted(ref_counts.items())
+                },
+                indent=2,
+            )
+        )
+        return
+
+    if not ref_counts:
+        console.print("[dim]no concept nodes found[/dim]")
+        return
+
+    table = Table(title="Node reference summary", show_header=True)
+    table.add_column("node")
+    table.add_column("refs", justify="right")
+    table.add_column("referrers")
+    for nid, refs in sorted(ref_counts.items(), key=lambda x: len(x[1])):
+        count = len(refs)
+        style = "red" if count == 0 else "yellow" if count == 1 else ""
+        referrers = ", ".join(sorted(refs)[:5])
+        if len(refs) > 5:
+            referrers += f" (+{len(refs) - 5} more)"
+        table.add_row(
+            f"[{style}]{nid}[/{style}]" if style else nid,
+            f"[{style}]{count}[/{style}]" if style else str(count),
+            referrers,
+        )
+    console.print(table)
+
+
+# ============================================================================
 # Helpers
 # ============================================================================
 
