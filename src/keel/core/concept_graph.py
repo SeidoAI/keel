@@ -45,7 +45,17 @@ def _from_cache(cache: GraphIndex, project_dir: Path) -> FullGraphResult:
             continue
         issue_id = Path(rel).stem
         node_ids.add(issue_id)
-        nodes.append(GraphNode(id=issue_id, kind="issue"))
+        # Read title from the issue file for the graph label
+        label = None
+        issue_path = project_dir / rel
+        if issue_path.is_file():
+            try:
+                from keel.core.parser import parse_frontmatter_body
+                fm, _ = parse_frontmatter_body(issue_path.read_text(encoding="utf-8"))
+                label = fm.get("title")
+            except Exception:
+                pass
+        nodes.append(GraphNode(id=issue_id, kind="issue", label=label))
 
     # Node files → GraphNode(kind="node"). We need name/type/status from the
     # file to populate the display fields; we read the file here (still

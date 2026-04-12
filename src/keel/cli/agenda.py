@@ -225,7 +225,7 @@ def _render_json(result: AgendaResult) -> str:
     "--format",
     "output_format",
     type=click.Choice(["text", "json"]),
-    default="text",
+    default="json",
     show_default=True,
     help="Output format.",
 )

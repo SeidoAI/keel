@@ -48,14 +48,14 @@ the project's shape comes from that output.
 ## Write files directly
 
 You create entities by writing files with your `Write` tool. There are
-no `issue create` or `node create` CLI commands — those are deferred
-from v0. The flow is:
+no `issue create` or `node create` CLI commands. The flow is:
 
 1. Read the relevant schema reference (`references/SCHEMA_<ENTITY>.md`)
 2. Read the matching example file (`examples/<entity>-*.yaml`)
-3. Call `keel next-key --type issue` (for issues only — nodes
-   and sessions use slug ids you choose yourself)
-4. Generate a fresh `uuid4` in-memory for the `uuid` field
+3. Allocate keys: `keel next-key --type issue --count N` for issues
+   (batch allocation). Nodes and sessions use slug ids you choose.
+4. Allocate UUIDs: `keel uuid --count N` for all entities. Do NOT
+   hand-craft UUIDs — the validator checks RFC 4122 version bits.
 5. Use the `Write` tool to drop the YAML file in the right directory
 
 **The example file is the canonical truth.** If a schema reference
@@ -66,19 +66,27 @@ disagrees with the example, trust the example.
 After every batch of file writes, run:
 
 ```bash
-keel validate --strict --format=json
+keel validate --strict
 ```
 
-Parse the JSON. Fix every error. Re-run. Repeat until `exit_code == 0`.
+Output is JSON by default. Fix every error. Re-run. Repeat until
+`exit_code == 0`.
 
 When validating after a targeted edit, use selectors to save tokens:
 
 ```bash
-keel validate --strict --format=json --select SEI-42+
+keel validate --strict --select SEI-42+
 ```
 
 This validates only SEI-42 and its downstream dependents. Use `+SEI-42`
 for upstream. Use `SEI-42+2` to limit to 2 hops.
+
+**What validate checks:** structural integrity — schemas, references,
+bidirectional consistency, status transitions, freshness, UUID format.
+**What validate does NOT check:** semantic completeness. A clean
+validate means "structurally sound," not "the scope is complete." Use
+the gap analysis step in the scoping workflow to check completeness.
+
 The command also rebuilds the graph cache as a side effect — no separate
 rebuild step needed.
 
@@ -88,14 +96,15 @@ Full details: `references/VALIDATION.md`.
 
 Every entity has **both** a canonical `uuid` and a human-readable `id`:
 
-- **UUIDs**: generate yourself (`uuid4`) and put in frontmatter. No CLI
-  call needed. Astronomically unlikely to collide.
+- **UUIDs**: run `keel uuid --count N` to generate real uuid4 values.
+  Do NOT hand-craft UUIDs — the validator checks RFC 4122 version bits.
 - **Sequential issue keys** (`SEI-42`, etc.): call `keel next-key
-  --type issue` **once per new issue**. Atomic under a file lock — safe
-  even if other agents are running in parallel.
+  --type issue --count N` for batch allocation. Atomic under a file
+  lock — safe even if other agents are running in parallel.
 - **Node ids**: you pick the slug (`user-model`, `auth-token-endpoint`).
   No CLI call. Must be lowercase, letter-first, hyphenated.
-- **Session ids**: you pick the slug (`wave1-agent-a`, `critical-fix`).
+- **Session ids**: you pick the slug (`storage-adapter-impl`,
+  `api-endpoints-core`). Descriptive, not wave-numbered.
 
 Full details: `references/ID_ALLOCATION.md`.
 
@@ -110,7 +119,8 @@ and costs you an iteration:
    without exception.
 3. **Forgetting to allocate via `next-key`**. Don't hand-pick issue
    numbers or read `next_issue_number` yourself — the counter drifts.
-4. **Hand-writing UUIDs**. Use a real uuid4. The validator checks format.
+4. **Hand-writing UUIDs**. Use `keel uuid`. The validator checks RFC
+   4122 version bits — hand-crafted hex patterns will be rejected.
 5. **Producing dangling references** — `[[non-existent-node]]` or
    `blocked_by: [INVENTED-99]`. Only reference entities you've created
    or confirmed already exist in the project.
@@ -151,14 +161,49 @@ until the referrer is updated or re-acknowledged.
 When you need to understand what's connected to a given entity, use:
 
 ```bash
-keel graph --format=json
+keel graph --type concept
 ```
 
-This returns the full concept graph — every node and edge — as
-structured JSON. Parse the `nodes` and `edges` arrays to answer
-questions like "what depends on the auth endpoint?" or "which
+This returns the full concept graph — every node and edge — as JSON
+(default output format). Parse the `nodes` and `edges` arrays to
+answer questions like "what depends on the auth endpoint?" or "which
 issues reference this decision?" without reading individual files.
-This is your primary structural query tool.
+
+Use `--upstream <id>` or `--downstream <id>` to get a subgraph.
+Use `keel refs summary` to see reference counts across all nodes.
+
+## How you think about scope
+
+**Do not set a target number** of issues, nodes, or sessions before
+reading the planning docs. Let the planning docs dictate the count.
+If you find yourself thinking "that's enough issues," that's a red
+flag — the planning docs, not your intuition, define scope.
+
+**You are not constrained by time.** Writing 40 well-formed issues
+takes you minutes, not days. Do not compress scope to save effort.
+Do not say "with more time I would split this." Split it now.
+
+**Write for the execution agent, not yourself.** Every issue and
+session plan will be read by an agent that has NOT read the planning
+docs and does NOT share your context. Default to more detail, not
+less. If a concept, endpoint, schema, or decision is relevant,
+write it into the issue body explicitly. The execution agent cannot
+infer what you know.
+
+## Sessions
+
+A session is a bounded unit of delegated work. Sessions launch
+independently when their `blocked_by_sessions` have reached a
+sufficient status — there are no "waves" or batch schedules.
+
+Each session gets its own directory: `sessions/<id>/session.yaml`
+with a `plan.md` alongside it. The plan uses the step-by-step
+template from `examples/artifacts/plan.md`.
+
+Think in dependency chains, not waves. If session B depends on
+session A's storage adapter being done, set
+`blocked_by_sessions: [session-a-id]`. When session A completes,
+session B becomes launchable.
 
 ## Delegation model
 
@@ -175,7 +220,7 @@ or a separate Claude Code session; in the future, a container).
 The execution agent receives the plan and runs it.
 
 After the execution agent completes:
-1. Run `keel validate --strict --format=json`
+1. Run `keel validate --strict`
 2. Review the validation report
 3. If errors: create fix issues or re-delegate
 4. If clean: update issue statuses, close the session

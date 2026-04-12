@@ -100,6 +100,11 @@ class ScaffoldData:
     skill_examples: list[str]
     validation_gate: dict[str, Any]
     id_allocation: dict[str, Any]
+    # Entity counts for incremental context
+    issue_count: int = 0
+    issue_by_status: dict[str, int] = field(default_factory=dict)
+    node_count: int = 0
+    session_count: int = 0
 
 
 # ============================================================================
@@ -225,6 +230,21 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
     project = load_project(project_dir)
     next_issue, next_session, next_node = _collect_next_ids(project)
 
+    # Entity counts
+    issue_files = list((project_dir / "issues").glob("*.yaml")) if (project_dir / "issues").is_dir() else []
+    node_files = list((project_dir / "graph" / "nodes").glob("*.yaml")) if (project_dir / "graph" / "nodes").is_dir() else []
+    session_dirs = [d for d in (project_dir / "sessions").iterdir() if d.is_dir()] if (project_dir / "sessions").is_dir() else []
+
+    issue_by_status: dict[str, int] = {}
+    for f in issue_files:
+        try:
+            from keel.core.parser import parse_frontmatter_body
+            fm, _ = parse_frontmatter_body(f.read_text(encoding="utf-8"))
+            s = fm.get("status", "unknown")
+            issue_by_status[s] = issue_by_status.get(s, 0) + 1
+        except Exception:
+            issue_by_status["parse_error"] = issue_by_status.get("parse_error", 0) + 1
+
     return ScaffoldData(
         project_name=project.name,
         key_prefix=project.key_prefix,
@@ -239,8 +259,12 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
         orchestration=_collect_orchestration(project_dir, project),
         templates=_collect_templates(project_dir),
         skill_examples=_collect_skill_examples(project_dir),
+        issue_count=len(issue_files),
+        issue_by_status=issue_by_status,
+        node_count=len(node_files),
+        session_count=len(session_dirs),
         validation_gate={
-            "command": "keel validate --strict --format=json",
+            "command": "keel validate --strict",
             "exit_codes": {
                 "0": "clean",
                 "1": "warnings only",
@@ -249,10 +273,10 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
             "side_effect": "rebuilds graph/index.yaml",
         },
         id_allocation={
-            "sequential_keys": "keel next-key --type issue",
-            "uuids": "generate uuid4 yourself and add to frontmatter",
+            "sequential_keys": "keel next-key --type issue --count N",
+            "uuids": "keel uuid --count N",
             "rules": [
-                "Do NOT hand-write UUIDs",
+                "Do NOT hand-write UUIDs — validator checks RFC 4122",
                 "Do NOT manually increment project.yaml.next_issue_number",
             ],
         },
@@ -288,6 +312,15 @@ def _render_text(data: ScaffoldData) -> str:
     else:
         lines.append("Repos: (none registered)")
     lines.append("")
+
+    # Entity counts
+    if data.issue_count or data.node_count or data.session_count:
+        status_str = ", ".join(f"{s}={c}" for s, c in sorted(data.issue_by_status.items()))
+        lines.append("EXISTING ENTITIES:")
+        lines.append(f"  issues: {data.issue_count}" + (f" ({status_str})" if status_str else ""))
+        lines.append(f"  concept nodes: {data.node_count}")
+        lines.append(f"  sessions: {data.session_count}")
+        lines.append("")
 
     # Next IDs
     lines.append("NEXT IDS:")

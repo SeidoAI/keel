@@ -34,7 +34,7 @@ Workflow:
    why, acceptance criteria, testing plan).
 8. Update the issue status to `in_progress` and add a comment linking
    to the new session.
-9. Run `keel validate --strict --format=json`. Fix any errors.
+9. Run `keel validate --strict`. Fix any errors.
 10. Commit with a message like `handoff: <issue-key> → <agent-type>`.
 11. Report the session directory path so the user (or the orchestration
     runtime) can dispatch the coding agent.

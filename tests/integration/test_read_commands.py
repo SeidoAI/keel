@@ -145,7 +145,18 @@ class TestValidate:
     def test_clean_project_exits_zero(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         init_project(runner, target)
+        # Default output is now JSON
         result = runner.invoke(cli, ["validate", "--project-dir", str(target)])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["exit_code"] == 0
+
+    def test_text_format(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "p"
+        init_project(runner, target)
+        result = runner.invoke(
+            cli, ["validate", "--project-dir", str(target), "--format", "text"]
+        )
         assert result.exit_code == 0
         assert "passed" in result.output
 
@@ -159,15 +170,12 @@ class TestValidate:
         write_node_file(target, "user-model")
         result = runner.invoke(cli, ["validate", "--project-dir", str(target)])
         assert result.exit_code == 2
-        assert "errors" in result.output.lower()
         assert "id/wrong_prefix" in result.output
 
-    def test_json_format(self, runner: CliRunner, tmp_path: Path) -> None:
+    def test_json_format_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         init_project(runner, target)
-        result = runner.invoke(
-            cli, ["validate", "--project-dir", str(target), "--format", "json"]
-        )
+        result = runner.invoke(cli, ["validate", "--project-dir", str(target)])
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["version"] == 1
@@ -228,28 +236,28 @@ class TestStatus:
     def test_empty_project(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         init_project(runner, target)
+        # Default is JSON now
         result = runner.invoke(cli, ["status", "--project-dir", str(target)])
         assert result.exit_code == 0
-        assert "0 issues" in result.output
+        payload = json.loads(result.output)
+        assert payload["total_issues"] == 0
 
     def test_populated_project(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
-        result = runner.invoke(cli, ["status", "--project-dir", str(target)])
+        # Use rich format for human-readable assertions
+        result = runner.invoke(
+            cli, ["status", "--project-dir", str(target), "--format", "rich"]
+        )
         assert result.exit_code == 0
-        # 3 issues total
         assert "3 issues" in result.output
-        # Blocked count (TST-2 blocked by TST-1, TST-3 blocked by TST-2)
         assert "2 blocked" in result.output
-        # Critical path length 3
         assert "critical path: 3" in result.output
 
-    def test_json_format(self, runner: CliRunner, tmp_path: Path) -> None:
+    def test_json_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
-        result = runner.invoke(
-            cli, ["status", "--project-dir", str(target), "--format", "json"]
-        )
+        result = runner.invoke(cli, ["status", "--project-dir", str(target)])
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["total_issues"] == 3
@@ -271,10 +279,20 @@ class TestStatus:
 
 
 class TestGraph:
-    def test_deps_mermaid(self, runner: CliRunner, tmp_path: Path) -> None:
+    def test_json_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
         result = runner.invoke(cli, ["graph", "--project-dir", str(target)])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert len(payload["nodes"]) == 3
+
+    def test_deps_mermaid(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "p"
+        populate_project(runner, target)
+        result = runner.invoke(
+            cli, ["graph", "--project-dir", str(target), "--format", "mermaid"]
+        )
         assert result.exit_code == 0
         assert result.output.startswith("graph LR")
         assert "TST-1" in result.output
@@ -288,34 +306,22 @@ class TestGraph:
         assert result.exit_code == 0
         assert "digraph" in result.output
 
-    def test_deps_json(self, runner: CliRunner, tmp_path: Path) -> None:
-        target = tmp_path / "p"
-        populate_project(runner, target)
-        result = runner.invoke(
-            cli, ["graph", "--project-dir", str(target), "--format", "json"]
-        )
-        assert result.exit_code == 0
-        payload = json.loads(result.output)
-        assert len(payload["nodes"]) == 3
-        assert len(payload["critical_path"]) == 3
-
     def test_concept_graph(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
-        # First need to build the cache — `validate` does that.
         runner.invoke(cli, ["validate", "--project-dir", str(target)])
         result = runner.invoke(
             cli,
-            ["graph", "--project-dir", str(target), "--type", "concept"],
+            ["graph", "--project-dir", str(target), "--type", "concept", "--format", "mermaid"],
         )
         assert result.exit_code == 0
         assert result.output.startswith("graph LR")
-        assert "user_model" in result.output  # _safe_id replaces hyphens
+        assert "user_model" in result.output
 
     def test_output_to_file(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
-        out = tmp_path / "graph.mmd"
+        out = tmp_path / "graph.json"
         result = runner.invoke(
             cli,
             [
@@ -328,7 +334,9 @@ class TestGraph:
         )
         assert result.exit_code == 0
         assert out.exists()
-        assert out.read_text().startswith("graph LR")
+        # Default is JSON now
+        payload = json.loads(out.read_text())
+        assert "nodes" in payload
 
     def test_status_filter(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"

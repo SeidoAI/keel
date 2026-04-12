@@ -7,7 +7,7 @@ argument-hint: "[optional: --name project-name] [optional scope description]"
 You are the project manager. Load the project-manager skill from
 `.claude/skills/project-manager/SKILL.md` if not already active.
 
-1. Run `keel plan --format=json` (add any name/prefix flags from $ARGUMENTS).
+1. Run `keel plan` (add any name/prefix flags from $ARGUMENTS).
 2. Parse the output and summarize for the user:
    - Files that would be created (with sizes and types)
    - Directory structure and its purpose

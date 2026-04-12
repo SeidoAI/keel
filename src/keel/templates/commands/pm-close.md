@@ -28,7 +28,7 @@ Workflow:
    - `author: pm-agent`
    - Body = the closing note from $ARGUMENTS, or a default if none given
 6. Write the comment file to the issue's comments directory.
-7. Run `keel validate --strict --format=json`. Fix any errors.
+7. Run `keel validate --strict`. Fix any errors.
 8. Commit with a message like `close: <issue-key>`.
 
 If the issue has downstream consumers (`blocked_by` from other issues),

@@ -25,6 +25,7 @@ from keel.cli.refs import refs_cmd
 from keel.cli.scaffold import brief_cmd, scaffold_cmd
 from keel.cli.status import status_cmd
 from keel.cli.templates import templates_cmd
+from keel.cli.uuid_cmd import uuid_cmd
 from keel.cli.validate import validate_cmd
 from keel.cli.view import view_cmd
 
@@ -78,6 +79,7 @@ cli.add_command(brief_cmd)
 cli.add_command(scaffold_cmd)  # hidden alias — prefer `brief`
 cli.add_command(next_key_cmd)
 cli.add_command(plan_cmd)
+cli.add_command(uuid_cmd)
 cli.add_command(validate_cmd)
 cli.add_command(status_cmd)
 cli.add_command(graph_cmd)

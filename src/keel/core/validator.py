@@ -1306,12 +1306,105 @@ def _filter_none(items: list[Any]) -> list[Any]:
 
 
 # ============================================================================
+# v0.2 checks — UUID v4 + coverage heuristics
+# ============================================================================
+
+
+def check_uuid_v4_version(ctx: ValidationContext) -> list[CheckResult]:
+    """Check that UUIDs have RFC 4122 version 4 bits set."""
+    results: list[CheckResult] = []
+    for _bucket_name, bucket in [
+        ("issue", ctx.issues),
+        ("node", ctx.nodes),
+        ("session", ctx.sessions),
+    ]:
+        for entity in bucket:
+            uid = entity.raw_frontmatter.get("uuid")
+            if uid is None:
+                continue
+            uid_str = str(uid).replace("-", "")
+            if len(uid_str) != 32:
+                continue
+            # Version nibble (char 12, 0-indexed) must be '4'
+            version_char = uid_str[12]
+            # Variant nibble (char 16) must be 8, 9, a, or b
+            variant_char = uid_str[16]
+            if version_char != "4" or variant_char not in "89ab":
+                results.append(
+                    CheckResult(
+                        code="uuid/not_v4",
+                        severity="error",
+                        file=entity.rel_path,
+                        field="uuid",
+                        message=(
+                            f"UUID {uid} is not a valid RFC 4122 v4 UUID. "
+                            f"Use `keel uuid` to generate real UUIDs."
+                        ),
+                        fix_hint="Run `keel uuid` and replace the value.",
+                    )
+                )
+    return results
+
+
+def check_coverage_heuristics(ctx: ValidationContext) -> list[CheckResult]:
+    """Coverage warnings — hint at potential semantic gaps."""
+    results: list[CheckResult] = []
+
+    # Build reference counts from issue bodies
+    node_ids = {e.raw_frontmatter.get("id", "") for e in ctx.nodes}
+    node_ref_counts: dict[str, int] = dict.fromkeys(node_ids, 0)
+
+    for entity in ctx.issues:
+        refs = extract_references(entity.body)
+        issue_has_node_ref = False
+        for ref in refs:
+            if ref in node_ref_counts:
+                node_ref_counts[ref] += 1
+                issue_has_node_ref = True
+        if not issue_has_node_ref and entity.body.strip():
+            results.append(
+                CheckResult(
+                    code="coverage/no_nodes_referenced",
+                    severity="warning",
+                    file=entity.rel_path,
+                    message=(
+                        "Issue body contains no [[node-id]] references. "
+                        "Consider linking to relevant concept nodes."
+                    ),
+                )
+            )
+
+    for nid, count in node_ref_counts.items():
+        if count <= 1 and nid:
+            node_entity = next(
+                (e for e in ctx.nodes if e.raw_frontmatter.get("id") == nid),
+                None,
+            )
+            if node_entity:
+                results.append(
+                    CheckResult(
+                        code="coverage/unreferenced_node",
+                        severity="warning",
+                        file=node_entity.rel_path,
+                        message=(
+                            f"Concept node '{nid}' is referenced by only "
+                            f"{count} issue(s). Consider whether other issues "
+                            f"should reference it, or merge it."
+                        ),
+                    )
+                )
+
+    return results
+
+
+# ============================================================================
 # The main entry point
 # ============================================================================
 
 
 ALL_CHECKS = [
     check_uuid_present,
+    check_uuid_v4_version,
     check_id_format,
     check_enum_values,
     check_reference_integrity,
@@ -1325,6 +1418,7 @@ ALL_CHECKS = [
     check_timestamps,
     check_comment_provenance,
     check_project_standards,
+    check_coverage_heuristics,
 ]
 
 

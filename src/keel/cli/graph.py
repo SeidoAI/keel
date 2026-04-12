@@ -51,7 +51,7 @@ from keel.core.store import (
     "--format",
     "output_format",
     type=click.Choice(["mermaid", "dot", "json"]),
-    default="mermaid",
+    default="json",
     show_default=True,
     help="Output format.",
 )

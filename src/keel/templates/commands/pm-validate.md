@@ -10,7 +10,7 @@ skill if not active.
 Mode:
 $ARGUMENTS
 
-1. Run `keel validate --strict --format=json`. Parse the output.
+1. Run `keel validate --strict`. Parse the output.
 2. If `exit_code == 0`:
    - Report "validation clean" plus the duration and cache rebuild
      status. Nothing else needed.
@@ -25,7 +25,7 @@ $ARGUMENTS
      - `sequence/drift`
      - Sorted-list normalisation
    - If the user passed `--fix`, run `keel validate --strict --fix
-     --format=json` and report the auto-fix results. Then re-run the
+    ` and report the auto-fix results. Then re-run the
      validator to confirm clean.
    - For the non-auto-fixable findings, propose specific edits to the
      affected files.

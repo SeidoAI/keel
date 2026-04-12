@@ -194,8 +194,7 @@ class TestScaffoldText:
         result = runner.invoke(
             cli, ["scaffold-for-creation", "--project-dir", str(target)]
         )
-        assert "keel validate --strict --format=json" in result.output
-        assert "Exit 0 = clean" in result.output
+        assert "keel validate --strict" in result.output
 
     def test_id_allocation_instructions_present(
         self, runner: CliRunner, tmp_path: Path

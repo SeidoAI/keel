@@ -22,7 +22,7 @@ Before editing any files:
 4. Apply the minimal set of edits needed to execute the change.
 5. If the change affects the concept graph (new `[[node]]` references,
    or a new node file), verify the graph is consistent.
-6. Run `keel validate --strict --format=json`. Fix any errors.
+6. Run `keel validate --strict`. Fix any errors.
 7. When validation is clean, commit the result with a focused message
    describing just this change.
 

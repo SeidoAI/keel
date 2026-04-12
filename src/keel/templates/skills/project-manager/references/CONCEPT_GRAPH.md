@@ -28,26 +28,38 @@ hash.
 
 ## When to create a node
 
-**Create a node when a concept is referenced by multiple issues OR
-crosses a repo boundary.**
+**When in doubt, create the node.** The cost of a node is 30 seconds
+of writing a YAML file. The cost of a missing node is undetected
+drift across every issue that mentions the concept in prose.
 
-That's the rule. Named bookmarks into the codebase. One-off file
-mentions in a single issue stay as inline prose.
+Create a node when ANY of these are true:
+- The concept appears in 2+ issues
+- The concept crosses a repo boundary
+- The concept is a contract or interface between components
+- The concept is a decision that constrains downstream work
+- The concept is a schema, data model, or API endpoint that other
+  things validate against
 
-Good candidates for nodes:
-- API endpoints that downstream issues consume
-- Data models used across multiple features
-- Decisions (DEC-xxx) that constrain multiple issues
-- API contracts implementing a specification
-- Environment variables or config values consumed in multiple places
-- Terraform outputs consumed by other repos
+**Granularity:** A node should be specific enough to have a single
+owner (one file, one schema, one endpoint) but general enough to be
+meaningfully referenced. If you'd link to it in a design doc, it
+should be a node. If a node covers an entire repo, it's too broad —
+break it into the concepts within the repo that other things
+actually reference.
+
+Good candidates:
+- API endpoints (one node per endpoint or endpoint group)
+- Data schemas (Firestore collections, config schemas, event types)
+- Contracts between systems (SSE event model, approval flow)
+- Decisions that constrain work (storage choice, auth approach)
+- Shared libraries or SDKs (but subdivide: the SDK is one node, the
+  client class within it that others import is another)
+- Infrastructure resources consumed by application code
 
 Bad candidates (keep as prose):
-- A single helper function only mentioned once
-- Local variables
-- Things that don't exist yet and are unlikely to be referenced
-  (exception: `status: planned` nodes for upcoming work are fine if
-  you already know 2+ issues will reference them)
+- A single helper function only one issue mentions
+- Local variables or implementation details
+- Things internal to a single file that nothing else references
 
 ## Reference syntax
 

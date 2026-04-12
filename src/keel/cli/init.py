@@ -40,7 +40,7 @@ CREATED_DIRS = [
     "graph/nodes",
     "sessions",
     "docs/issues",
-    "planning",
+    "plans",
 ]
 PROJECT_TEMPLATE_SUBDIR = "project"
 
@@ -561,7 +561,7 @@ def init_cmd(
     )
     console.print()
     console.print(
-        "[dim]Drop raw planning docs in [/dim][cyan]./planning/[/cyan]"
+        "[dim]Drop raw planning docs in [/dim][cyan]./plans/[/cyan]"
         "[dim] first — /pm-scope reads them automatically.[/dim]"
     )
     console.print()
