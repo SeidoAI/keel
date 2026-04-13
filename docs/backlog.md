@@ -21,7 +21,7 @@ Revisit after v0.1 selector usage patterns emerge.
 
 ### Container-native execution + verification skills
 Full container delegation with execution/verification skills loaded
-per-container. Depends on agent-containers infrastructure. See
+per-container. Depends on `keel.containers` infrastructure. See
 SKILL.md delegation model section for the design intent.
 
 ### `keel plan` full workflow intent abstraction (F15 v2)

@@ -1,12 +1,34 @@
-# Agent Projects UI — Detailed Plan
+# Keel UI — Detailed Plan
 
 ## Context
 
-Command-and-control centre for the agent development platform. Local development tool (localhost only). See `overarching-plan.md` for how it connects to keel (data) and agent-containers (execution).
+Command-and-control centre for the agent development platform. Local
+development tool (localhost only). Part of the `keel` package — lives
+at `src/keel/ui/` alongside `keel.core` and `keel.cli`.
 
-**Tech stack**: React 19, TypeScript 5.8, Vite 7, Tailwind CSS v4, shadcn/ui, React Flow (XyFlow), TanStack Query v5, Biome, Vitest.
+**Tech stack**: React 19, TypeScript 5.8, Vite 7, Tailwind CSS v4,
+shadcn/ui, React Flow (XyFlow), TanStack Query v5, Biome, Vitest.
+Backend: FastAPI (Python), imported directly from `keel.core`.
 
-**Source-of-truth principle**: All customisable data — enums, templates, orchestration patterns, artifact manifests, skills — comes from the project repo, not from the keel-ui package. The UI is purely a visualizer and command surface; it never owns config.
+**Source-of-truth principle**: All customisable data — enums, templates,
+orchestration patterns, artifact manifests, skills — comes from the
+project repo, not from the keel package. The UI is purely a visualizer
+and command surface; it never owns config.
+
+---
+
+## v1 Scope
+
+**v1 ships with:** Project list/switch, kanban board, concept graph
+visualisation, issue detail, node detail, session list/detail,
+artifact viewer, validation status, phase display, WebSocket live
+updates from file watching.
+
+**v2 (future):** Container management, agent messaging, GitHub PR
+integration, approval queue, PM reviews, desktop notifications. These
+features depend on `keel.containers` which is not yet implemented.
+The v1 architecture is designed to accommodate them — routes, services,
+and WebSocket events are defined but stubbed.
 
 ---
 
@@ -15,8 +37,8 @@ Command-and-control centre for the agent development platform. Local development
 ### For new users — zero config
 
 ```bash
-pip install keel-ui       # installs backend + bundled frontend
-keel-ui                   # starts everything, opens browser
+pip install keel          # installs everything including UI
+keel ui                   # starts dashboard, opens browser
 ```
 
 What happens:
@@ -25,16 +47,19 @@ What happens:
 3. Browser opens automatically
 4. Auto-discovers projects — scans for `project.yaml` in:
    - Current directory
-   - `~/.keels/config.yaml` configured roots (if file exists)
+   - `~/.keel/config.yaml` configured roots (if file exists)
    - Common locations: `~/Code/**/project.yaml` (shallow, max 2 levels)
 5. One project found → go straight to it
 6. Multiple → project switcher
 7. None → "No projects found" with instructions to run `keel init`
 
+If keel was installed with `pip install keel[projects]` (minimal),
+`keel ui` prints: "UI requires the full keel install. Run: pip install keel"
+
 ### Configuration (optional)
 
 ```yaml
-# ~/.keels/config.yaml
+# ~/.keel/config.yaml
 project_roots:
   - ~/Code/seido/projects
   - ~/Code/other-org/projects
@@ -46,7 +71,7 @@ open_browser: true
 ### CLI
 
 ```
-keel-ui
+keel ui
   --project-dir TEXT    Open directly to this project [default: auto-discover]
   --port INT            Port [default: 8000]
   --no-browser          Don't auto-open browser
@@ -56,20 +81,23 @@ keel-ui
 ### For UI developers
 
 ```bash
-cd keel-ui
+cd src/keel/ui/frontend   # React source (within the keel repo)
 npm install && npm run dev        # Vite :3000, proxies /api → :8000
 # Separate terminal:
-cd backend && uv run uvicorn keels_api.main:app --reload --port 8000
+keel ui --dev             # FastAPI backend on :8000 with auto-reload
 ```
 
 ### Packaging
 
-The pip package bundles pre-built frontend statics. Backend serves them directly — no Node.js process needed in production mode.
+The pip package bundles pre-built frontend statics at
+`src/keel/ui/static/`. Backend serves them directly — no Node.js
+process needed. The `static/` directory is git-ignored; CI builds it
+from `src/keel/ui/frontend/` before publishing to PyPI.
 
 ```python
-# main.py
+# src/keel/ui/server.py
 if not dev_mode:
-    app.mount("/", StaticFiles(directory=FRONTEND_DIST_DIR, html=True))
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True))
 ```
 
 ---
@@ -79,19 +107,20 @@ if not dev_mode:
 ### Stack
 
 - **FastAPI** (async, WebSocket built-in)
-- **keel** imported as Python library (not subprocess)
-- **Docker CLI** via subprocess for container management
-- **`gh` CLI** via subprocess for GitHub API
-- **SQLite** for message storage (`~/.keels/messages.db`)
+- **keel.core** imported directly (same package)
+- **Docker CLI** via subprocess for container management (v2)
+- **`gh` CLI** via subprocess for GitHub API (v2)
+- **SQLite** for message storage (`~/.keel/messages.db`) (v2)
 - **watchdog** for filesystem monitoring
 - **uvicorn** as ASGI server
 
 ### Service layer
 
 ```
-backend/src/keels_api/
-├── main.py                    # FastAPI app, lifespan, static file serving
-├── config.py                  # Load ~/.keels/config.yaml
+src/keel/ui/
+├── __init__.py
+├── server.py                  # FastAPI app, lifespan, static file serving
+├── config.py                  # Load ~/.keel/config.yaml
 ├── dependencies.py            # FastAPI Depends() — project context, services
 │
 ├── routes/
@@ -99,26 +128,26 @@ backend/src/keels_api/
 │   ├── issues.py              # GET/PATCH /api/projects/:id/issues[/:key], validate
 │   ├── nodes.py               # GET /api/projects/:id/nodes[/:nodeId], check freshness
 │   ├── graph.py               # GET /api/projects/:id/graph/{deps,concept}
-│   ├── sessions.py            # GET /api/projects/:id/sessions[/:sid], re-engage
+│   ├── sessions.py            # GET /api/projects/:id/sessions[/:sid]
 │   ├── agents.py              # GET /api/projects/:id/agents[/:aid]
-│   ├── containers.py          # GET/POST /api/containers — launch, stop, stats, logs, terminal
-│   ├── messages.py            # POST/GET /api/messages — agent messaging
-│   ├── github.py              # GET /api/github/prs, checks, reviews
+│   ├── containers.py          # (v2) GET/POST /api/containers — launch, stop, stats, logs
+│   ├── messages.py            # (v2) POST/GET /api/messages — agent messaging
+│   ├── github.py              # (v2) GET /api/github/prs, checks, reviews
 │   ├── artifacts.py           # GET/POST /api/projects/:id/sessions/:sid/artifacts[/:name]
-│   ├── pm_reviews.py          # GET/POST /api/projects/:id/pm-reviews[/:pr]
+│   ├── pm_reviews.py          # (v2) GET/POST /api/projects/:id/pm-reviews[/:pr]
 │   ├── orchestration.py       # GET /api/projects/:id/orchestration/pattern
 │   ├── enums.py               # GET /api/projects/:id/enums/:name
 │   ├── actions.py             # POST /api/actions/{action}
 │   └── ws.py                  # WebSocket /api/ws
 │
 ├── services/
-│   ├── project_service.py     # Discover + load projects via keel lib
+│   ├── project_service.py     # Discover + load projects via keel.core.store
 │   ├── issue_service.py       # CRUD via keel.core.store
 │   ├── node_service.py        # CRUD via keel.core.node_store
 │   ├── graph_service.py       # Build graphs via keel.core.concept_graph
-│   ├── session_service.py     # Read sessions, trigger re-engagement
-│   ├── container_service.py   # Docker CLI wrapper: ps, stats, logs, start, stop, terminal
-│   ├── github_service.py      # gh CLI wrapper: PRs, checks, reviews, merge, close
+│   ├── session_service.py     # Read sessions
+│   ├── container_service.py   # (v2) Docker CLI wrapper
+│   ├── github_service.py      # (v2) gh CLI wrapper
 │   ├── message_service.py     # SQLite CRUD for messages
 │   ├── artifact_service.py    # Read artifact manifest + files, approve/reject gates
 │   ├── pm_review_service.py   # Run PM PR review checks via keel.core.pm_review
@@ -164,7 +193,7 @@ async def list_issues(project: ProjectContext = Depends(get_project)):
 - `get_stats(id)` → `docker stats <id> --no-stream --format json`
 - `get_logs(id, tail)` → `docker logs <id> --tail N`
 - `stop(id)` → `docker stop <id>`
-- `launch(session_id, project_dir)` → delegates to `agent-containers launch`
+- `launch(session_id, project_dir)` → delegates to `keel-containers launch`
 
 **GitHubService** — `gh` CLI via subprocess:
 - `list_prs(repo, head?)` → `gh pr list --repo R --json ...`
@@ -463,7 +492,7 @@ POST /api/containers/:id/terminal          → open a terminal tab via the confi
 POST /api/containers/cleanup               → remove stopped
 ```
 
-The backend uses the terminal launcher configured in `~/.agent-containers/config.yaml` (`iterm`, `terminal`, `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, `none`, or a fully custom command). Because this is a localhost dev tool, the launcher runs on the same machine as the user.
+The backend uses the terminal launcher configured in `~/.keel-containers/config.yaml` (`iterm`, `terminal`, `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, `none`, or a fully custom command). Because this is a localhost dev tool, the launcher runs on the same machine as the user.
 
 ### Messages
 ```
@@ -700,110 +729,87 @@ A user can manually trigger a review via `POST /api/projects/:id/pm-reviews/:pr-
 
 ### Message storage
 
-- SQLite at `~/.keels/messages.db` (hot store)
+- SQLite at `~/.keel/messages.db` (hot store)
 - On session complete: finalize to `sessions/<id>/messages.yaml` in project repo (permanent audit trail)
 
 ---
 
 ## 10. Package Structure
 
+The UI lives within the keel monorepo. The Python backend is at
+`src/keel/ui/`. The React frontend source is at `src/keel/ui/frontend/`
+and builds to `src/keel/ui/static/` (git-ignored).
+
 ```
-keel-ui/
-├── package.json
-├── vite.config.ts
-├── tsconfig.json
-├── biome.json
-├── src/
-│   ├── app/
-│   │   ├── App.tsx
-│   │   ├── routes.tsx
-│   │   └── ProjectShell.tsx           # layout: sidebar + main + status bar
-│   ├── features/
-│   │   ├── projects/
-│   │   │   ├── ProjectList.tsx
-│   │   │   └── hooks/useProjects.ts
-│   │   ├── kanban/
-│   │   │   ├── KanbanBoard.tsx
-│   │   │   ├── KanbanColumn.tsx
-│   │   │   ├── IssueCard.tsx
-│   │   │   └── hooks/useKanban.ts
-│   │   ├── graph/
-│   │   │   ├── ConceptGraph.tsx
-│   │   │   ├── IssueNode.tsx          # React Flow custom node
-│   │   │   ├── ConceptNode.tsx        # React Flow custom node
-│   │   │   └── hooks/useGraphData.ts
-│   │   ├── issues/
-│   │   │   ├── IssueDetail.tsx
-│   │   │   ├── IssueTimeline.tsx
-│   │   │   ├── MarkdownBody.tsx       # renders [[refs]] as links
-│   │   │   └── hooks/useIssue.ts
-│   │   ├── nodes/
-│   │   │   ├── NodeDetail.tsx
-│   │   │   └── hooks/useNode.ts
-│   │   ├── agents/
-│   │   │   ├── AgentMonitor.tsx
-│   │   │   ├── SessionDetail.tsx
-│   │   │   ├── EngagementTimeline.tsx
-│   │   │   ├── ReEngageDialog.tsx
-│   │   │   ├── SessionStatusBadge.tsx
-│   │   │   └── hooks/
-│   │   │       ├── useSessions.ts
-│   │   │       └── useContainerStatus.ts
-│   │   ├── messages/
-│   │   │   ├── MessageInbox.tsx
-│   │   │   ├── MessageThread.tsx
-│   │   │   ├── PlanApprovalCard.tsx
-│   │   │   ├── MessageBadge.tsx
-│   │   │   └── hooks/
-│   │   │       ├── useMessages.ts
-│   │   │       └── useDesktopNotification.ts
-│   │   ├── artifacts/
-│   │   │   ├── ArtifactViewer.tsx
-│   │   │   ├── ArtifactList.tsx
-│   │   │   ├── ApprovalQueue.tsx
-│   │   │   ├── TaskChecklistProgress.tsx
-│   │   │   └── hooks/
-│   │   │       ├── useArtifacts.ts
-│   │   │       ├── useArtifactManifest.ts
-│   │   │       └── useApprovalQueue.ts
-│   │   ├── pm-reviews/
-│   │   │   ├── PmReviewList.tsx
-│   │   │   ├── PmReviewDetail.tsx
-│   │   │   ├── CheckResultCard.tsx
-│   │   │   └── hooks/usePmReviews.ts
-│   │   ├── orchestration/
-│   │   │   ├── OrchestrationView.tsx
-│   │   │   └── hooks/useOrchestrationPattern.ts
-│   │   └── actions/
-│   │       ├── ActionsPanel.tsx
-│   │       └── hooks/useActions.ts
-│   ├── components/
-│   │   └── ui/                        # shadcn/ui
-│   ├── hooks/
-│   │   └── useProjectWebSocket.ts     # WebSocket + cache invalidation
-│   ├── lib/
-│   │   └── api/
-│   │       ├── client.ts              # fetch wrapper
-│   │       └── queryKeys.ts
-│   └── types/
-│       ├── issue.ts
-│       ├── node.ts
-│       ├── session.ts
-│       ├── container.ts
-│       ├── message.ts
-│       └── events.ts
+src/keel/ui/
+├── __init__.py
+├── server.py                          # FastAPI app, lifespan, static serving
+├── config.py                          # Load ~/.keel/config.yaml
+├── dependencies.py                    # FastAPI Depends() — project context
 │
-├── backend/
-│   ├── pyproject.toml                 # depends on keel, fastapi, watchdog, uvicorn
-│   └── src/keels_api/
-│       ├── main.py
-│       ├── config.py
-│       ├── dependencies.py
-│       ├── routes/                    # one file per resource
-│       ├── services/                  # one file per data source
-│       └── ws/                        # hub + events
+├── routes/                            # one file per resource
+│   ├── projects.py
+│   ├── issues.py
+│   ├── nodes.py
+│   ├── graph.py
+│   ├── sessions.py
+│   ├── artifacts.py
+│   ├── enums.py
+│   ├── orchestration.py
+│   ├── actions.py
+│   └── ws.py                          # WebSocket
 │
-└── tests/
-    ├── frontend/                      # Vitest + RTL
-    └── backend/                       # pytest
+├── services/                          # one file per data source
+│   ├── project_service.py             # uses keel.core.store
+│   ├── issue_service.py               # uses keel.core.store
+│   ├── node_service.py                # uses keel.core.node_store
+│   ├── graph_service.py               # uses keel.core.concept_graph
+│   ├── session_service.py
+│   ├── file_watcher.py                # watchdog → event queue
+│   └── action_service.py
+│
+├── ws/
+│   ├── hub.py                         # WebSocket connection manager
+│   └── events.py                      # event type definitions
+│
+├── static/                            # git-ignored, built from frontend/
+│
+└── frontend/                          # React source
+    ├── package.json
+    ├── vite.config.ts
+    ├── tsconfig.json
+    ├── biome.json
+    ├── src/
+    │   ├── app/
+    │   │   ├── App.tsx
+    │   │   ├── routes.tsx
+    │   │   └── ProjectShell.tsx
+    │   ├── features/
+    │   │   ├── projects/              # ProjectList, useProjects
+    │   │   ├── kanban/                # KanbanBoard, KanbanColumn, IssueCard
+    │   │   ├── graph/                 # ConceptGraph, IssueNode, ConceptNode
+    │   │   ├── issues/                # IssueDetail, MarkdownBody
+    │   │   ├── nodes/                 # NodeDetail
+    │   │   ├── sessions/              # SessionList, SessionDetail
+    │   │   ├── artifacts/             # ArtifactViewer, ArtifactList
+    │   │   ├── agents/                # (v2) AgentMonitor, containers
+    │   │   ├── messages/              # (v2) MessageInbox, MessageThread
+    │   │   ├── pm-reviews/            # (v2) PmReviewList
+    │   │   └── actions/               # ActionsPanel
+    │   ├── components/ui/             # shadcn/ui
+    │   ├── hooks/
+    │   │   └── useProjectWebSocket.ts
+    │   ├── lib/api/
+    │   │   ├── client.ts
+    │   │   └── queryKeys.ts
+    │   └── types/
+    │       ├── issue.ts
+    │       ├── node.ts
+    │       ├── session.ts
+    │       └── events.ts
+    │
+    └── tests/                         # Vitest + RTL
+
+tests/
+└── ui/                                # pytest tests for keel.ui backend
 ```

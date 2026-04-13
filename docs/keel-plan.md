@@ -32,7 +32,7 @@ The first concrete test case is `project-kb-pivot/raw_planning/*.md` — a direc
 
 - **Templates ship as readable example files, not as CLI generator inputs.** The PM skill points the agent at `examples/issue-fully-formed.yaml`, `examples/node-endpoint.yaml`, etc. The agent reads them, learns the shape, and produces files that match. There is no `--template default` flag the agent has to remember.
 
-- **`keel` is fully standalone first-class.** Useful and polished before anyone touches `agent-containers` or `keel-ui`. The verification target (`project-kb-pivot`) only requires the CLI, the skill, and Claude Code — no orchestration runtime, no UI, no containers. The other layers come later, after v0 ships and the verification passes.
+- **`keel` is fully standalone first-class.** Useful and polished before anyone touches `keel-containers` or `keel-ui`. The verification target (`project-kb-pivot`) only requires the CLI, the skill, and Claude Code — no orchestration runtime, no UI, no containers. The other layers come later, after v0 ships and the verification passes.
 
 The rest of this document describes the data model, CLI surface, validator, ID system, and skill structure with this primary use case in mind.
 
@@ -215,10 +215,10 @@ keels/                          # /Users/maia/Code/seido/projects/keels/
 │       │   ├── graph_cache.py           # Incremental graph index cache (v2 schema)
 │       │   └── pm_review.py             # DEFERRED: PM agent PR review checks (deferred from v0)
 │       │   #
-│       │   # NOTE: the orchestration RUNTIME lives in the agent-containers package
-│       │   # (`agent_containers/core/orchestration.py`), NOT here. The keel
+│       │   # NOTE: the orchestration RUNTIME lives in the keel-containers package
+│       │   # (`keel_containers/core/orchestration.py`), NOT here. The keel
 │       │   # package owns the data models and CLI for managing patterns; the runtime
-│       │   # that reads patterns and dispatches actions ships with agent-containers.
+│       │   # that reads patterns and dispatches actions ships with keel-containers.
 │       │
 │       ├── cli/                         # Click CLI — v0 surface only (read + atomic ops)
 │       │   ├── __init__.py
@@ -466,8 +466,8 @@ The complete set of enum files shipped under `templates/enums/`:
 | `node_status.yaml` | Concept node lifecycle (active, planned, deprecated, stale) |
 | `session_status.yaml` | Session lifecycle (planned, active, waiting_for_ci, …, completed, failed) |
 | `re_engagement_trigger.yaml` | Why a session was re-engaged (ci_failure, plan_approved, …) |
-| `message_type.yaml` | MCP message types — gains a new `status` value (see Section: Status Messages in `agent-containers.md`) |
-| `agent_state.yaml` | NEW enum for status messages — see Section: Status Messages in `agent-containers.md` for the full value list (investigating, planning, awaiting_plan_approval, implementing, testing, debugging, refactoring, documenting, self_verifying, blocked, handed_off, done) |
+| `message_type.yaml` | MCP message types — gains a new `status` value (see Section: Status Messages in `keel-containers.md`) |
+| `agent_state.yaml` | NEW enum for status messages — see Section: Status Messages in `keel-containers.md` for the full value list (investigating, planning, awaiting_plan_approval, implementing, testing, debugging, refactoring, documenting, self_verifying, blocked, handed_off, done) |
 
 The `AgentState` enum is brand new in this design — it powers the structured `status` message body so the UI can show "what is the agent doing right now" without parsing free-form text. Because it ships as `templates/enums/agent_state.yaml`, projects can extend it with their own states.
 
@@ -1026,7 +1026,7 @@ engagements:
 
 - **`docs: list[str] | None`** — session-level extra docs. Merged with the agent definition's `context.docs` and every issue's `docs` field, deduped by path, and mounted read-only at `/workspace/docs/<path>` in the container.
 
-- **`current_state: str | None`** — the latest agent state from a `status` message (see the Status Messages section in `agent-containers.md`). The orchestration runtime writes this back to the session YAML each time a new status message arrives so the UI can render it without subscribing to the live stream.
+- **`current_state: str | None`** — the latest agent state from a `status` message (see the Status Messages section in `keel-containers.md`). The orchestration runtime writes this back to the session YAML each time a new status message arrives so the UI can render it without subscribing to the live stream.
 
 - **`orchestration: { pattern: str, overrides: dict }`** — overrides for the project's default orchestration pattern. The hierarchy is **Project → Session** (just two tiers). `project.yaml` declares `orchestration.default_pattern` plus global flags; the session can either pick a different named pattern (`pattern: strict`) or override individual fields (`overrides: {plan_approval_required: true}`). Session-level fields win — straight field-level override, no deeper merging.
 
@@ -1572,7 +1572,7 @@ validate (clean)
 commit
 ```
 
-If `validate` is rigorous, the loop converges quickly and produces clean output. If `validate` is sloppy, errors leak into commits and surface much later (PR review time, agent-containers launch time, CI failure). Every check in the catalogue is something the validator catches that would otherwise be the agent's problem to remember and the human's problem to clean up.
+If `validate` is rigorous, the loop converges quickly and produces clean output. If `validate` is sloppy, errors leak into commits and surface much later (PR review time, keel-containers launch time, CI failure). Every check in the catalogue is something the validator catches that would otherwise be the agent's problem to remember and the human's problem to clean up.
 
 ---
 
@@ -1580,7 +1580,7 @@ If `validate` is rigorous, the loop converges quickly and produces clean output.
 
 Orchestration patterns codify *who acts when*: PM auto-launches vs human approves, plan gate enabled or not, verifier required or skipped, auto-merge on green, etc. Different projects and sessions need different patterns. The patterns themselves are project-owned YAML (with optional Python hook scripts as an escape hatch), version-controlled in the project repo.
 
-**Important: the orchestration runtime lives in `agent-containers`, not `keel`.** The runtime is the engine that reads patterns and dispatches actions on every event. The `keel` package owns the data models, the templates that ship as defaults, and the CLI for managing patterns. This matches the broader principle: the project repo is the configuration; `agent-containers` is the engine that executes that configuration. The runtime reads from the project repo on every event.
+**Important: the orchestration runtime lives in `keel-containers`, not `keel`.** The runtime is the engine that reads patterns and dispatches actions on every event. The `keel` package owns the data models, the templates that ship as defaults, and the CLI for managing patterns. This matches the broader principle: the project repo is the configuration; `keel-containers` is the engine that executes that configuration. The runtime reads from the project repo on every event.
 
 ### File layout
 
@@ -1655,7 +1655,7 @@ hooks:
 
 | Action | Effect |
 |--------|--------|
-| `re_engage` | Calls `keel session re-engage` + `agent-containers launch` |
+| `re_engage` | Calls `keel session re-engage` + `keel-containers launch` |
 | `launch_agent` | Spawns a new container for a named agent (e.g. verifier) |
 | `send_message` | Posts to UI message inbox |
 | `wait_for` | Pauses the orchestrator until an event happens |
@@ -1724,7 +1724,7 @@ orchestration:
 
 ### Where the orchestration runtime runs
 
-The runtime module (`agent_containers/core/orchestration.py`) reacts to events from:
+The runtime module (`keel_containers/core/orchestration.py`) reacts to events from:
 - File watcher on the project repo (issue/session/artifact changes)
 - WebSocket messages (agent status updates from running containers)
 - GitHub webhook polling (CI status, PR reviews)
@@ -2297,10 +2297,10 @@ The following features are NOT in v0. Each entry includes a rationale for why it
 |---------|--------------|
 | `keel issue {create,update}` (mutation CLI) | Agents write files directly using the `Write` tool. Not needed in v0. Adds complexity and a parallel code path that has to stay in sync with the validator. |
 | `keel node {create,update}` (mutation CLI) | Same as above. |
-| `keel session {create,update,re-engage}` (mutation CLI) | Same. `re-engage` becomes relevant only when `agent-containers` exists. |
+| `keel session {create,update,re-engage}` (mutation CLI) | Same. `re-engage` becomes relevant only when `keel-containers` exists. |
 | `keel comment add` (mutation CLI) | Comments are just files. Direct writes work. |
 | `keel pm review-pr` | The PM PR review concept stays in the docs but the CLI for it is deferred — in v0 the PM agent runs `validate` and inspects PRs directly via files and `gh`. |
-| `keel orchestrate evaluate` | Orchestration runtime lives in `agent-containers`, not `keel`. Deferred until that package is built. |
+| `keel orchestrate evaluate` | Orchestration runtime lives in `keel-containers`, not `keel`. Deferred until that package is built. |
 | `keel migrate` (schema migrations) | Premature. Schema is too young to need migrations. Plan to add when v1 makes its first breaking change. |
 | Multiple starter templates (`webapp-fullstack`, `python-backend`, `multi-repo-infra`) | Deferred — only the `default` template ships in v0. Stack-specific starters with seed nodes are valuable but require domain research and maintenance. |
 | Rust validator | Premature. Python validator with `libyaml` + `msgspec` will handle 5000+ entities in <1s. Profile before reaching for Rust. |

@@ -40,9 +40,23 @@ Then in Claude Code:
 That's it. The agent reads your intent, scopes the project, writes the files,
 validates its own work, and hands you a clean project to commit.
 
+To see your project in the web dashboard:
+
+```bash
+keel ui
+```
+
 `keel init` auto-derives a key prefix from the project name (`my-project-cool` →
 `MPC`), defaults to `main` as the base branch, and prompts for anything
 non-obvious. Pass `--key-prefix`, `--base-branch`, or `--repos` to override.
+
+### Minimal install
+
+For CI pipelines or agents that only need the CLI (no web dashboard):
+
+```bash
+pip install keel[projects]
+```
 
 ## What it does
 
