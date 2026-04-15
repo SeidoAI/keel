@@ -88,9 +88,10 @@ class ConceptNode(BaseModel):
 
     @model_validator(mode="after")
     def _workspace_sha_consistent_with_origin(self) -> "ConceptNode":
-        """workspace_sha is required iff origin=workspace."""
-        if self.origin == "workspace" and self.workspace_sha is None:
-            raise ValueError("workspace_sha is required when origin=workspace")
+        """workspace_sha is project-side bookkeeping — only meaningful when
+        origin=workspace. Canonical workspace nodes (in the workspace repo)
+        don't carry it, and local-origin project nodes must not carry it.
+        """
         if self.origin == "local" and self.workspace_sha is not None:
             raise ValueError("workspace_sha is forbidden when origin=local")
         return self

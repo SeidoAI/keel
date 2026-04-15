@@ -39,9 +39,13 @@ class TestOriginAndScope:
         assert n.origin == "workspace"
         assert n.workspace_sha == "a3f2b1c"
 
-    def test_workspace_origin_requires_workspace_sha(self):
-        with pytest.raises(ValidationError):
-            _base_node(origin="workspace", scope="workspace")
+    def test_workspace_origin_without_sha_allowed(self):
+        """Canonical workspace nodes (in the workspace repo itself) have
+        origin=workspace but no workspace_sha — that's project-side
+        bookkeeping stamped at pull time.
+        """
+        n = _base_node(origin="workspace", scope="workspace")
+        assert n.workspace_sha is None
 
     def test_local_origin_forbids_workspace_sha(self):
         with pytest.raises(ValidationError):

@@ -1,69 +1,13 @@
 """keel workspace CLI: init, link, unlink, list, status, prune."""
 
-from datetime import datetime, timezone
-from pathlib import Path
-from uuid import uuid4
-
-import pytest
 from click.testing import CliRunner
 
 from keel.cli.workspace import workspace_cmd
-from keel.core.paths import workspace_nodes_dir
 from keel.core.store import load_project as load_project_config
-from keel.core.workspace_store import (
-    load_workspace,
-    save_workspace,
-    workspace_exists,
-)
-from keel.models.workspace import Workspace
+from keel.core.workspace_store import load_workspace, workspace_exists
 
 
-@pytest.fixture
-def fresh_workspace():
-    """Factory: create a workspace directory with workspace.yaml + nodes/."""
-
-    def _factory(ws_dir: Path, slug: str = "ws") -> Path:
-        ws_dir.mkdir(parents=True, exist_ok=True)
-        workspace_nodes_dir(ws_dir).mkdir(parents=True, exist_ok=True)
-        now = datetime.now(tz=timezone.utc)
-        save_workspace(
-            ws_dir,
-            Workspace(
-                uuid=uuid4(),
-                name=slug,
-                slug=slug,
-                description="",
-                schema_version=1,
-                keel_version="0.6.0",
-                created_at=now,
-                updated_at=now,
-            ),
-        )
-        return ws_dir
-
-    return _factory
-
-
-@pytest.fixture
-def fresh_project():
-    """Factory: create a minimal keel project directory with project.yaml."""
-
-    def _factory(
-        proj_dir: Path, *, name: str = "test", key_prefix: str = "TST"
-    ) -> Path:
-        proj_dir.mkdir(parents=True, exist_ok=True)
-        (proj_dir / "project.yaml").write_text(
-            f"name: {name}\n"
-            f"key_prefix: {key_prefix}\n"
-            "next_issue_number: 1\n"
-            "next_session_number: 1\n",
-            encoding="utf-8",
-        )
-        for sub in ("issues", "nodes", "sessions", "docs"):
-            (proj_dir / sub).mkdir(parents=True, exist_ok=True)
-        return proj_dir
-
-    return _factory
+# fresh_workspace and fresh_project fixtures live in tests/conftest.py.
 
 
 class TestInit:

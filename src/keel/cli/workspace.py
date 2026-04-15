@@ -428,3 +428,151 @@ def workspace_prune_cmd(workspace_dir: Path, force: bool) -> None:
     for p in orphans:
         remove_project(resolved, slug=p.slug)
     click.echo(f"removed {len(orphans)} orphan(s)")
+
+
+# ============================================================================
+# Git helpers (shared across copy/pull/push/merge-resolve)
+# ============================================================================
+
+
+def _git_head(repo_dir: Path) -> str:
+    """Return the short SHA of HEAD in the given git repo."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"],
+        cwd=repo_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def _git_show_node(ws_dir: Path, sha: str, node_id: str) -> dict:
+    """Read a node's frontmatter from a specific workspace commit.
+
+    Raises FileNotFoundError if the file doesn't exist at that sha.
+    """
+    import yaml as _yaml
+
+    result = subprocess.run(
+        ["git", "show", f"{sha}:nodes/{node_id}.yaml"],
+        cwd=ws_dir,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise FileNotFoundError(
+            f"node {node_id} at sha {sha} not in workspace history"
+        )
+    text = result.stdout
+    parts = text.split("---", 2)
+    if len(parts) < 2:
+        raise ValueError(f"malformed frontmatter for {node_id} at {sha}")
+    return _yaml.safe_load(parts[1])
+
+
+def _load_workspace_node(ws_dir: Path, node_id: str):
+    """Load a node from <ws_dir>/nodes/<node_id>.yaml (working tree)."""
+    from keel.core.parser import ParseError, parse_frontmatter_body
+    from keel.core.paths import workspace_node_path
+    from keel.models.node import ConceptNode
+
+    path = workspace_node_path(ws_dir, node_id)
+    if not path.is_file():
+        raise FileNotFoundError(f"node {node_id} not in workspace")
+    text = path.read_text(encoding="utf-8")
+    try:
+        frontmatter, _body = parse_frontmatter_body(text)
+    except ParseError as exc:
+        raise ValueError(f"Could not parse {path}: {exc}") from exc
+    return ConceptNode.model_validate(frontmatter)
+
+
+def _resolve_workspace(proj_dir: Path) -> Path:
+    """Resolve the workspace directory from a project's link pointer."""
+    cfg = load_project_config(proj_dir)
+    if cfg.workspace is None:
+        raise click.ClickException("project is not linked to a workspace")
+    ws_resolved = (proj_dir / cfg.workspace.path).resolve()
+    if not workspace_exists(ws_resolved):
+        raise click.ClickException(
+            f"linked workspace at {ws_resolved} has no workspace.yaml"
+        )
+    return ws_resolved
+
+
+def _find_workspace_entry_for_project(
+    ws_dir: Path, proj_dir: Path
+):
+    """Return the WorkspaceProjectEntry that points at proj_dir, or None."""
+    ws = load_workspace(ws_dir)
+    for entry in ws.projects:
+        if (ws_dir / entry.path).resolve() == proj_dir:
+            return entry
+    return None
+
+
+# ============================================================================
+# copy
+# ============================================================================
+
+
+@workspace_cmd.command("copy")
+@click.argument("node_ids", nargs=-1, required=True)
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def workspace_copy_cmd(
+    node_ids: tuple[str, ...], project_dir: Path
+) -> None:
+    """Import workspace nodes into this project for the first time.
+
+    Each node is stamped with origin=workspace, scope=workspace, and
+    workspace_sha = current workspace HEAD. Refuses when the node id
+    already exists locally — use `pull` (to refresh) or `fork` (to
+    detach) instead.
+    """
+    from keel.core.node_store import node_exists, save_node
+
+    proj = project_dir.expanduser().resolve()
+    _require_project(proj)
+    ws_dir = _resolve_workspace(proj)
+
+    head_sha = _git_head(ws_dir)
+    copied: list[str] = []
+    skipped: list[tuple[str, str]] = []
+
+    for node_id in node_ids:
+        if node_exists(proj, node_id):
+            skipped.append((node_id, "already exists locally"))
+            continue
+        try:
+            canonical = _load_workspace_node(ws_dir, node_id)
+        except FileNotFoundError:
+            skipped.append((node_id, "not found in workspace"))
+            continue
+
+        local_copy = canonical.model_copy(
+            update={
+                "origin": "workspace",
+                "scope": "workspace",
+                "workspace_sha": head_sha,
+                "workspace_pulled_at": datetime.now(tz=timezone.utc),
+            }
+        )
+        save_node(proj, local_copy, update_cache=False)
+        copied.append(node_id)
+
+    for node_id in copied:
+        click.echo(f"✓ {node_id}")
+    for node_id, reason in skipped:
+        click.echo(f"✗ {node_id}: {reason}")
+    click.echo(
+        f"\n{len(copied)} of {len(node_ids)} node(s) copied; "
+        f"workspace_sha={head_sha}."
+    )
+    if skipped and not copied:
+        raise click.exceptions.Exit(1)
