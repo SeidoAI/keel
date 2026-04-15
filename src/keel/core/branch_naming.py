@@ -4,7 +4,7 @@ Format: <type>/<session-slug> where:
 - <type> is one of ALLOWED_TYPES (feat, fix, refactor, docs, chore, test),
   derived from the session's primary issue kind.
 - <session-slug> is the session id minus any "session-" prefix,
-  lowercase, hyphen-separated, ≤ 48 chars.
+  lowercase, hyphen-separated, ≤ `MAX_BRANCH_LENGTH` chars.
 
 The convention is enforced at session launch (handoff.yaml.branch) and
 checked by `keel lint handoff`. Sessions spanning multiple repos use the
@@ -64,9 +64,7 @@ def derive_branch_name(session_id: str, primary_issue_kind: str) -> str:
             f"issue kind '{primary_issue_kind}' has no branch type "
             f"(allowed kinds: {ALLOWED_TYPES})"
         )
-    slug = session_id
-    if slug.startswith(SESSION_ID_PREFIX):
-        slug = slug[len(SESSION_ID_PREFIX):]
+    slug = session_id.removeprefix(SESSION_ID_PREFIX)
     candidate = f"{primary_issue_kind}/{slug}"
     if not is_valid_branch_name(candidate):
         raise BranchNameError(
