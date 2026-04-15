@@ -45,6 +45,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import ValidationError
 
 from keel.core import freshness as freshness_mod
 from keel.core import paths
@@ -61,6 +62,7 @@ from keel.core.store import (
 )
 from keel.models.comment import Comment
 from keel.models.issue import Issue
+from keel.models.manifest import ArtifactManifest
 from keel.models.node import ConceptNode
 from keel.models.project import ProjectConfig
 from keel.models.session import AgentSession
@@ -124,6 +126,15 @@ class ValidationReport:
     fixed: list[CheckResult] = field(default_factory=list)
     cache_rebuilt: bool = False
     duration_ms: int = 0
+
+    @property
+    def findings(self) -> list[CheckResult]:
+        """All findings, errors + warnings + fixed, in a single list.
+
+        Convenience for callers (and tests) that want to scan for a
+        specific code without having to know which bucket it landed in.
+        """
+        return [*self.errors, *self.warnings, *self.fixed]
 
     @property
     def category_summary(self) -> dict[str, dict[str, int]]:
@@ -1141,21 +1152,108 @@ def check_freshness(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
-def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
-    """Sessions in `completed` status must have all required artifacts."""
+def _load_manifest(
+    ctx: ValidationContext,
+) -> tuple[ArtifactManifest | None, list[CheckResult]]:
+    """Parse `templates/artifacts/manifest.yaml` via the Pydantic model.
+
+    Returns (manifest, findings). A missing manifest file is not an error
+    (returns `(None, [])`). YAML parse errors and schema violations — including
+    unknown `produced_by` / `owned_by` agent types — surface as
+    `manifest_schema/*` findings so `check_manifest_schema` can emit them.
+    """
     manifest_path = paths.templates_artifacts_manifest_path(ctx.project_dir)
     if not manifest_path.exists():
-        return []
+        return None, []
+    rel = paths.TEMPLATES_ARTIFACTS_MANIFEST
     try:
-        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError:
+        raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        return None, [
+            CheckResult(
+                code="manifest_schema/parse_error",
+                severity="error",
+                file=rel,
+                message=f"manifest.yaml failed to parse: {exc}",
+            )
+        ]
+    try:
+        manifest = ArtifactManifest.model_validate(raw)
+    except ValidationError as exc:
+        findings: list[CheckResult] = []
+        for err in exc.errors():
+            loc = err.get("loc", ())
+            field_name = loc[-1] if loc else None
+            code = "manifest_schema/invalid"
+            if field_name == "produced_by":
+                code = "manifest_schema/produced_by_valid"
+            elif field_name == "owned_by":
+                code = "manifest_schema/owned_by_valid"
+            findings.append(
+                CheckResult(
+                    code=code,
+                    severity="error",
+                    file=rel,
+                    field=str(field_name) if field_name is not None else None,
+                    message=err.get("msg", "manifest.yaml failed schema validation."),
+                )
+            )
+        return None, findings
+    return manifest, []
+
+
+def check_manifest_schema(ctx: ValidationContext) -> list[CheckResult]:
+    """`templates/artifacts/manifest.yaml` parses and matches the schema.
+
+    Emits `manifest_schema/produced_by_valid` or `manifest_schema/owned_by_valid`
+    when those enum-like fields carry an unknown agent type.
+    """
+    _, findings = _load_manifest(ctx)
+    return findings
+
+
+def check_manifest_phase_ownership_consistent(
+    ctx: ValidationContext,
+) -> list[CheckResult]:
+    """Warn if pm owns an artifact produced during implementing/verifying.
+
+    The PM agent steers scoping and planning; once a session is in
+    `implementing` or `verifying`, the execution/verification agent owns
+    what gets written. A manifest that assigns `owned_by: pm` to such
+    artifacts likely encodes the v0.5 bug where the PM wrote files the
+    execution agent should have written.
+    """
+    manifest, _ = _load_manifest(ctx)
+    if manifest is None:
         return []
-    artifacts = manifest.get("artifacts", []) if isinstance(manifest, dict) else []
-    required_files = [
-        a["file"]
-        for a in artifacts
-        if isinstance(a, dict) and a.get("required") and "file" in a
-    ]
+    results: list[CheckResult] = []
+    for entry in manifest.artifacts:
+        if entry.owned_by == "pm" and entry.produced_at in (
+            "implementing",
+            "verifying",
+        ):
+            results.append(
+                CheckResult(
+                    code="manifest_schema/phase_ownership_consistent",
+                    severity="warning",
+                    file=paths.TEMPLATES_ARTIFACTS_MANIFEST,
+                    field="owned_by",
+                    message=(
+                        f"artifact '{entry.name}' owned by pm but produced at "
+                        f"{entry.produced_at} — consider ownership by "
+                        "execution-agent or verification-agent"
+                    ),
+                )
+            )
+    return results
+
+
+def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
+    """Sessions in `completed` status must have all required artifacts."""
+    manifest, _ = _load_manifest(ctx)
+    if manifest is None:
+        return []
+    required_files = [a.file for a in manifest.artifacts if a.required]
 
     results: list[CheckResult] = []
     for entity in ctx.sessions:
@@ -1899,6 +1997,8 @@ ALL_CHECKS = [
     check_issue_body_structure,
     check_status_transitions,
     check_freshness,
+    check_manifest_schema,
+    check_manifest_phase_ownership_consistent,
     check_artifact_presence,
     check_id_collisions,
     check_sequence_drift,
