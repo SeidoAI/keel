@@ -29,6 +29,27 @@ Refactor all PM workflows to separate intent from I/O via a
 WorkflowIntent dataclass. Allows plan/apply for any workflow, not
 just brief. Revisit when multiple workflows need dry-run support.
 
+### Hybrid frontmatter + markdown-body artifacts for issues and nodes
+Today issues and nodes are pure YAML; narrative content gets crammed
+into multi-line `description:` / `definition:` fields with pipe
+strings. Sessions already do the right thing: `session.yaml` holds
+metadata, `plan.md` holds the narrative. Extending that pattern to
+issues (`issues/<KEY>/issue.yaml` + `README.md` with required
+sections like `## Context`, `## Scope`, `## Success criteria`) and
+nodes (`nodes/<ID>.yaml` + `nodes/<ID>.md`) would let the narrative
+live where agents reason about it best, while validation actually
+gets *stronger* — the validator can require specific H2 section
+headings, making stub-filling harder than it is today with a
+one-line `description: "TBD"`.
+
+Why deferred: the current YAML format is validatable, UI/container
+consumers handle it fine, and agents can parse it even if they
+don't prefer it. The upside is real but incremental, and the
+rewrite touches every template, schema, and test. Revisit once we
+have evidence that narrative-in-YAML is a measured drag on agent
+reasoning quality (A/B experiment: one agent with hybrid artifacts,
+one with current, measure decision quality on a shared task).
+
 ## Explicitly skipped
 
 ### F1: Property drawers (arbitrary metadata on entities)
