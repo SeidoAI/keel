@@ -66,3 +66,107 @@ class TestDeriveBranch:
         )
         assert result.exit_code != 0
         assert "no issues" in result.output.lower()
+
+
+class TestSessionCheck:
+    def test_session_check_reports_missing_handoff(
+        self, save_test_issue, save_test_session, tmp_path_project
+    ):
+        save_test_issue(
+            tmp_path_project, key="TMP-1", kind="feat", title="Setup"
+        )
+        save_test_session(
+            tmp_path_project,
+            session_id="session-setup",
+            issues=["TMP-1"],
+            plan=True,
+        )
+        # No handoff.yaml written yet — check should surface error.
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "check",
+                "session-setup",
+                "--project-dir",
+                str(tmp_path_project),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "handoff.yaml" in result.output.lower()
+
+    def test_session_check_passes_when_ready(
+        self,
+        save_test_issue,
+        save_test_session,
+        tmp_path_project,
+        write_handoff_yaml,
+    ):
+        save_test_issue(
+            tmp_path_project, key="TMP-1", kind="feat", title="Setup"
+        )
+        save_test_session(
+            tmp_path_project,
+            session_id="session-setup",
+            issues=["TMP-1"],
+            plan=True,
+            status="planned",
+        )
+        write_handoff_yaml(
+            tmp_path_project, "session-setup", branch="feat/setup"
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "check",
+                "session-setup",
+                "--project-dir",
+                str(tmp_path_project),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "launch-ready" in result.output.lower()
+
+    def test_session_check_reports_unresolved_blocker(
+        self,
+        save_test_issue,
+        save_test_session,
+        tmp_path_project,
+        write_handoff_yaml,
+    ):
+        save_test_issue(
+            tmp_path_project, key="TMP-1", kind="feat", title="Blocker", status="todo"
+        )
+        save_test_issue(
+            tmp_path_project,
+            key="TMP-2",
+            kind="feat",
+            title="Blocked",
+            blocked_by=["TMP-1"],
+        )
+        save_test_session(
+            tmp_path_project,
+            session_id="session-blocked",
+            issues=["TMP-2"],
+            plan=True,
+        )
+        write_handoff_yaml(
+            tmp_path_project, "session-blocked", branch="feat/blocked"
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "check",
+                "session-blocked",
+                "--project-dir",
+                str(tmp_path_project),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "blocker" in result.output.lower()
+        assert "TMP-1" in result.output
