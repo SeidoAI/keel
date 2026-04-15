@@ -36,4 +36,4 @@ content:
    `rescope: add billing initiative with 8 new issues`).
 
 Rescoping is additive by default. If the user wants to drop work, they
-should use `/pm-close` or explicit `/pm-update` commands.
+should use `/pm-issue-close` or explicit `/pm-edit` commands.
