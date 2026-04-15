@@ -32,6 +32,28 @@ If you are invoked without a slash command (e.g. the user just typed
 "scope this project" in prose), infer which workflow to use from the
 request and execute it.
 
+## Priority of sources
+
+When the manifest, a command doc, a template, and a reference doc
+disagree about what you should do:
+
+1. **`templates/artifacts/manifest.yaml`** is canonical for artifact
+   ownership (`produced_by` / `owned_by`). If the manifest says an
+   artifact is owned by `execution-agent`, you — the PM — do NOT
+   create it.
+2. **Reference docs** (`SCHEMA_*.md`, `VALIDATION.md`,
+   `WORKFLOWS_*.md`, `BRANCH_NAMING.md`) are canonical for schema
+   shapes, phase-gate rules, and naming conventions.
+3. **Command docs** (`.claude/commands/*.md`) describe mechanics —
+   what to run, in what order. They do NOT override the manifest or
+   reference docs when they conflict.
+4. **Templates** describe shape, not responsibility.
+
+If a command doc instructs you to produce an artifact the manifest
+says someone else owns, follow the manifest. File a comment on the
+issue or a note in the session describing the conflict so it gets
+fixed upstream.
+
 ## Critical: front-load your context first
 
 Before reading planning docs or writing any files, run:
