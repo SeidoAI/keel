@@ -895,6 +895,28 @@ def workspace_push_cmd(
             click.echo(f"would {action}: {node_id}")
         return
 
+    # Acquire the workspace lock for the entire write-commit-bookkeep
+    # sequence. Without this, concurrent pushes from different project
+    # repos race on git's own index.lock and one or more may fail.
+    from keel.core.locks import project_lock
+
+    with project_lock(ws_dir):
+        _apply_pushes(proj, ws_dir, pushes)
+
+
+def _apply_pushes(
+    proj: Path, ws_dir: Path, pushes: list[tuple[str, str, dict]]
+) -> None:
+    """Write node files to the workspace, commit, and update bookkeeping.
+
+    Called while holding the workspace lock.
+    """
+    from keel.core.node_store import save_node
+    from keel.core.parser import serialize_frontmatter_body
+    from keel.core.paths import workspace_node_path
+    from keel.core.workspace_store import update_project_push_state
+    from keel.models.node import ConceptNode
+
     # Write each push to the workspace working tree.
     for node_id, _action, final_dict in pushes:
         canonical = dict(final_dict)
@@ -949,7 +971,10 @@ def workspace_push_cmd(
         cwd=ws_dir,
         check=True,
     )
-    new_sha = _git_head(ws_dir)
+    new_sha = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"],
+        cwd=ws_dir, check=True, capture_output=True, text=True,
+    ).stdout.strip()
 
     # Update local bookkeeping on each pushed node.
     for node_id, action, final_dict in pushes:
@@ -965,14 +990,23 @@ def workspace_push_cmd(
         save_node(proj, ConceptNode.model_validate(local), update_cache=False)
 
     # Update workspace.yaml's last_pushed_sha for this project.
+    # We already hold the workspace lock via the enclosing context
+    # manager — inline the mutation to avoid re-entering project_lock.
+    from keel.core.workspace_store import load_workspace, save_workspace
+
     entry = _find_workspace_entry_for_project(ws_dir, proj)
     if entry is not None:
-        update_project_push_state(
-            ws_dir,
-            slug=entry.slug,
-            sha=new_sha,
-            at=datetime.now(tz=timezone.utc),
-        )
+        ws = load_workspace(ws_dir)
+        now = datetime.now(tz=timezone.utc)
+        updated = [
+            p.model_copy(
+                update={"last_pushed_sha": new_sha, "last_pushed_at": now}
+            )
+            if p.slug == entry.slug
+            else p
+            for p in ws.projects
+        ]
+        save_workspace(ws_dir, ws.model_copy(update={"projects": updated}))
 
     for node_id, action, _ in pushes:
         click.echo(f"✓ {node_id}: {action}")
