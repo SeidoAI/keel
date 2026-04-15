@@ -388,6 +388,75 @@ def _git_init(target_dir: Path) -> None:
 # ============================================================================
 
 
+def _link_to_workspace(
+    *,
+    target_dir: Path,
+    workspace_path: Path,
+    key_prefix: str,
+    project_name: str,
+    copy_nodes: str | None,
+) -> None:
+    """Run `keel workspace link` + optional `keel workspace copy` after init.
+
+    Uses subprocess to reuse the same code paths as direct CLI invocation —
+    preserves the bidirectional handshake and all validation logic.
+    """
+    import subprocess as _subprocess
+
+    slug = key_prefix.lower()
+
+    link_result = _subprocess.run(
+        [
+            "uv",
+            "run",
+            "keel",
+            "workspace",
+            "link",
+            str(workspace_path),
+            "--project-dir",
+            str(target_dir),
+            "--slug",
+            slug,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if link_result.returncode != 0:
+        raise InitError(
+            f"Failed to link to workspace at {workspace_path}:\n"
+            f"{link_result.stderr}"
+        )
+
+    console.print(
+        f"[dim]✓ Linked {project_name} to workspace at {workspace_path}[/dim]"
+    )
+
+    if copy_nodes:
+        node_ids = [nid.strip() for nid in copy_nodes.split(",") if nid.strip()]
+        copy_result = _subprocess.run(
+            [
+                "uv",
+                "run",
+                "keel",
+                "workspace",
+                "copy",
+                *node_ids,
+                "--project-dir",
+                str(target_dir),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if copy_result.returncode != 0:
+            console.print(
+                f"[yellow]Warning: failed to copy nodes: {copy_result.stderr}[/yellow]"
+            )
+        else:
+            console.print(
+                f"[dim]✓ Copied {len(node_ids)} node(s) from workspace[/dim]"
+            )
+
+
 @click.command(name="init")
 @click.argument(
     "target",
@@ -424,6 +493,25 @@ def _git_init(target_dir: Path) -> None:
     is_flag=True,
     help="Fail instead of prompting for missing required options.",
 )
+@click.option(
+    "--workspace",
+    "workspace_path",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=None,
+    help=(
+        "Path to a keel workspace to link this project to (v0.6b). "
+        "After init, the project.yaml gains a workspace pointer and the "
+        "workspace.yaml gains a project entry."
+    ),
+)
+@click.option(
+    "--copy-nodes",
+    default=None,
+    help=(
+        "Comma-separated workspace node ids to copy into the project "
+        "after linking. Only valid with --workspace."
+    ),
+)
 def init_cmd(
     target: Path,
     name: str | None,
@@ -434,6 +522,8 @@ def init_cmd(
     no_git: bool,
     force: bool,
     non_interactive: bool,
+    workspace_path: Path | None,
+    copy_nodes: str | None,
 ) -> None:
     """Initialise a new keel in TARGET (or the current directory).
 
@@ -556,6 +646,26 @@ def init_cmd(
         console.print("  [green]+[/green] .git/ (git init + git add)")
     else:
         console.print("  [dim](skipped git init)[/dim]")
+
+    # ------------------------------------------------------------------
+    # Next steps
+    # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Workspace link (v0.6b)
+    # ------------------------------------------------------------------
+
+    if copy_nodes and workspace_path is None:
+        raise InitError("--copy-nodes requires --workspace")
+
+    if workspace_path is not None:
+        _link_to_workspace(
+            target_dir=target_dir,
+            workspace_path=workspace_path.expanduser().resolve(),
+            key_prefix=key_prefix,
+            project_name=name,
+            copy_nodes=copy_nodes,
+        )
 
     # ------------------------------------------------------------------
     # Next steps
