@@ -17,6 +17,7 @@ from keel.cli.completion import completion_cmd
 from keel.cli.enums import enums_cmd
 from keel.cli.graph import graph_cmd
 from keel.cli.init import init_cmd
+from keel.cli.lint import lint_cmd
 from keel.cli.next_key import next_key_cmd
 from keel.cli.node import node_cmd
 from keel.cli.plan import plan_cmd
@@ -82,6 +83,7 @@ cli.add_command(next_key_cmd)
 cli.add_command(plan_cmd)
 cli.add_command(uuid_cmd)
 cli.add_command(validate_cmd)
+cli.add_command(lint_cmd)
 cli.add_command(status_cmd)
 cli.add_command(graph_cmd)
 cli.add_command(refresh_cmd)
