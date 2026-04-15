@@ -639,9 +639,12 @@ def workspace_pull_cmd(
         candidates = [n for n in candidates if n.id in target_ids]
 
     auto_merged: list[str] = []
-    conflicts: list[str] = []
+    conflicts: list[tuple[str, object]] = []  # (node_id, MergeResult)
     skipped: list[tuple[str, str]] = []
     fast_forwards: list[str] = []
+
+    # Used later for brief generation on conflict.
+    conflict_context: dict[str, tuple[dict, dict, dict]] = {}
 
     for node in candidates:
         ours_dict = node.model_dump(mode="python")
@@ -667,7 +670,8 @@ def workspace_pull_cmd(
             continue
 
         if result.status is MergeStatus.CONFLICT:
-            conflicts.append(node.id)
+            conflicts.append((node.id, result))
+            conflict_context[node.id] = (base_dict, ours_dict, theirs_dict)
             continue
 
         # FAST_FORWARD or AUTO_MERGED — apply.
@@ -719,11 +723,55 @@ def workspace_pull_cmd(
             click.echo("\nAlready up to date.")
         return
 
-    # Conflicts present — brief generation lands in T19.
+    # Conflicts present — generate structured briefs for each and write
+    # a draft merge (auto-merged fields applied; conflicting fields left
+    # as ours as a starting point for the agent).
+    from keel.core.merge_brief import MergeType, build_merge_brief, save_merge_brief
+
+    for node_id, result in conflicts:
+        base_dict, ours_dict, theirs_dict = conflict_context[node_id]
+        brief = build_merge_brief(
+            node_id=node_id,
+            merge_type=MergeType.PULL,
+            base_sha=ours_dict.get("workspace_sha") or "",
+            base=base_dict,
+            ours=ours_dict,
+            theirs=theirs_dict,
+            auto_merged_fields=result.auto_merged_fields,  # type: ignore[attr-defined]
+        )
+        save_merge_brief(proj, brief)
+
+        if dry_run:
+            continue
+
+        # Draft merge starting point: apply auto-merged fields, take ours
+        # for conflicting fields, keep workspace_sha unchanged until the
+        # agent runs merge-resolve.
+        draft = dict(base_dict)
+        for f in result.auto_merged_fields:  # type: ignore[attr-defined]
+            if ours_dict.get(f) != base_dict.get(f):
+                draft[f] = ours_dict[f]
+            else:
+                draft[f] = theirs_dict[f]
+        for f in result.conflicting_fields:  # type: ignore[attr-defined]
+            draft[f] = ours_dict[f]
+        draft.update(
+            {
+                "origin": "workspace",
+                "scope": "workspace",
+                "workspace_sha": ours_dict["workspace_sha"],
+                "workspace_pulled_at": datetime.now(tz=timezone.utc),
+            }
+        )
+        save_node(proj, ConceptNode.model_validate(draft), update_cache=False)
+
     click.echo(f"\nNeeds agent resolution ({len(conflicts)}):")
-    for n in conflicts:
-        click.echo(f"  - {n}")
-    click.echo("\nBrief generation + /pm-project-sync ship in T19.")
+    for node_id, _ in conflicts:
+        click.echo(f"  → .keel/merge-briefs/{node_id}.yaml")
+    click.echo(
+        "\nRun /pm-project-sync (or `keel workspace merge-resolve <id>` per "
+        "brief) to proceed."
+    )
     raise click.exceptions.Exit(EXIT_PULL_MERGES_PENDING)
 
 
