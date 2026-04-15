@@ -929,3 +929,115 @@ def workspace_push_cmd(
     for node_id, action, _ in pushes:
         click.echo(f"✓ {node_id}: {action}")
     click.echo(f"\n{len(pushes)} node(s) pushed; workspace at {new_sha}.")
+
+
+# ============================================================================
+# fork
+# ============================================================================
+
+
+@workspace_cmd.command("fork")
+@click.argument("node_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def workspace_fork_cmd(node_id: str, project_dir: Path) -> None:
+    """Detach a workspace-origin node from sync (scope workspace → local).
+
+    The node keeps origin=workspace + workspace_sha for audit, but pull
+    and push skip it. Useful when a project needs to specialize a node
+    without tracking upstream changes.
+    """
+    from keel.core.node_store import load_node, save_node
+
+    proj = project_dir.expanduser().resolve()
+    _require_project(proj)
+
+    try:
+        node = load_node(proj, node_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(
+            f"node '{node_id}' not found in project"
+        ) from exc
+
+    if node.origin != "workspace":
+        raise click.ClickException(
+            f"node '{node_id}' has origin=local — nothing to fork from"
+        )
+    if node.scope == "local":
+        click.echo(
+            f"node '{node_id}' is already forked (origin=workspace, scope=local)"
+        )
+        return
+
+    forked = node.model_copy(update={"scope": "local"})
+    save_node(proj, forked, update_cache=False)
+    click.echo(
+        f"✓ Forked {node_id}. origin={forked.origin} scope={forked.scope} "
+        f"workspace_sha={forked.workspace_sha} (kept for audit)."
+    )
+
+
+# ============================================================================
+# promote
+# ============================================================================
+
+
+@workspace_cmd.command("promote")
+@click.argument("node_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.pass_context
+def workspace_promote_cmd(
+    ctx: click.Context, node_id: str, project_dir: Path
+) -> None:
+    """Promote a local node to workspace (scope local → workspace + push).
+
+    Shortcut that flips ``scope`` and delegates to push. Refuses if the
+    node is already workspace-origin (use pull/push directly) or if the
+    workspace already has a node with the same id.
+    """
+    from keel.core.node_store import load_node, save_node
+    from keel.core.paths import workspace_node_path
+
+    proj = project_dir.expanduser().resolve()
+    _require_project(proj)
+    ws_dir = _resolve_workspace(proj)
+
+    try:
+        node = load_node(proj, node_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(
+            f"node '{node_id}' not found in project"
+        ) from exc
+
+    if node.origin != "local":
+        raise click.ClickException(
+            f"node '{node_id}' is already origin=workspace; promote only "
+            "applies to local-origin nodes. Use `keel workspace push` to "
+            "send pending changes upstream."
+        )
+
+    if workspace_node_path(ws_dir, node_id).exists():
+        raise click.ClickException(
+            f"workspace already has a node with id '{node_id}'. Rename your "
+            "local node, or pull + fork if you're intentionally overriding."
+        )
+
+    # Flip scope and delegate to push.
+    promoted = node.model_copy(update={"scope": "workspace"})
+    save_node(proj, promoted, update_cache=False)
+    click.echo(f"marked {node_id} as scope=workspace; pushing...")
+    ctx.invoke(
+        workspace_push_cmd,
+        project_dir=proj,
+        nodes=node_id,
+        dry_run=False,
+    )
