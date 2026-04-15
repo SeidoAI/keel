@@ -258,6 +258,9 @@ class TestInitBasics:
             "pm-status.md",
             "pm-triage.md",
             "pm-validate.md",
+            # v0.6b workspace commands:
+            "pm-project-create.md",
+            "pm-project-sync.md",
             # Deprecated forwarders (removed in v0.7):
             "pm-close.md",
             "pm-handoff.md",

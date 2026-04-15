@@ -41,7 +41,10 @@ EXPECTED_COMMANDS: tuple[str, ...] = (
     "pm-status",
     "pm-triage",
     "pm-validate",
-    # Deprecated forwarders (still shipped in v0.6a, removed in v0.7):
+    # v0.6b workspace commands:
+    "pm-project-create",
+    "pm-project-sync",
+    # Deprecated forwarders (still shipped, removed in v0.7):
     "pm-close",
     "pm-handoff",
     "pm-plan",
