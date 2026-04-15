@@ -1,7 +1,5 @@
 """Validator rules for manifest ownership (v0.6a additions)."""
 
-from pathlib import Path
-
 
 def test_validator_rejects_invalid_produced_by(tmp_project_manifest):
     """manifest_schema/produced_by_valid fires for unknown agent type."""
