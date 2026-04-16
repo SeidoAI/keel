@@ -41,8 +41,11 @@ coverage.xml
 *.bak
 
 # Project-specific
-# (none yet)
 tmp/
+
+# Frontend
+src/keel/ui/frontend/node_modules/
+src/keel/ui/static/
 
 # Worktrees
 .worktrees/
