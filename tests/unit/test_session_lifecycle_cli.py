@@ -14,8 +14,16 @@ def _init_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
     subprocess.run(
         [
-            "git", "-c", "user.name=t", "-c", "user.email=t@t",
-            "commit", "--allow-empty", "-q", "-m", "init",
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-q",
+            "-m",
+            "init",
         ],
         cwd=path,
         check=True,
@@ -23,14 +31,12 @@ def _init_repo(path: Path) -> None:
 
 
 class TestSessionPause:
-    def test_pause_executing_session(
-        self, tmp_path_project, save_test_session
-    ):
-        proc = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(60)"]
-        )
+    def test_pause_executing_session(self, tmp_path_project, save_test_session):
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         save_test_session(
-            tmp_path_project, "s1", status="executing",
+            tmp_path_project,
+            "s1",
+            status="executing",
             runtime_state={"pid": proc.pid, "claude_session_id": "abc"},
         )
         try:
@@ -46,9 +52,7 @@ class TestSessionPause:
             proc.kill()
             proc.wait()
 
-    def test_pause_rejects_non_executing(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_pause_rejects_non_executing(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="planned")
         runner = CliRunner()
         result = runner.invoke(
@@ -57,11 +61,11 @@ class TestSessionPause:
         )
         assert result.exit_code != 0
 
-    def test_pause_dead_process_sets_failed(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_pause_dead_process_sets_failed(self, tmp_path_project, save_test_session):
         save_test_session(
-            tmp_path_project, "s1", status="executing",
+            tmp_path_project,
+            "s1",
+            status="executing",
             runtime_state={"pid": 4_000_000, "claude_session_id": "abc"},
         )
         runner = CliRunner()
@@ -86,9 +90,7 @@ class TestSessionAbandon:
         s = load_session(tmp_path_project, "s1")
         assert s.status == "abandoned"
 
-    def test_abandon_rejects_completed(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_abandon_rejects_completed(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="completed")
         runner = CliRunner()
         result = runner.invoke(
@@ -97,14 +99,12 @@ class TestSessionAbandon:
         )
         assert result.exit_code != 0
 
-    def test_abandon_executing_kills_process(
-        self, tmp_path_project, save_test_session
-    ):
-        proc = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(60)"]
-        )
+    def test_abandon_executing_kills_process(self, tmp_path_project, save_test_session):
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         save_test_session(
-            tmp_path_project, "s1", status="executing",
+            tmp_path_project,
+            "s1",
+            status="executing",
             runtime_state={"pid": proc.pid, "claude_session_id": "abc"},
         )
         try:
@@ -130,19 +130,33 @@ class TestSessionCleanup:
         _init_repo(clone)
         wt_path = tmp_path / "clone-wt-s1"
         subprocess.run(
-            ["git", "-C", str(clone), "worktree", "add", str(wt_path),
-             "-b", "feat/s1", "HEAD"],
-            check=True, capture_output=True,
+            [
+                "git",
+                "-C",
+                str(clone),
+                "worktree",
+                "add",
+                str(wt_path),
+                "-b",
+                "feat/s1",
+                "HEAD",
+            ],
+            check=True,
+            capture_output=True,
         )
         save_test_session(
-            tmp_path_project, "s1", status="completed",
+            tmp_path_project,
+            "s1",
+            status="completed",
             runtime_state={
-                "worktrees": [{
-                    "repo": "X/Y",
-                    "clone_path": str(clone),
-                    "worktree_path": str(wt_path),
-                    "branch": "feat/s1",
-                }]
+                "worktrees": [
+                    {
+                        "repo": "X/Y",
+                        "clone_path": str(clone),
+                        "worktree_path": str(wt_path),
+                        "branch": "feat/s1",
+                    }
+                ]
             },
         )
         runner = CliRunner()
@@ -153,27 +167,39 @@ class TestSessionCleanup:
         assert result.exit_code == 0, result.output
         assert not wt_path.exists()
 
-    def test_cleanup_skips_failed(
-        self, tmp_path, tmp_path_project, save_test_session
-    ):
+    def test_cleanup_skips_failed(self, tmp_path, tmp_path_project, save_test_session):
         clone = tmp_path / "clone"
         clone.mkdir()
         _init_repo(clone)
         wt_path = tmp_path / "clone-wt-s1"
         subprocess.run(
-            ["git", "-C", str(clone), "worktree", "add", str(wt_path),
-             "-b", "feat/s1", "HEAD"],
-            check=True, capture_output=True,
+            [
+                "git",
+                "-C",
+                str(clone),
+                "worktree",
+                "add",
+                str(wt_path),
+                "-b",
+                "feat/s1",
+                "HEAD",
+            ],
+            check=True,
+            capture_output=True,
         )
         save_test_session(
-            tmp_path_project, "s1", status="failed",
+            tmp_path_project,
+            "s1",
+            status="failed",
             runtime_state={
-                "worktrees": [{
-                    "repo": "X/Y",
-                    "clone_path": str(clone),
-                    "worktree_path": str(wt_path),
-                    "branch": "feat/s1",
-                }]
+                "worktrees": [
+                    {
+                        "repo": "X/Y",
+                        "clone_path": str(clone),
+                        "worktree_path": str(wt_path),
+                        "branch": "feat/s1",
+                    }
+                ]
             },
         )
         runner = CliRunner()
@@ -184,27 +210,39 @@ class TestSessionCleanup:
         assert result.exit_code == 0
         assert wt_path.exists()
 
-    def test_cleanup_explicit_id(
-        self, tmp_path, tmp_path_project, save_test_session
-    ):
+    def test_cleanup_explicit_id(self, tmp_path, tmp_path_project, save_test_session):
         clone = tmp_path / "clone"
         clone.mkdir()
         _init_repo(clone)
         wt_path = tmp_path / "clone-wt-s1"
         subprocess.run(
-            ["git", "-C", str(clone), "worktree", "add", str(wt_path),
-             "-b", "feat/s1", "HEAD"],
-            check=True, capture_output=True,
+            [
+                "git",
+                "-C",
+                str(clone),
+                "worktree",
+                "add",
+                str(wt_path),
+                "-b",
+                "feat/s1",
+                "HEAD",
+            ],
+            check=True,
+            capture_output=True,
         )
         save_test_session(
-            tmp_path_project, "s1", status="failed",
+            tmp_path_project,
+            "s1",
+            status="failed",
             runtime_state={
-                "worktrees": [{
-                    "repo": "X/Y",
-                    "clone_path": str(clone),
-                    "worktree_path": str(wt_path),
-                    "branch": "feat/s1",
-                }]
+                "worktrees": [
+                    {
+                        "repo": "X/Y",
+                        "clone_path": str(clone),
+                        "worktree_path": str(wt_path),
+                        "branch": "feat/s1",
+                    }
+                ]
             },
         )
         runner = CliRunner()
@@ -215,34 +253,46 @@ class TestSessionCleanup:
         assert result.exit_code == 0
         assert not wt_path.exists()
 
-    def test_cleanup_refuses_dirty(
-        self, tmp_path, tmp_path_project, save_test_session
-    ):
+    def test_cleanup_refuses_dirty(self, tmp_path, tmp_path_project, save_test_session):
         clone = tmp_path / "clone"
         clone.mkdir()
         _init_repo(clone)
         wt_path = tmp_path / "clone-wt-s1"
         subprocess.run(
-            ["git", "-C", str(clone), "worktree", "add", str(wt_path),
-             "-b", "feat/s1", "HEAD"],
-            check=True, capture_output=True,
+            [
+                "git",
+                "-C",
+                str(clone),
+                "worktree",
+                "add",
+                str(wt_path),
+                "-b",
+                "feat/s1",
+                "HEAD",
+            ],
+            check=True,
+            capture_output=True,
         )
         (wt_path / "dirty.txt").write_text("uncommitted")
         subprocess.run(["git", "add", "dirty.txt"], cwd=wt_path, check=True)
 
         save_test_session(
-            tmp_path_project, "s1", status="completed",
+            tmp_path_project,
+            "s1",
+            status="completed",
             runtime_state={
-                "worktrees": [{
-                    "repo": "X/Y",
-                    "clone_path": str(clone),
-                    "worktree_path": str(wt_path),
-                    "branch": "feat/s1",
-                }]
+                "worktrees": [
+                    {
+                        "repo": "X/Y",
+                        "clone_path": str(clone),
+                        "worktree_path": str(wt_path),
+                        "branch": "feat/s1",
+                    }
+                ]
             },
         )
         runner = CliRunner()
-        result = runner.invoke(
+        runner.invoke(
             session_cmd,
             ["cleanup", "--project-dir", str(tmp_path_project)],
         )
@@ -296,9 +346,7 @@ class TestSessionAgenda:
         assert result.exit_code == 0
         assert "no sessions" in result.output.lower()
 
-    def test_agenda_shows_launchable(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_agenda_shows_launchable(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="planned")
         save_test_session(tmp_path_project, "s2", status="planned")
         runner = CliRunner()
@@ -311,12 +359,12 @@ class TestSessionAgenda:
         assert "s2" in result.output
         assert "LAUNCHABLE" in result.output
 
-    def test_agenda_shows_blocked(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_agenda_shows_blocked(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="planned")
         save_test_session(
-            tmp_path_project, "s2", status="planned",
+            tmp_path_project,
+            "s2",
+            status="planned",
             blocked_by_sessions=["s1"],
         )
         runner = CliRunner()
@@ -327,9 +375,7 @@ class TestSessionAgenda:
         assert result.exit_code == 0
         assert "BLOCKED" in result.output
 
-    def test_agenda_json_format(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_agenda_json_format(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="planned")
         runner = CliRunner()
         result = runner.invoke(
@@ -338,13 +384,12 @@ class TestSessionAgenda:
         )
         assert result.exit_code == 0
         import json
+
         data = json.loads(result.output)
         assert "sessions" in data
         assert "recommendations" in data
 
-    def test_agenda_all_completed(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_agenda_all_completed(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="completed")
         runner = CliRunner()
         result = runner.invoke(
@@ -354,15 +399,17 @@ class TestSessionAgenda:
         assert result.exit_code == 0
         assert "all sessions complete" in result.output.lower()
 
-    def test_agenda_cycle_exits_nonzero(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_agenda_cycle_exits_nonzero(self, tmp_path_project, save_test_session):
         save_test_session(
-            tmp_path_project, "s1", status="planned",
+            tmp_path_project,
+            "s1",
+            status="planned",
             blocked_by_sessions=["s2"],
         )
         save_test_session(
-            tmp_path_project, "s2", status="planned",
+            tmp_path_project,
+            "s2",
+            status="planned",
             blocked_by_sessions=["s1"],
         )
         runner = CliRunner()

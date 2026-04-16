@@ -79,7 +79,7 @@ def build_agenda(sessions: list[dict]) -> AgendaReport:
         info.blocked_by = resolved_blockers
 
     # Cycle detection via topological sort (Kahn's algorithm)
-    in_degree: dict[str, int] = {sid: 0 for sid in by_id}
+    in_degree: dict[str, int] = dict.fromkeys(by_id, 0)
     for info in by_id.values():
         for _dep_id in info.blocked_by:
             in_degree[info.id] += 1
@@ -117,8 +117,8 @@ def build_agenda(sessions: list[dict]) -> AgendaReport:
             report.blocked.append(info)
 
     # Critical path (longest path in DAG)
-    dist: dict[str, int] = {sid: 0 for sid in by_id}
-    pred: dict[str, str | None] = {sid: None for sid in by_id}
+    dist: dict[str, int] = dict.fromkeys(by_id, 0)
+    pred: dict[str, str | None] = dict.fromkeys(by_id, None)
 
     for sid in topo_order:
         for dep_id in by_id[sid].dependents:

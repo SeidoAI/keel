@@ -41,7 +41,7 @@ from keel.core.git_helpers import (
     worktree_remove,
 )
 from keel.core.process_helpers import is_alive, send_sigterm
-from keel.core.session_readiness import ReadinessItem, check_readiness
+from keel.core.session_readiness import check_readiness
 from keel.core.session_store import list_sessions, load_session, save_session
 from keel.models.session import EngagementEntry, WorktreeEntry
 
@@ -413,7 +413,7 @@ def _launch_claude(
     )
 
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_file = open(log_path, "w")  # noqa: SIM115
+    log_file = open(log_path, "w")
 
     proc = subprocess.Popen(
         [
@@ -639,9 +639,7 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
         click.echo(f"Session '{session_id}' → paused (SIGTERM sent to PID {pid})")
     else:
         session.status = "failed"
-        click.echo(
-            f"Warning: PID {pid} not found — session '{session_id}' → failed"
-        )
+        click.echo(f"Warning: PID {pid} not found — session '{session_id}' → failed")
 
     session.updated_at = now
     save_session(resolved, session)
@@ -733,9 +731,7 @@ def session_cleanup_cmd(
             if not wt_path.exists():
                 continue
             if not force and worktree_is_dirty(wt_path):
-                click.echo(
-                    f"  Skipping {wt_path} — uncommitted changes (use --force)"
-                )
+                click.echo(f"  Skipping {wt_path} — uncommitted changes (use --force)")
                 continue
             clone_path = Path(wt.clone_path)
             worktree_remove(clone_path, wt_path)
@@ -849,9 +845,7 @@ def session_agenda_cmd(
 
     if report.critical_path and len(report.critical_path) > 1:
         cp = " → ".join(report.critical_path)
-        click.echo(
-            f"\n  critical path: {cp} ({len(report.critical_path)} sessions)"
-        )
+        click.echo(f"\n  critical path: {cp} ({len(report.critical_path)} sessions)")
 
     if report.launchable:
         click.echo("\nLAUNCHABLE (all blockers completed):")

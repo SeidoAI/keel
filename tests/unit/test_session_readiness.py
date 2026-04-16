@@ -1,7 +1,5 @@
 """Session readiness checks (shared between queue, spawn, check)."""
 
-from pathlib import Path
-
 import pytest
 
 from keel.core.session_readiness import check_readiness
@@ -12,9 +10,7 @@ class TestCheckReadiness:
         with pytest.raises(FileNotFoundError):
             check_readiness(tmp_path_project, "nonexistent", kind="check")
 
-    def test_minimal_session_missing_plan(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_minimal_session_missing_plan(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", plan=False)
         report = check_readiness(tmp_path_project, "s1", kind="check")
         assert not report.ready

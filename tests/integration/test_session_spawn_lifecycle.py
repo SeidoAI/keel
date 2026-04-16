@@ -17,8 +17,16 @@ def _init_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
     subprocess.run(
         [
-            "git", "-c", "user.name=t", "-c", "user.email=t@t",
-            "commit", "--allow-empty", "-q", "-m", "init",
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-q",
+            "-m",
+            "init",
         ],
         cwd=path,
         check=True,
@@ -49,7 +57,7 @@ class TestSpawnLifecycle:
         clone.mkdir()
         _init_repo(clone)
 
-        shim = _create_claude_shim(tmp_path)
+        _create_claude_shim(tmp_path)
         env = {**os.environ, "PATH": f"{tmp_path}:{os.environ.get('PATH', '')}"}
 
         save_test_session(
@@ -102,14 +110,10 @@ class TestSpawnLifecycle:
         save_session(tmp_path_project, s)
 
         # Cleanup
-        result = runner.invoke(
-            session_cmd, ["cleanup", "--project-dir", pdir]
-        )
+        result = runner.invoke(session_cmd, ["cleanup", "--project-dir", pdir])
         assert result.exit_code == 0, result.output
 
-    def test_agenda_with_dependencies(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_agenda_with_dependencies(self, tmp_path_project, save_test_session):
         """Agenda correctly identifies launchable vs blocked."""
         save_test_session(tmp_path_project, "s1", status="planned")
         save_test_session(
@@ -131,9 +135,7 @@ class TestSpawnLifecycle:
         assert "BLOCKED" in result.output
         assert "s2" in result.output
 
-    def test_abandon_then_cleanup(
-        self, tmp_path, tmp_path_project, save_test_session
-    ):
+    def test_abandon_then_cleanup(self, tmp_path, tmp_path_project, save_test_session):
         """Abandon sets status, cleanup removes worktree."""
         clone = tmp_path / "clone"
         clone.mkdir()
@@ -141,8 +143,15 @@ class TestSpawnLifecycle:
         wt_path = tmp_path / "clone-wt-s1"
         subprocess.run(
             [
-                "git", "-C", str(clone), "worktree", "add",
-                str(wt_path), "-b", "feat/s1", "HEAD",
+                "git",
+                "-C",
+                str(clone),
+                "worktree",
+                "add",
+                str(wt_path),
+                "-b",
+                "feat/s1",
+                "HEAD",
             ],
             check=True,
             capture_output=True,

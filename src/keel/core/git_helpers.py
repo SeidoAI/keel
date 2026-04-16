@@ -9,7 +9,14 @@ from pathlib import Path
 def branch_exists(repo_path: Path, branch_name: str) -> bool:
     """Check whether a branch exists in the given repo."""
     result = subprocess.run(
-        ["git", "-C", str(repo_path), "rev-parse", "--verify", f"refs/heads/{branch_name}"],
+        [
+            "git",
+            "-C",
+            str(repo_path),
+            "rev-parse",
+            "--verify",
+            f"refs/heads/{branch_name}",
+        ],
         capture_output=True,
     )
     return result.returncode == 0
@@ -33,10 +40,14 @@ def worktree_add(
     """Create a git worktree with a new branch."""
     subprocess.run(
         [
-            "git", "-C", str(clone_path),
-            "worktree", "add",
+            "git",
+            "-C",
+            str(clone_path),
+            "worktree",
+            "add",
             str(wt_path),
-            "-b", branch,
+            "-b",
+            branch,
             base_ref,
         ],
         check=True,

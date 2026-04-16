@@ -14,8 +14,16 @@ def _init_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
     subprocess.run(
         [
-            "git", "-c", "user.name=t", "-c", "user.email=t@t",
-            "commit", "--allow-empty", "-q", "-m", "init",
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-q",
+            "-m",
+            "init",
         ],
         cwd=path,
         check=True,
@@ -23,9 +31,7 @@ def _init_repo(path: Path) -> None:
 
 
 class TestSessionSpawn:
-    def test_spawn_rejects_non_queued(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_spawn_rejects_non_queued(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="planned")
         runner = CliRunner()
         result = runner.invoke(
@@ -43,13 +49,18 @@ class TestSessionSpawn:
         _init_repo(clone)
 
         save_test_session(
-            tmp_path_project, "s1", plan=True, status="queued",
+            tmp_path_project,
+            "s1",
+            plan=True,
+            status="queued",
             repos=[{"repo": "SeidoAI/keel", "base_branch": "main"}],
         )
         write_handoff_yaml(tmp_path_project, "s1")
 
-        with patch("shutil.which", return_value="/usr/bin/claude"), \
-             patch("keel.cli.session._resolve_clone_path", return_value=clone):
+        with (
+            patch("shutil.which", return_value="/usr/bin/claude"),
+            patch("keel.cli.session._resolve_clone_path", return_value=clone),
+        ):
             runner = CliRunner()
             result = runner.invoke(
                 session_cmd,
@@ -68,15 +79,21 @@ class TestSessionSpawn:
         _init_repo(clone)
 
         save_test_session(
-            tmp_path_project, "s1", plan=True, status="queued",
-            repos=[{"repo": "SeidoAI/keel", "base_branch": "main",
-                     "branch": "feat/s1"}],
+            tmp_path_project,
+            "s1",
+            plan=True,
+            status="queued",
+            repos=[
+                {"repo": "SeidoAI/keel", "base_branch": "main", "branch": "feat/s1"}
+            ],
         )
         write_handoff_yaml(tmp_path_project, "s1", branch="feat/s1")
 
-        with patch("shutil.which", return_value="/usr/bin/claude"), \
-             patch("keel.cli.session._resolve_clone_path", return_value=clone), \
-             patch("keel.cli.session._launch_claude", return_value=99999):
+        with (
+            patch("shutil.which", return_value="/usr/bin/claude"),
+            patch("keel.cli.session._resolve_clone_path", return_value=clone),
+            patch("keel.cli.session._launch_claude", return_value=99999),
+        ):
             runner = CliRunner()
             result = runner.invoke(
                 session_cmd,

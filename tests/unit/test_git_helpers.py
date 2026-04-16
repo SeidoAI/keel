@@ -17,8 +17,16 @@ def _init_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
     subprocess.run(
         [
-            "git", "-c", "user.name=t", "-c", "user.email=t@t",
-            "commit", "--allow-empty", "-q", "-m", "init",
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-q",
+            "-m",
+            "init",
         ],
         cwd=path,
         check=True,

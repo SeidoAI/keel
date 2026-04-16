@@ -17,9 +17,7 @@ class TestIsAlive:
 
 class TestSendSigterm:
     def test_sigterm_running_process(self):
-        proc = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(60)"]
-        )
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         try:
             assert send_sigterm(proc.pid) is True
             proc.wait(timeout=5)
