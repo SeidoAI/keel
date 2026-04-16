@@ -43,9 +43,10 @@ coverage.xml
 # Project-specific
 tmp/
 
-# Frontend
-src/keel/ui/frontend/node_modules/
+# UI frontend build artifacts
 src/keel/ui/static/
+src/keel/ui/frontend/node_modules/
+src/keel/ui/frontend/dist/
 
 # Worktrees
 .worktrees/
