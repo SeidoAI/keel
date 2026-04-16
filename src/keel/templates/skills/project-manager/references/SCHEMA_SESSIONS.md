@@ -122,7 +122,7 @@ structure.
 
 ## `handoff.yaml` (v0.6a+)
 
-Written by the PM agent at session launch via `/pm-session-launch`.
+Written by the PM agent at session launch via `/pm-session-queue`.
 Lives at `sessions/<id>/handoff.yaml`. **Required when the session
 is in `queued` state** (validator rule `handoff_schema/required_at_queued`).
 
@@ -161,7 +161,7 @@ last_verification_passed_at: null
 
 - `/pm-session-create` writes the initial version with `branch` filled
   in from `keel session derive-branch` output.
-- `/pm-session-launch` validates readiness and confirms; it does not
+- `/pm-session-queue` validates readiness and confirms; it does not
   rewrite the handoff record.
 - Execution agents read `handoff.yaml` first thing on start.
 

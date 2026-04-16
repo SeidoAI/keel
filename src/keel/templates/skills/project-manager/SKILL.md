@@ -27,9 +27,11 @@ selects the workflow to execute:
 | `/pm-validate` | read-only wrapper | Running the validation gate and interpreting errors |
 | `/pm-lint` | read-only wrapper | Running stage-aware heuristic checks (scoping, handoff, session) |
 | `/pm-session-create` | specialization | Scaffolding a session for an issue |
-| `/pm-session-launch` | specialization | Transitioning an existing session from planned → queued |
+| `/pm-session-queue` | specialization | Transitioning an existing session from planned → queued |
+| `/pm-session-spawn` | specialization | Spawning a queued session locally via Claude Code subprocess |
 | `/pm-session-check` | read-only wrapper | Reporting launch-readiness for a session |
 | `/pm-session-progress` | read-only wrapper | Aggregating in-flight session status |
+| `/pm-session-agenda` | read-only wrapper | Session dependency DAG with launch recommendations |
 | `/pm-rescope` | `WORKFLOWS_INITIAL_SCOPING.md` (expand mode) | Adding new scope to an existing project |
 | `/pm-issue-close` | `WORKFLOWS_INCREMENTAL_UPDATE.md` (close mode) | Marking an issue done + writing a closing comment |
 

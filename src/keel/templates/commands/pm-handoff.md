@@ -1,6 +1,6 @@
 ---
 name: pm-handoff
-description: DEPRECATED — use /pm-session-create or /pm-session-launch.
+description: DEPRECATED — use /pm-session-create or /pm-session-queue.
 argument-hint: "<issue-key-or-session-id>"
 ---
 
@@ -11,7 +11,7 @@ commands:
 
 - `/pm-session-create <issue-key> [agent-type]` — scaffold a new
   session for an issue (formerly the implicit first half of handoff).
-- `/pm-session-launch <session-id>` — transition an existing
+- `/pm-session-queue <session-id>` — transition an existing
   session from `planned` to `queued` (formerly the implicit second
   half).
 
@@ -21,7 +21,7 @@ Choose based on your starting state:
   `/pm-session-create $ARGUMENTS` (assuming `$ARGUMENTS` is an issue
   key like `AUTH-42`).
 - **I already have a session and need to launch it**: run
-  `/pm-session-launch $ARGUMENTS` (assuming `$ARGUMENTS` is a session
+  `/pm-session-queue $ARGUMENTS` (assuming `$ARGUMENTS` is a session
   id like `session-auth-42-setup`).
 
 If `$ARGUMENTS` is ambiguous (could be either), tell the user to
