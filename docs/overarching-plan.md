@@ -320,7 +320,7 @@ docs:
   - docs/auth/jwt-spec.md
   - docs/decisions/DEC-003.md
 
-# sessions/wave1-agent-a.yaml — extra docs for this multi-issue session
+# sessions/api-endpoints-core.yaml — extra docs for this multi-issue session
 docs:
   - docs/integration/cross-service-flow.md
 ```
@@ -332,13 +332,12 @@ This solves the alignment problem at every granularity: agents always read the l
 Sessions point to an agent definition and carry runtime state across re-engagements:
 
 ```yaml
-# sessions/wave1-agent-a.yaml
+# sessions/api-endpoints-core.yaml
 ---
-id: wave1-agent-a
+id: api-endpoints-core
 name: "Agent A: Auth + User Model"
 agent: backend-coder                  # references agents/backend-coder.yaml
 issues: [SEI-40, SEI-42]
-wave: 1
 
 # Multi-repo: sessions can target multiple repos. All repos are equal — no
 # primary. The agent treats them symmetrically and may branch and PR in any.
@@ -358,7 +357,7 @@ status: waiting_for_ci                # see "Session Status Lifecycle" below
 runtime_state:
   claude_session_id: "sess_abc123"    # for claude --resume
   langgraph_thread_id: null           # for langgraph checkpoint resume
-  workspace_volume: "vol-wave1-a"     # Docker volume preserving workspace
+  workspace_volume: "vol-api-endpoints-core"  # Docker volume preserving workspace
   # one runtime_state.repos entry tracks per-repo branch and PR;
   # the canonical branch/pr_number are stored in the repos[] list above
 
@@ -417,10 +416,10 @@ The UI is the human's primary interface for the entire platform. Key control flo
 4. Container starts, iTerm tab opens, agent monitor shows live status
 
 **PM agent auto-orchestration (visible in UI):**
-1. PM agent proposes a wave plan → visible as a PR in the UI
-2. Human approves → PM agent launches agents for wave 1
-3. UI shows wave progress: which agents are running, which issues are in progress
-4. As agents complete → PM agent auto-launches wave 2 (if plan approved)
+1. PM agent proposes a launch plan → visible as a PR in the UI
+2. Human approves → PM agent launches agents for the first set
+3. UI shows session progress: which agents are running, which issues are in progress
+4. As agents complete → PM agent auto-launches the next set (if plan approved)
 5. Human can intervene at any point: stop agent, reassign issue, modify plan
 
 **Manual actions from UI:**
@@ -446,7 +445,7 @@ When a coding agent opens a PR and exits, it has built up a mental model of the 
 
 The container is disposable. The agent state is not.
 
-- **Docker volume** persists the workspace (`/workspace/repo`, `/workspace/project`, `/workspace/.claude/`) across container restarts. Named per-session: `vol-wave1-a`.
+- **Docker volume** persists the workspace (`/workspace/repo`, `/workspace/project`, `/workspace/.claude/`) across container restarts. Named per-session: `vol-api-endpoints-core`.
 - **Claude Code sessions** resume via `claude --resume --session-id <id>`. The session ID is stored in the session YAML.
 - **LangGraph checkpoints** resume via thread ID from the checkpoint store. The thread ID is stored in the session YAML.
 - **Session YAML** (`sessions/<id>.yaml`) is the persistence anchor — it tracks runtime state, re-engagement history, and current status.
@@ -602,7 +601,7 @@ Full pattern detail, the complete action vocabulary, hook signatures, and worked
 A session produces structured outputs as it runs. These are the agent's plan, its task tracking, its verification checklist, the testing plan it wants reviewers to follow, and its post-completion reflection. The defaults are five artifacts:
 
 ```
-sessions/wave1-agent-a/artifacts/
+sessions/api-endpoints-core/artifacts/
 ├── plan.md                      # written at session start (the agent's internal plan)
 ├── task-checklist.md            # updated continuously as work progresses
 ├── verification-checklist.md    # generated at planning, confirmed at completion
@@ -728,7 +727,7 @@ New re-engagement triggers:
 Messages live in SQLite for real-time delivery. When a session completes or fails, the UI backend writes the full conversation to `sessions/<session-id>/messages.yaml` in the project repo and commits it. This is the permanent audit trail.
 
 ```yaml
-# sessions/wave1-agent-a/messages.yaml (committed on session complete)
+# sessions/api-endpoints-core/messages.yaml (committed on session complete)
 - id: "001"
   direction: agent_to_human
   type: plan_approval
@@ -771,7 +770,7 @@ Full implementation details (MCP server code, skill protocol, UI components) in 
 - `project.yaml` — project config, repo registry, agent permissions, status flow
 - `issues/` — issue files (YAML frontmatter + Markdown body with `[[references]]`)
 - `graph/nodes/` — concept nodes with content hashes for staleness detection
-- `sessions/` — agent session definitions (wave-based parallelism)
+- `sessions/` — agent session definitions (dependency-based parallelism)
 - `.claude/skills/project-manager/` — PM agent skill for generated repos
 
 **CLI:** `keel init`, `issue`, `node`, `refs`, `status`, `graph`, `session`
@@ -941,8 +940,8 @@ def open_iterm_tab(container_id: str, session_name: str):
 
 For multiple agents, open a split layout:
 ```
-keel-containers launch-wave 1 --terminal
-# Opens a tab per agent in the wave using the configured terminal launcher
+keel-containers launch-batch <session-id> [<session-id> ...] --terminal
+# Opens a tab per agent in the batch using the configured terminal launcher
 # Each tab is docker exec -it <container> bash
 ```
 
@@ -954,11 +953,10 @@ keel-containers launch <session-id>
   --detach             Run in background
   --dry-run            Show what would happen without launching
 
-keel-containers launch-wave <wave-number>
+keel-containers launch-batch <session-id> [<session-id> ...]
   --project-dir TEXT   Path to project repo
-  --plan TEXT          Division plan file (if multiple plans exist)
   --terminal           Open a tab per agent using the configured launcher
-  --max-parallel INT   Limit concurrent containers [default: from plan]
+  --max-parallel INT   Limit concurrent containers [default: unlimited]
 
 keel-containers list
   --format TEXT        table/json [default: table]
@@ -990,7 +988,7 @@ keel-containers cleanup
   # Remove stopped containers and dangling images
 ```
 
-The terminal launcher is configurable via `~/.keel-containers/config.yaml` and supports `iterm`, `terminal` (Terminal.app), `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, or `none` (no terminal spawning — run all detached). For wave launches, `keel-containers launch-wave <wave> --terminal` opens a tab per agent using whichever launcher is configured.
+The terminal launcher is configurable via `~/.keel-containers/config.yaml` and supports `iterm`, `terminal` (Terminal.app), `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, or `none` (no terminal spawning — run all detached). For batch launches, `keel-containers launch-batch <session-ids> --terminal` opens a tab per agent using whichever launcher is configured.
 
 ### Container images
 
@@ -1041,7 +1039,7 @@ keel-containers/
 │       ├── __init__.py
 │       ├── cli/
 │       │   ├── main.py              # Click CLI root
-│       │   ├── launch.py            # launch, launch-wave
+│       │   ├── launch.py            # launch, launch-batch
 │       │   ├── manage.py            # list, status, stop, cleanup
 │       │   └── terminal.py          # attach, iterm, iterm-all
 │       ├── core/
@@ -1170,7 +1168,7 @@ Why a backend API instead of reading git directly from the frontend:
 **5. Agent Monitor** (dedicated view or sidebar panel)
 - List of running containers: session name, issue key, uptime, memory/CPU
 - Status indicators: running, completed, failed, blocked
-- Wave visualization: which wave is active, which sessions are complete
+- Session dependency visualization: which sessions are active, which are complete
 - Per-container actions:
   - "Open in iTerm" button (calls `keel-containers iterm`)
   - "View logs" (streams container logs)

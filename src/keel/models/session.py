@@ -98,7 +98,7 @@ class AgentSession(BaseModel):
 
     uuid: UUID = Field(default_factory=_uuid.uuid4)
 
-    # Human-readable slug, e.g. "wave1-agent-a".
+    # Human-readable slug, e.g. "api-endpoints-core".
     id: str
 
     name: str

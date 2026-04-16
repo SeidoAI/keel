@@ -129,7 +129,7 @@ def _filter_report_by_selector(
         # Extract entity ID from file path:
         #   issues/SEI-1/issue.yaml → SEI-1 (parent dir name)
         #   nodes/user-model.yaml → user-model (stem)
-        #   sessions/wave1/session.yaml → wave1 (parent dir name)
+        #   sessions/api-endpoints/session.yaml → api-endpoints (parent dir name)
         p = Path(finding.file)
         if p.name in {"issue.yaml", "session.yaml"}:
             return p.parent.name in selected_ids

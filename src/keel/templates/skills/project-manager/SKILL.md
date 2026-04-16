@@ -155,7 +155,7 @@ Every entity has **both** a canonical `uuid` and a human-readable `id`:
 - **Node ids**: you pick the slug (`user-model`, `auth-token-endpoint`).
   No CLI call. Must be lowercase, letter-first, hyphenated.
 - **Session ids**: you pick the slug (`storage-adapter-impl`,
-  `api-endpoints-core`). Descriptive, not wave-numbered.
+  `api-endpoints-core`). Descriptive.
 
 Full details: `references/ID_ALLOCATION.md`.
 
@@ -273,13 +273,13 @@ calibration checkpoint.
 
 A session is a bounded unit of delegated work. Sessions launch
 independently when their `blocked_by_sessions` have reached a
-sufficient status — there are no "waves" or batch schedules.
+sufficient status — there are no batch schedules.
 
 Each session gets its own directory: `sessions/<id>/session.yaml`
 with a `plan.md` alongside it. The plan uses the step-by-step
 template from `examples/artifacts/plan.md`.
 
-Think in dependency chains, not waves. If session B depends on
+Think in dependency chains. If session B depends on
 session A's storage adapter being done, set
 `blocked_by_sessions: [session-a-id]`. When session A completes,
 session B becomes launchable.

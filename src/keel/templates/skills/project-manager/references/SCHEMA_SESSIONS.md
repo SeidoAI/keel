@@ -74,7 +74,7 @@ Session-wide runtime handles persisted across container restarts:
 runtime_state:
   claude_session_id: "sess_abc123"    # for `claude --resume`
   langgraph_thread_id: null           # for LangGraph checkpoint resume
-  workspace_volume: "vol-wave1-a"     # Docker volume name
+  workspace_volume: "vol-api-endpoints-core"  # Docker volume name
 ```
 
 Per-repo branch and PR number live in the `RepoBinding` entries above

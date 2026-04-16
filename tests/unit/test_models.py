@@ -219,7 +219,7 @@ class TestRepoBinding:
 class TestAgentSession:
     def test_minimal_session(self) -> None:
         s = AgentSession(
-            id="wave1-agent-a",
+            id="api-endpoints-core",
             name="Auth + User Model",
             agent="backend-coder",
         )
@@ -230,7 +230,7 @@ class TestAgentSession:
 
     def test_multi_repo_session(self) -> None:
         s = AgentSession(
-            id="wave1-agent-a",
+            id="api-endpoints-core",
             name="x",
             agent="backend-coder",
             issues=["SEI-40", "SEI-42"],

@@ -1,4 +1,4 @@
-# Verification Checklist — wave1-agent-a
+# Verification Checklist — api-endpoints-core
 
 ## Acceptance criteria
 - [x] Happy path returns 200 + valid JWT (SEI-42 AC#1)

@@ -738,7 +738,7 @@ class TestArtifacts:
             [
                 "artifacts",
                 "list",
-                "wave1-a",
+                "api-endpoints",
                 "--project-dir",
                 str(target),
                 "--format",
@@ -790,7 +790,7 @@ class TestArtifacts:
             )
         )
 
-        session_dir = target / "sessions" / "wave1-a" / "artifacts"
+        session_dir = target / "sessions" / "api-endpoints" / "artifacts"
         session_dir.mkdir(parents=True)
         (session_dir / "plan.md").write_text("# Plan\n\nSteps...\n")
         # post-completion-comments.md intentionally missing → required-missing
@@ -801,7 +801,7 @@ class TestArtifacts:
             [
                 "artifacts",
                 "list",
-                "wave1-a",
+                "api-endpoints",
                 "--project-dir",
                 str(target),
                 "--format",
@@ -827,7 +827,7 @@ class TestArtifacts:
         target = tmp_path / "p"
         init_project(runner, target)
 
-        session_dir = target / "sessions" / "wave1-a" / "artifacts"
+        session_dir = target / "sessions" / "api-endpoints" / "artifacts"
         session_dir.mkdir(parents=True)
         (session_dir / "plan.md").write_text("content")
 
@@ -836,7 +836,7 @@ class TestArtifacts:
             [
                 "artifacts",
                 "list",
-                "wave1-a",
+                "api-endpoints",
                 "--project-dir",
                 str(target),
                 "--format",
@@ -845,14 +845,14 @@ class TestArtifacts:
         )
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["session"] == "wave1-a"
+        assert payload["session"] == "api-endpoints"
         assert any(a["file"] == "plan.md" for a in payload["artifacts"])
 
     def test_show_by_file(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         init_project(runner, target)
 
-        session_dir = target / "sessions" / "wave1-a" / "artifacts"
+        session_dir = target / "sessions" / "api-endpoints" / "artifacts"
         session_dir.mkdir(parents=True)
         (session_dir / "plan.md").write_text("# Plan content\n")
 
@@ -861,7 +861,7 @@ class TestArtifacts:
             [
                 "artifacts",
                 "show",
-                "wave1-a",
+                "api-endpoints",
                 "plan.md",
                 "--project-dir",
                 str(target),
@@ -893,7 +893,7 @@ class TestArtifacts:
             )
         )
 
-        session_dir = target / "sessions" / "wave1-a" / "artifacts"
+        session_dir = target / "sessions" / "api-endpoints" / "artifacts"
         session_dir.mkdir(parents=True)
         (session_dir / "plan.md").write_text("VIA MANIFEST NAME\n")
 
@@ -902,7 +902,7 @@ class TestArtifacts:
             [
                 "artifacts",
                 "show",
-                "wave1-a",
+                "api-endpoints",
                 "plan",  # the manifest "name" field, not the filename
                 "--project-dir",
                 str(target),

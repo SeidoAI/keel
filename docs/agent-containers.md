@@ -393,7 +393,7 @@ Event: Session stuck in waiting state > threshold
 Each session gets a named Docker volume that persists across container restarts:
 
 ```
-Volume: vol-wave1-agent-a
+Volume: vol-api-endpoints-core
   /workspace/
   ├── repos/         # NEW: multi-repo (was just `repo/`)
   │   ├── web-app-backend/
@@ -421,7 +421,7 @@ Each path is relative to the project repo. The container launch code reads the i
 
 **First launch:**
 ```bash
-docker volume create vol-wave1-agent-a
+docker volume create vol-api-endpoints-core
 
 # For each repo declared in session.repos[*], the launch code clones into
 # /workspace/repos/<repo-name>/ and sets the same agent git identity.
@@ -429,8 +429,8 @@ docker volume create vol-wave1-agent-a
 # under /workspace/docs/<path>.
 
 docker run \
-  --name agent-wave1-a \
-  -v vol-wave1-agent-a:/workspace \
+  --name agent-api-endpoints-core \
+  -v vol-api-endpoints-core:/workspace \
   -v /path/to/project/docs/api-contract.yaml:/workspace/docs/api-contract.yaml:ro \
   -v /path/to/project/docs/auth/jwt-spec.md:/workspace/docs/auth/jwt-spec.md:ro \
   -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
@@ -438,14 +438,14 @@ docker run \
   -e GITHUB_TOKEN_INFRA="$GITHUB_TOKEN_INFRA" \
   -e AGENT_GIT_USERNAME="seido-backend-bot" \
   -e AGENT_GIT_EMAIL="backend-bot@seido.dev" \
-  --network agent-net-wave1-a \
+  --network agent-net-api-endpoints-core \
   agent-claude-code:latest
 ```
 
 **Re-engagement (same volume, new container):**
 ```bash
 # Write re-engagement context to volume
-docker run --rm -v vol-wave1-agent-a:/workspace alpine \
+docker run --rm -v vol-api-endpoints-core:/workspace alpine \
   sh -c 'cat > /workspace/config/re_engage.yaml << EOF
 trigger: ci_failure
 timestamp: "2026-03-26T17:15:00"
@@ -457,20 +457,20 @@ EOF'
 
 # Launch new container with same volume — repos already cloned in /workspace/repos/
 docker run \
-  --name agent-wave1-a-re1 \
-  -v vol-wave1-agent-a:/workspace \
+  --name agent-api-endpoints-core-re1 \
+  -v vol-api-endpoints-core:/workspace \
   -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
   -e GITHUB_TOKEN_BACKEND="$GITHUB_TOKEN_BACKEND" \
   -e GITHUB_TOKEN_INFRA="$GITHUB_TOKEN_INFRA" \
   -e AGENT_GIT_USERNAME="seido-backend-bot" \
   -e AGENT_GIT_EMAIL="backend-bot@seido.dev" \
-  --network agent-net-wave1-a \
+  --network agent-net-api-endpoints-core \
   agent-claude-code:latest
 ```
 
 **Cleanup (session completed):**
 ```bash
-docker volume rm vol-wave1-agent-a  # only after session marked completed
+docker volume rm vol-api-endpoints-core  # only after session marked completed
 ```
 
 ---
@@ -739,14 +739,14 @@ keel-containers cleanup <session-id>
 
 The `--iterm` flag has been removed from `launch`. The user already runs the CLI from a terminal — spawning another one to attach to the same agent is pointless. Default is foreground; `--detach` runs the container in the background.
 
-### Wave launch
+### Batch launch
 
 ```
-keel-containers launch-wave <wave>                # all detached
-keel-containers launch-wave <wave> --terminal     # spawn one terminal per agent
+keel-containers launch-batch <session-id> [<session-id> ...]  # all detached
+keel-containers launch-batch <session-id> [<session-id> ...] --terminal  # spawn one terminal per agent
 ```
 
-`launch-wave` brings up multiple containers at once. With `--terminal`, the configured terminal launcher (see below) opens a tab/window per agent.
+`launch-batch` brings up multiple containers at once. With `--terminal`, the configured terminal launcher (see below) opens a tab/window per agent.
 
 ### Open a terminal for a running container
 
@@ -869,7 +869,7 @@ keel-containers/
 │       ├── __init__.py
 │       ├── cli/
 │       │   ├── main.py              # Click CLI root
-│       │   ├── launch.py            # launch, launch-wave
+│       │   ├── launch.py            # launch, launch-batch
 │       │   ├── manage.py            # list, status, stop, cleanup
 │       │   └── terminal.py          # terminal, terminal-all
 │       ├── core/
