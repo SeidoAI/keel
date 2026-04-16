@@ -224,8 +224,6 @@ def _days_since(when: datetime | None) -> int:
     """Approximate: days since ``when`` (UTC now - when)."""
     if when is None:
         return 0
-    from datetime import timezone
-
     now = datetime.now(tz=timezone.utc)
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
@@ -399,39 +397,47 @@ def _launch_claude(
     plan_content: str,
     session_id: str,
     session_name: str,
+    branch_type: str,
     claude_session_id: str,
     max_turns: int,
     log_path: Path,
+    *,
+    resume: bool = False,
 ) -> int:
     """Launch ``claude -p`` as a background process. Returns PID."""
     prompt = (
         f"{plan_content}\n\n"
         f"You are autonomous. Execute the plan above.\n"
         f"Stop only at the plan's stop-and-ask points.\n"
-        f"Open a PR titled 'feat({session_id}): {session_name}' when done.\n"
+        f"Open a PR titled '{branch_type}({session_id}): {session_name}' when done.\n"
         f"Report back as the final message."
     )
 
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = open(log_path, "w")
 
+    args = [
+        "claude",
+        "-p",
+        prompt,
+        "--session-id",
+        claude_session_id,
+        "--max-turns",
+        str(max_turns),
+        "--output-format",
+        "json",
+    ]
+    if resume:
+        args.append("--resume")
+
     proc = subprocess.Popen(
-        [
-            "claude",
-            "-p",
-            prompt,
-            "--session-id",
-            claude_session_id,
-            "--max-turns",
-            str(max_turns),
-            "--output-format",
-            "json",
-        ],
+        args,
         cwd=str(wt_path),
         stdout=log_file,
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
+    log_file.close()
     return proc.pid
 
 
@@ -496,7 +502,27 @@ def session_spawn_cmd(
         raise click.ClickException("handoff.yaml not found")
     branch = handoff.branch
 
-    max_turns = max_turns_override or 200
+    # Parse branch type for PR title (e.g. "feat" from "feat/api-endpoints")
+    from keel.core.branch_naming import parse_branch_name
+
+    try:
+        branch_type, _ = parse_branch_name(branch)
+    except Exception:
+        branch_type = "feat"
+
+    # max_turns precedence: CLI override > agent YAML > 200
+    agent_max_turns: int | None = None
+    agent_yaml = resolved / "agents" / f"{session.agent}.yaml"
+    if agent_yaml.is_file():
+        import yaml as _yaml
+
+        try:
+            agent_data = _yaml.safe_load(agent_yaml.read_text(encoding="utf-8"))
+            if isinstance(agent_data, dict):
+                agent_max_turns = agent_data.get("max_turns")
+        except Exception:
+            pass
+    max_turns = max_turns_override or agent_max_turns or 200
 
     # Create worktrees (or reuse on --resume)
     worktree_entries: list[WorktreeEntry] = []
@@ -528,6 +554,13 @@ def session_spawn_cmd(
                     f"Use --resume or 'keel session cleanup {session_id}'."
                 )
             if not wt_path.exists():
+                from keel.core.git_helpers import branch_exists
+
+                if branch_exists(clone_path, branch):
+                    raise click.ClickException(
+                        f"Branch '{branch}' already exists in {clone_path}. "
+                        f"Use --resume to reuse it, or delete the branch first."
+                    )
                 base_ref = rb.base_branch or "HEAD"
                 worktree_add(clone_path, wt_path, branch, base_ref)
             worktree_entries.append(
@@ -577,9 +610,11 @@ def session_spawn_cmd(
         plan_content=plan_content,
         session_id=session_id,
         session_name=session.name,
+        branch_type=branch_type,
         claude_session_id=claude_sid,
         max_turns=max_turns,
         log_path=log_file,
+        resume=resume_flag,
     )
 
     now = datetime.now(tz=timezone.utc)
@@ -779,6 +814,8 @@ def session_agenda_cmd(
     _require_project(resolved)
 
     sessions = list_sessions(resolved)
+    if filter_status:
+        sessions = [s for s in sessions if s.status == filter_status]
     if not sessions:
         click.echo("No sessions found.")
         return

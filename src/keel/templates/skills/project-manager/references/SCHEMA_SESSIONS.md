@@ -40,7 +40,7 @@ The directory name must match the session's `id` field.
 | `blocked_by_sessions` | list[string] | no | Other session ids that must complete first. |
 | `key_files` | list[string] | no | Files the session is expected to touch. |
 | `grouping_rationale` | string | no | Why these issues are grouped. |
-| `status` | string | yes | Must be in `enums/session_status.yaml`. Default `planned`. |
+| `status` | string | yes | Must be in `enums/session_status.yaml`. Default `planned`. See lifecycle below. |
 | `current_state` | string or null | no | Latest `AgentState` from a status message. |
 | `orchestration` | SessionOrchestration or null | no | Per-session orchestration override. |
 | `artifact_overrides` | list[ArtifactSpec] | no | Per-session artifact overrides. |
@@ -49,6 +49,25 @@ The directory name must match the session's `id` field.
 | `created_at` | ISO datetime | no | |
 | `updated_at` | ISO datetime | no | |
 | `created_by` | string | no | |
+
+## Session lifecycle (v0.6c)
+
+```
+planned ──[keel session queue]────→ queued
+queued  ──[keel session spawn]───→ executing
+executing ──[agent exits 0]──────→ completed
+executing ──[agent exits non-0]──→ failed
+executing ──[keel session pause]─→ paused
+paused  ──[keel session spawn --resume]──→ executing
+failed  ──[keel session spawn --resume]──→ executing
+{planned,queued,executing,paused,failed} ──[keel session abandon]──→ abandoned
+```
+
+- `executing`: agent launched locally via `keel session spawn`
+- `active`: agent managed by the orchestrator/container runtime
+- `paused`: SIGTERM sent, worktree preserved, resumable
+- `abandoned`: deliberately stopped, worktree preserved until cleanup
+- Terminal states: `completed`, `abandoned`
 
 ## RepoBinding
 
@@ -75,10 +94,21 @@ runtime_state:
   claude_session_id: "sess_abc123"    # for `claude --resume`
   langgraph_thread_id: null           # for LangGraph checkpoint resume
   workspace_volume: "vol-api-endpoints-core"  # Docker volume name
+  worktrees:                          # v0.6c: one entry per repo (local spawn)
+    - repo: SeidoAI/keel
+      clone_path: ~/Code/seido/projects/keel
+      worktree_path: ~/Code/seido/projects/keel-wt-api-endpoints
+      branch: feat/api-endpoints
+  pid: 12345                          # v0.6c: claude process PID
+  started_at: "2026-04-16T10:30:00Z"  # v0.6c: spawn timestamp
+  log_path: ~/.keel/logs/proj/s1.log  # v0.6c: stdout/stderr log
 ```
 
 Per-repo branch and PR number live in the `RepoBinding` entries above
 — not in `runtime_state`.
+
+The `worktrees`, `pid`, `started_at`, and `log_path` fields are
+populated by `keel session spawn` and cleared by `keel session cleanup`.
 
 ## EngagementEntry
 

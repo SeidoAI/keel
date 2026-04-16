@@ -7,9 +7,11 @@ values:
   - id: queued
     label: Queued
     color: cyan
+  # executing: local spawn via `keel session spawn` (v0.6c)
   - id: executing
     label: Executing
     color: blue
+  # active: orchestrator-managed sessions (container runtime)
   - id: active
     label: Active
     color: blue

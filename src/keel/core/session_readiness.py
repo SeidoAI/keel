@@ -105,7 +105,8 @@ def check_readiness(
                     )
                 )
 
-    # 3. Blocked-by-sessions check.
+    # 3. Blocked-by-sessions check (v0.6c addition — not in v0.6a's
+    #    _compute_readiness which only checked issue blockers).
     for dep_id in session.blocked_by_sessions:
         try:
             dep = load_session(project_dir, dep_id)
