@@ -22,7 +22,8 @@ from rich.table import Table
 
 from keel.cli._utils import require_project as _require_project
 from keel.cli.artifacts import artifacts_list
-from keel.core.session_store import list_sessions, load_session
+from keel.core.session_readiness import ReadinessItem, check_readiness
+from keel.core.session_store import list_sessions, load_session, save_session
 
 console = Console()
 
@@ -136,132 +137,6 @@ def session_show_cmd(session_id: str, project_dir: Path, output_format: str) -> 
     click.echo(yaml_path.read_text(encoding="utf-8"))
 
 
-@dataclass
-class ReadinessItem:
-    label: str
-    passing: bool
-    severity: str  # "error" | "warning"
-    fix_hint: str | None = None
-
-
-def _load_manifest_for_check(project_dir: Path):
-    """Load ArtifactManifest; raises ClickException on parse failure."""
-    import yaml as _yaml
-
-    from keel.models.manifest import ArtifactManifest
-
-    manifest_path = project_dir / "templates" / "artifacts" / "manifest.yaml"
-    if not manifest_path.exists():
-        raise click.ClickException(f"manifest.yaml not found at {manifest_path}")
-    return ArtifactManifest.model_validate(
-        _yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    )
-
-
-def _compute_readiness(project_dir: Path, session_id: str) -> list[ReadinessItem]:
-    """Compute launch-readiness for a session.
-
-    Checks required planning artifacts (per manifest.yaml, owned_by=pm),
-    blockers on the session's issues, handoff.yaml presence + validity.
-    """
-    from keel.core.handoff_store import handoff_exists, load_handoff
-    from keel.core.store import load_issue
-
-    items: list[ReadinessItem] = []
-
-    try:
-        session = load_session(project_dir, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
-
-    # Required planning artifacts owned by PM per manifest.
-    manifest = _load_manifest_for_check(project_dir)
-    sess_dir = project_dir / "sessions" / session_id
-    for entry in manifest.artifacts:
-        if entry.produced_at != "planning" or entry.owned_by != "pm":
-            continue
-        if not entry.required:
-            continue
-        present = (sess_dir / entry.file).is_file()
-        items.append(
-            ReadinessItem(
-                label=f"planning artifact: {entry.file}",
-                passing=present,
-                severity="error",
-                fix_hint=(
-                    None if present else f"Write {entry.file} from {entry.template}"
-                ),
-            )
-        )
-
-    # Blockers on issues.
-    for issue_key in session.issues:
-        try:
-            issue = load_issue(project_dir, issue_key)
-        except FileNotFoundError:
-            items.append(
-                ReadinessItem(
-                    label=f"issue {issue_key} referenced by session not found",
-                    passing=False,
-                    severity="error",
-                )
-            )
-            continue
-        for blocker_key in issue.blocked_by or []:
-            try:
-                blocker = load_issue(project_dir, blocker_key)
-            except FileNotFoundError:
-                items.append(
-                    ReadinessItem(
-                        label=f"blocker {blocker_key} referenced by {issue_key} not found",
-                        passing=False,
-                        severity="error",
-                    )
-                )
-                continue
-            if blocker.status != "done":
-                items.append(
-                    ReadinessItem(
-                        label=f"blocker: {blocker_key} ({blocker.status})",
-                        passing=False,
-                        severity="error",
-                        fix_hint=f"Wait for {blocker_key} to reach status=done",
-                    )
-                )
-
-    # handoff.yaml presence + loadability.
-    if not handoff_exists(project_dir, session_id):
-        items.append(
-            ReadinessItem(
-                label="handoff.yaml present",
-                passing=False,
-                severity="error",
-                fix_hint="Run /pm-session-launch to create handoff.yaml",
-            )
-        )
-    else:
-        try:
-            load_handoff(project_dir, session_id)
-            items.append(
-                ReadinessItem(
-                    label="handoff.yaml valid + branch per convention",
-                    passing=True,
-                    severity="error",
-                )
-            )
-        except Exception as exc:
-            items.append(
-                ReadinessItem(
-                    label=f"handoff.yaml invalid: {exc}",
-                    passing=False,
-                    severity="error",
-                    fix_hint="Fix handoff.yaml to match schema",
-                )
-            )
-
-    return items
-
-
 @session_cmd.command("check")
 @click.argument("session_id")
 @click.option(
@@ -281,7 +156,11 @@ def session_check_cmd(session_id: str, project_dir: Path, output_format: str) ->
     """Report launch-readiness for a session — no state transition."""
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
-    items = _compute_readiness(resolved, session_id)
+    try:
+        report = check_readiness(resolved, session_id, kind="check")
+    except FileNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
+    items = report.items
     errors = [i for i in items if not i.passing and i.severity == "error"]
 
     if output_format == "json":
