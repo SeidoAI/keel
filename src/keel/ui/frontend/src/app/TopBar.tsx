@@ -28,13 +28,11 @@ export function TopBar() {
         <PhaseBadge />
         <ValidationStatusIndicator />
       </div>
-      {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: preserves scaffold's tablist pattern; re-evaluated in follow-up a11y commit */}
-      <nav className="flex gap-1 px-4 pb-0" role="tablist">
+      <nav className="flex gap-1 px-4 pb-0">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            role="tab"
             className={({ isActive }) =>
               cn(
                 "border-b-2 px-3 py-2 text-sm transition-colors",
