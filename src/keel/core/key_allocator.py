@@ -104,5 +104,5 @@ def allocate_keys(
     # Sessions are slug-based by default, but for symmetry we still produce
     # a `<PREFIX>-S<N>` form when called via the next-key allocator. The
     # `next-key --type session` CLI is mostly future-proofing; in v0 sessions
-    # are slug-named (e.g. `wave1-agent-a`) and don't go through this path.
+    # are slug-named (e.g. `api-endpoints-core`) and don't go through this path.
     return [f"{prefix}-S{n}" for n in allocated]

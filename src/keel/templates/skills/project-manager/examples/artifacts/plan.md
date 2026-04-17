@@ -1,4 +1,4 @@
-# Plan — wave1-agent-a
+# Plan — api-endpoints-core
 
 ## Context
 Implement the JWT authentication endpoint (SEI-42) in `web-app-backend`.

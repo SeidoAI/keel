@@ -37,7 +37,7 @@ def test_no_regular_command_references_deprecated():
 def test_forwarders_mention_replacement():
     """Every forwarder file must mention the command it forwards to."""
     replacements = {
-        "pm-handoff.md": ("pm-session-create", "pm-session-launch"),
+        "pm-handoff.md": ("pm-session-create", "pm-session-queue"),
         "pm-close.md": ("pm-issue-close",),
         "pm-update.md": ("pm-edit",),
         "pm-plan.md": ("keel plan",),

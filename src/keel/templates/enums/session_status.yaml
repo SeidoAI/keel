@@ -4,6 +4,14 @@ values:
   - id: planned
     label: Planned
     color: gray
+  - id: queued
+    label: Queued
+    color: cyan
+  # executing: local spawn via `keel session spawn` (v0.6c)
+  - id: executing
+    label: Executing
+    color: blue
+  # active: orchestrator-managed sessions (container runtime)
   - id: active
     label: Active
     color: blue
@@ -25,3 +33,9 @@ values:
   - id: failed
     label: Failed
     color: red
+  - id: paused
+    label: Paused
+    color: yellow
+  - id: abandoned
+    label: Abandoned
+    color: gray

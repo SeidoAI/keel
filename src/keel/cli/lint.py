@@ -6,7 +6,7 @@ actually do the work at each stage).
 
 Stages:
 - ``scoping`` — ran during /pm-scope or /pm-rescope
-- ``handoff`` — before /pm-session-launch
+- ``handoff`` — before /pm-session-queue
 - ``session`` — in-flight health of one session
 
 Exit codes follow ``linter.exit_code_for``: 0 (info-only),

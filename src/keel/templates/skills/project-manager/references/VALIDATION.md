@@ -35,6 +35,18 @@ declaring any work done.
 | `handoff_schema/required_at_queued` | error | no | v0.6a — session in `queued` but `handoff.yaml` missing |
 | `handoff_schema/branch_format` | error | no | v0.6a — `handoff.yaml.branch` violates `<type>/<slug>` convention |
 | `handoff_schema/malformed` | error | no | v0.6a — `handoff.yaml` failed to parse or validate |
+| `spawn/not_queued` | error | no | v0.6c — session status isn't `queued` (or `failed`/`paused` without `--resume`) |
+| `spawn/worktree_path_exists` | error | no | v0.6c — worktree dir exists without `--resume` |
+| `spawn/worktree_missing` | error | no | v0.6c — `--resume` but worktree no longer on disk |
+| `spawn/branch_checked_out` | error | no | v0.6c — branch already checked out in another worktree |
+| `spawn/claude_not_on_path` | error | no | v0.6c — `which claude` empty |
+| `spawn/repo_not_cloned` | error | no | v0.6c — session repo has no local clone |
+| `pause/not_executing` | error | no | v0.6c — session isn't executing |
+| `pause/process_not_found` | warning | no | v0.6c — PID doesn't exist (process already dead) |
+| `abandon/already_terminal` | error | no | v0.6c — session is `completed` or `abandoned` |
+| `cleanup/worktree_dirty` | warning | no | v0.6c — uncommitted changes without `--force` |
+| `agenda/cycle_detected` | error | no | v0.6c — circular dependency in `blocked_by_sessions` |
+| `agenda/orphan_blocker` | warning | no | v0.6c — blocker references nonexistent session |
 
 ## The one command
 

@@ -3,7 +3,7 @@
 # The sessions/<id>/ directory also contains plan.md, artifacts/, and
 # optionally comments/. See SCHEMA_SESSIONS.md for the full layout.
 uuid: 2a1f3e4b-5c6d-47e8-9f0a-1b2c3d4e5f6a
-id: wave2-agent-b
+id: infra-gcs-setup
 name: "Agent B: Auth + Terraform secrets"
 agent: backend-coder
 issues:
@@ -43,7 +43,7 @@ artifact_overrides: []
 runtime_state:
   claude_session_id: "sess_abc123"
   langgraph_thread_id: null
-  workspace_volume: "vol-wave2-b"
+  workspace_volume: "vol-infra-gcs-setup"
 engagements:
   - started_at: "2026-04-07T14:00:00"
     trigger: initial_launch

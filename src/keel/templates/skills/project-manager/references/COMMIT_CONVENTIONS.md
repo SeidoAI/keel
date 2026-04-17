@@ -11,7 +11,7 @@ Agents push to branches named `<agent-id>/<slug>`:
 - `claude/initial-scoping-2026-04-07`
 - `claude/SEI-42-refresh-endpoint`
 - `pm/triage-inbound-bugs`
-- `claude/wave1-agent-a-fix-lint`
+- `claude/api-endpoints-core-fix-lint`
 
 When the branch is tied to a specific issue, include the issue key in
 the slug. When it's a broader piece of work, use a descriptive slug.
@@ -74,7 +74,7 @@ Use a section-heavy structure so reviewers can skim:
 ## Touched
 - issues/SEI-42.yaml (new)
 - nodes/auth-token-endpoint.yaml (new)
-- sessions/wave1-agent-a/artifacts/plan.md (new)
+- sessions/api-endpoints-core/artifacts/plan.md (new)
 
 ## Validator
 `keel validate --strict` exits 0.

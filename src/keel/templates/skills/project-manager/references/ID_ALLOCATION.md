@@ -62,7 +62,7 @@ Rules:
 
 - **Node ids** — lowercase, start with a letter, letters/digits/hyphens.
   Examples: `user-model`, `auth-token-endpoint`, `dec-003-session-tokens`.
-- **Session ids** — same slug format. Examples: `wave1-agent-a`,
+- **Session ids** — same slug format. Examples: `api-endpoints-core`,
   `critical-prod-fix`, `auth-epic-kickoff`.
 - The filename (minus `.yaml`) must exactly match the `id` field.
 

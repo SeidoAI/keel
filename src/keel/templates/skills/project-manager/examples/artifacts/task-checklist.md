@@ -1,4 +1,4 @@
-# Task Checklist — wave1-agent-a
+# Task Checklist — api-endpoints-core
 
 | # | Task | Status | Comments |
 |---|------|--------|----------|

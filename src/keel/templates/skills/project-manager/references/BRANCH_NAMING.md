@@ -46,7 +46,7 @@ Its output is the exact branch name — use it verbatim; don't guess.
 ## Enforcement
 
 - `handoff.yaml.branch` is validated against this pattern at session
-  launch (`/pm-session-launch`).
+  launch (`/pm-session-queue`).
 - `keel lint handoff` flags any branch that doesn't match.
 - The Pydantic `SessionHandoff` model rejects invalid branches at
   parse time.

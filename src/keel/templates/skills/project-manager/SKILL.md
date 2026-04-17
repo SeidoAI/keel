@@ -27,9 +27,11 @@ selects the workflow to execute:
 | `/pm-validate` | read-only wrapper | Running the validation gate and interpreting errors |
 | `/pm-lint` | read-only wrapper | Running stage-aware heuristic checks (scoping, handoff, session) |
 | `/pm-session-create` | specialization | Scaffolding a session for an issue |
-| `/pm-session-launch` | specialization | Transitioning an existing session from planned → queued |
+| `/pm-session-queue` | specialization | Transitioning an existing session from planned → queued |
+| `/pm-session-spawn` | specialization | Spawning a queued session locally via Claude Code subprocess |
 | `/pm-session-check` | read-only wrapper | Reporting launch-readiness for a session |
 | `/pm-session-progress` | read-only wrapper | Aggregating in-flight session status |
+| `/pm-session-agenda` | read-only wrapper | Session dependency DAG with launch recommendations |
 | `/pm-rescope` | `WORKFLOWS_INITIAL_SCOPING.md` (expand mode) | Adding new scope to an existing project |
 | `/pm-issue-close` | `WORKFLOWS_INCREMENTAL_UPDATE.md` (close mode) | Marking an issue done + writing a closing comment |
 
@@ -155,7 +157,7 @@ Every entity has **both** a canonical `uuid` and a human-readable `id`:
 - **Node ids**: you pick the slug (`user-model`, `auth-token-endpoint`).
   No CLI call. Must be lowercase, letter-first, hyphenated.
 - **Session ids**: you pick the slug (`storage-adapter-impl`,
-  `api-endpoints-core`). Descriptive, not wave-numbered.
+  `api-endpoints-core`). Descriptive.
 
 Full details: `references/ID_ALLOCATION.md`.
 
@@ -273,13 +275,13 @@ calibration checkpoint.
 
 A session is a bounded unit of delegated work. Sessions launch
 independently when their `blocked_by_sessions` have reached a
-sufficient status — there are no "waves" or batch schedules.
+sufficient status — there are no batch schedules.
 
 Each session gets its own directory: `sessions/<id>/session.yaml`
 with a `plan.md` alongside it. The plan uses the step-by-step
 template from `examples/artifacts/plan.md`.
 
-Think in dependency chains, not waves. If session B depends on
+Think in dependency chains. If session B depends on
 session A's storage adapter being done, set
 `blocked_by_sessions: [session-a-id]`. When session A completes,
 session B becomes launchable.

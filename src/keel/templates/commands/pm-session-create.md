@@ -48,4 +48,4 @@ Do NOT create `task-checklist.md`, `recommended-testing-plan.md`, or
 these are owned by `execution-agent` and produced at later phases.
 
 Do NOT transition session status to `queued`. Handoff is a separate
-step via `/pm-session-launch`.
+step via `/pm-session-queue`.

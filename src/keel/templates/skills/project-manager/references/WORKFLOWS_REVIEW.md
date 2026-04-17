@@ -57,7 +57,7 @@ especially on:
 Beyond the validator, read the actual content:
 
 - **New issues** — do they have meaningful acceptance criteria? Are they
-  in scope for the current wave? Do they reference the right concept
+  in scope for the current set? Do they reference the right concept
   nodes?
 - **New nodes** — do they point to real code (check the source field)?
   Are they placed at the right slug id?

@@ -3,7 +3,7 @@
 # The sessions/<id>/ directory also contains plan.md, artifacts/, and
 # optionally comments/. See SCHEMA_SESSIONS.md for the full layout.
 uuid: 7e6d5c4b-3a2f-41e8-9d7c-6b5a4f3e2d1c
-id: wave1-agent-a
+id: api-endpoints-core
 name: "Agent A: Auth endpoint"
 agent: backend-coder
 issues:

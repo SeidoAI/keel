@@ -474,7 +474,7 @@ GET  /api/projects/:id/refs/reverse/:nodeId → issues referencing this node
 
 ### Sessions & agents
 ```
-GET  /api/projects/:id/sessions            → list (?status, ?wave)
+GET  /api/projects/:id/sessions            → list (?status)
 GET  /api/projects/:id/sessions/:sid       → detail + runtime_state + engagements
 POST /api/projects/:id/sessions/:sid/re-engage → {trigger, context}
 GET  /api/projects/:id/agents              → list agent definitions
@@ -588,7 +588,7 @@ Each session card shows a status state badge driven by `session.current_state` (
 
 ```
 ┌──────────────────────────────────────┐
-│ wave1-agent-a · backend-coder        │
+│ api-endpoints-core · backend-coder        │
 │ [implementing] Wired JWT middleware. │
 │ Now writing unit tests.              │
 │ ─────────────────────────────────    │
@@ -619,7 +619,7 @@ Per-session engagement history:
 
 Aggregated timeline across all sources:
 ```
-14:00  Agent launched (backend-coder, wave 1)
+14:00  Agent launched (backend-coder)
 15:30  PR #42 opened
 15:35  CI failed: ruff E302
 15:36  Agent re-engaged (ci_failure)

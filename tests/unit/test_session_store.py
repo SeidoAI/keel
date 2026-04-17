@@ -39,32 +39,32 @@ def project_dir(tmp_path: Path) -> Path:
 
 class TestPathHelpers:
     def test_session_dir_returns_directory_path(self, project_dir: Path) -> None:
-        assert session_dir(project_dir, "wave1-agent") == (
-            project_dir / "sessions" / "wave1-agent"
+        assert session_dir(project_dir, "api-endpoints") == (
+            project_dir / "sessions" / "api-endpoints"
         )
 
     def test_session_yaml_path_nests_under_dir(self, project_dir: Path) -> None:
-        assert session_yaml_path(project_dir, "wave1-agent") == (
-            project_dir / "sessions" / "wave1-agent" / "session.yaml"
+        assert session_yaml_path(project_dir, "api-endpoints") == (
+            project_dir / "sessions" / "api-endpoints" / "session.yaml"
         )
 
 
 class TestSaveAndLoad:
     def test_save_creates_directory_and_yaml(self, project_dir: Path) -> None:
-        s = AgentSession(id="wave1-agent", name="x", agent="backend-coder")
+        s = AgentSession(id="api-endpoints", name="x", agent="backend-coder")
         save_session(project_dir, s)
-        assert (project_dir / "sessions" / "wave1-agent").is_dir()
-        assert (project_dir / "sessions" / "wave1-agent" / "session.yaml").is_file()
+        assert (project_dir / "sessions" / "api-endpoints").is_dir()
+        assert (project_dir / "sessions" / "api-endpoints" / "session.yaml").is_file()
 
     def test_save_then_load_round_trip(self, project_dir: Path) -> None:
         original = AgentSession(
-            id="wave1-agent",
+            id="api-endpoints",
             name="Round trip test",
             agent="backend-coder",
             issues=["TST-1", "TST-2"],
         )
         save_session(project_dir, original)
-        loaded = load_session(project_dir, "wave1-agent")
+        loaded = load_session(project_dir, "api-endpoints")
         assert loaded.id == original.id
         assert loaded.name == original.name
         assert loaded.issues == ["TST-1", "TST-2"]

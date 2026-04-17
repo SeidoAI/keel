@@ -416,7 +416,7 @@ class TestEnumValues:
         assert "enum/node_type" in codes(report)
 
     def test_invalid_session_status(self, empty_project: Path) -> None:
-        write_session(empty_project, "wave1", status="bogus_status")
+        write_session(empty_project, "auth-spike", status="bogus_status")
         report = validate_project(empty_project)
         assert "enum/session_status" in codes(report)
 
@@ -463,7 +463,7 @@ class TestReferenceIntegrity:
         assert "ref/related" in codes(report)
 
     def test_session_unknown_issue(self, empty_project: Path) -> None:
-        write_session(empty_project, "wave1", issues=["TST-99"])
+        write_session(empty_project, "auth-spike", issues=["TST-99"])
         report = validate_project(empty_project)
         assert "ref/session_issue" in codes(report)
 
@@ -1145,7 +1145,7 @@ class TestPhaseRequirements:
         save_test_issue(empty_project, "TST-1")
         _write_artifact(empty_project, "plans/artifacts/gap-analysis.md")
         _write_artifact(empty_project, "plans/artifacts/compliance.md")
-        save_test_session(empty_project, "wave1-agent", plan=False)
+        save_test_session(empty_project, "api-endpoints", plan=False)
         report = validate_project(empty_project)
         plan_errors = [
             e for e in report.errors if e.code == "phase/missing_session_plan"
@@ -1160,7 +1160,7 @@ class TestPhaseRequirements:
         save_test_issue(empty_project, "TST-1")
         _write_artifact(empty_project, "plans/artifacts/gap-analysis.md")
         _write_artifact(empty_project, "plans/artifacts/compliance.md")
-        save_test_session(empty_project, "wave1-agent", plan=True)
+        save_test_session(empty_project, "api-endpoints", plan=True)
         report = validate_project(empty_project)
         phase_errors = [e for e in report.errors if e.code.startswith("phase/")]
         assert phase_errors == []
@@ -1171,7 +1171,7 @@ class TestPhaseRequirements:
         write_project_yaml(empty_project, phase="executing")
         save_test_node(empty_project, "user-model")
         save_test_issue(empty_project, "TST-1")
-        save_test_session(empty_project, "wave1-agent", plan=False)
+        save_test_session(empty_project, "api-endpoints", plan=False)
         report = validate_project(empty_project)
         codes_seen = codes(report)
         assert "phase/missing_artifact" in codes_seen

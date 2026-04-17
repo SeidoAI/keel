@@ -1915,7 +1915,7 @@ def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
                         "artifact."
                     ),
                     fix_hint=(
-                        "Run `/pm-session-launch` which creates handoff.yaml, "
+                        "Run `/pm-session-queue` which creates handoff.yaml, "
                         "or write sessions/<id>/handoff.yaml manually."
                     ),
                 )
