@@ -1,6 +1,6 @@
 """Session listing and detail routes.
 
-Endpoints implemented in KUI-30.
+Endpoints filled by their respective route issues.
 """
 
 from __future__ import annotations
@@ -13,6 +13,6 @@ router = APIRouter(
 
 
 @router.get("")
-async def list_sessions(project_id: str) -> list:
+async def list_sessions(project_id: str) -> None:
     """List sessions for a project."""
     raise HTTPException(status_code=501, detail="Not yet implemented")

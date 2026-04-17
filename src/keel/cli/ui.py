@@ -84,8 +84,6 @@ def ui_cmd(
         project_dirs = [Path(p.dir) for p in projects]
 
     # 4. Launch the server.
-    from keel.ui.server import start_server
-
     start_server(
         host="127.0.0.1",
         port=port,

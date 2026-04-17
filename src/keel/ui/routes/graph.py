@@ -1,6 +1,6 @@
 """Concept-graph and dependency-graph traversal routes.
 
-Endpoints implemented in KUI-29.
+Endpoints filled by their respective route issues.
 """
 
 from __future__ import annotations
@@ -13,12 +13,12 @@ router = APIRouter(
 
 
 @router.get("/deps")
-async def get_dependency_graph(project_id: str) -> dict:
+async def get_dependency_graph(project_id: str) -> None:
     """Return the dependency graph for a project."""
     raise HTTPException(status_code=501, detail="Not yet implemented")
 
 
 @router.get("/concept")
-async def get_concept_graph(project_id: str) -> dict:
+async def get_concept_graph(project_id: str) -> None:
     """Return the concept graph for a project."""
     raise HTTPException(status_code=501, detail="Not yet implemented")

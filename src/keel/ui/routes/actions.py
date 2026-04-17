@@ -1,6 +1,6 @@
 """Global action routes (validate, rebuild-index, advance-phase, finalize-session).
 
-Endpoints implemented in KUI-34.
+Endpoints filled by their respective route issues.
 """
 
 from __future__ import annotations
@@ -11,6 +11,6 @@ router = APIRouter(prefix="/api/actions", tags=["actions"])
 
 
 @router.post("/validate")
-async def validate(body: dict) -> dict:
+async def validate() -> None:
     """Run project validation."""
     raise HTTPException(status_code=501, detail="Not yet implemented")

@@ -1,6 +1,6 @@
 """Enum descriptor routes.
 
-Endpoints implemented in KUI-32.
+Endpoints filled by their respective route issues.
 """
 
 from __future__ import annotations
@@ -13,6 +13,6 @@ router = APIRouter(
 
 
 @router.get("/{name}")
-async def get_enum(project_id: str, name: str) -> dict:
+async def get_enum(project_id: str, name: str) -> None:
     """Return an enum descriptor."""
     raise HTTPException(status_code=501, detail="Not yet implemented")

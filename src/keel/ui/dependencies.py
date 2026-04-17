@@ -90,7 +90,7 @@ async def get_project(
     )
 
 
-def get_hub(request: Request) -> Any:
+def get_hub(request: Request) -> Any | None:
     """Return the WebSocket hub from ``app.state`` (``None`` until KUI-37)."""
     return request.app.state.hub
 

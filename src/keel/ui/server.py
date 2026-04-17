@@ -17,6 +17,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as _StarletteHTTPException
 
 import keel
 
@@ -43,7 +44,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
-    # Shutdown
+    # Shutdown — stop background services if wired (KUI-36/37 will set these)
+    if app.state.observer is not None:
+        app.state.observer.stop()
+    if app.state.hub is not None:
+        await app.state.hub.shutdown()
     logger.info("Keel UI shutting down")
 
 
@@ -62,9 +67,8 @@ class _SPAStaticFiles(StaticFiles):
     async def get_response(self, path: str, scope: object) -> object:  # type: ignore[override]
         try:
             return await super().get_response(path, scope)
-        except Exception as exc:
-            # Starlette raises HTTPException(404) for missing files.
-            if getattr(exc, "status_code", None) == 404:
+        except _StarletteHTTPException as exc:
+            if exc.status_code == 404:
                 return await super().get_response(".", scope)
             raise
 
@@ -112,7 +116,7 @@ def create_app(*, dev_mode: bool = False) -> FastAPI:
     ----------
     dev_mode:
         When ``True``, skip the static file mount (the Vite dev server
-        handles it) and enable CORS for the dev proxy.
+        handles it via its proxy config).
     """
     app = FastAPI(
         title="Keel UI",

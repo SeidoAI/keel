@@ -1,6 +1,6 @@
 """Orchestration-pattern routes.
 
-Endpoints implemented in KUI-33.
+Endpoints filled by their respective route issues.
 """
 
 from __future__ import annotations
@@ -14,6 +14,6 @@ router = APIRouter(
 
 
 @router.get("/pattern")
-async def get_orchestration_pattern(project_id: str) -> dict:
+async def get_orchestration_pattern(project_id: str) -> None:
     """Return the orchestration pattern for a project."""
     raise HTTPException(status_code=501, detail="Not yet implemented")
