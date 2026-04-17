@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
 import { NavLink, useParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { PhaseBadge } from "./PhaseBadge";
 import { ValidationStatusIndicator } from "./ValidationStatusIndicator";
 
@@ -28,6 +28,7 @@ export function TopBar() {
         <PhaseBadge />
         <ValidationStatusIndicator />
       </div>
+      {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: preserves scaffold's tablist pattern; re-evaluated in follow-up a11y commit */}
       <nav className="flex gap-1 px-4 pb-0" role="tablist">
         {navItems.map((item) => (
           <NavLink
