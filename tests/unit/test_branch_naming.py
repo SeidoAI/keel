@@ -111,9 +111,7 @@ class TestProjectOverrides:
         (tmp_path / "enums" / "branch_type.yaml").write_text(
             "name: BranchType\nvalues:\n  - id: feat\n  - id: wip\n"
         )
-        assert (
-            derive_branch_name("s1", "wip", project_dir=tmp_path) == "wip/s1"
-        )
+        assert derive_branch_name("s1", "wip", project_dir=tmp_path) == "wip/s1"
         with pytest.raises(BranchNameError):
             derive_branch_name("s1", "refactor", project_dir=tmp_path)
 

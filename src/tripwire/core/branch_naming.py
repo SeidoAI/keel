@@ -88,9 +88,7 @@ def is_valid_branch_name(name: str, *, project_dir: Path | None = None) -> bool:
     return True
 
 
-def parse_branch_name(
-    name: str, *, project_dir: Path | None = None
-) -> tuple[str, str]:
+def parse_branch_name(name: str, *, project_dir: Path | None = None) -> tuple[str, str]:
     """Return (type, slug) from a valid branch name, else raise BranchNameError."""
     if not is_valid_branch_name(name, project_dir=project_dir):
         raise BranchNameError(

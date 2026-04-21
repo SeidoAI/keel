@@ -64,7 +64,7 @@ artifacts:
     produced_by: pm
 """,
     )
-    manifest, findings = load_artifact_manifest(tmp_path)
+    _manifest, findings = load_artifact_manifest(tmp_path)
     codes = [f.code for f in findings]
     assert "manifest_schema/produced_at_valid" in codes
 
@@ -81,7 +81,7 @@ artifacts:
     produced_by: wizard
 """,
     )
-    manifest, findings = load_artifact_manifest(tmp_path)
+    _manifest, findings = load_artifact_manifest(tmp_path)
     codes = [f.code for f in findings]
     assert "manifest_schema/produced_by_valid" in codes
 

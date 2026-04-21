@@ -279,8 +279,5 @@ def resolve_command_path(project_dir: Path, command_name: str) -> Path:
     import tripwire
 
     return (
-        Path(tripwire.__file__).parent
-        / "templates"
-        / "commands"
-        / f"{command_name}.md"
+        Path(tripwire.__file__).parent / "templates" / "commands" / f"{command_name}.md"
     )
