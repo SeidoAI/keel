@@ -1921,7 +1921,7 @@ def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
         if isinstance(branch, str):
             from tripwire.core.branch_naming import is_valid_branch_name
 
-            if not is_valid_branch_name(branch):
+            if not is_valid_branch_name(branch, project_dir=ctx.project_dir):
                 results.append(
                     CheckResult(
                         code="handoff_schema/branch_format",
