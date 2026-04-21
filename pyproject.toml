@@ -6,9 +6,11 @@
 name = "tripwire-pm"
 version = "0.7.0"
 description = "Git-native project management with concept graph for AI agents"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10,<3.14"
 license = { file = "LICENSE" }
 authors = [{ name = "Seido AI Ltd" }]
+urls = { Homepage = "https://github.com/SeidoAI/tripwire", Source = "https://github.com/SeidoAI/tripwire", Issues = "https://github.com/SeidoAI/tripwire/issues" }
 dependencies = [
     # Core (always present, minimal)
     "pydantic>=2.0,<3.0",
