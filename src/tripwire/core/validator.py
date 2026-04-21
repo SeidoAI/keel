@@ -1155,51 +1155,29 @@ def check_freshness(ctx: ValidationContext) -> list[CheckResult]:
 def _load_manifest(
     ctx: ValidationContext,
 ) -> tuple[ArtifactManifest | None, list[CheckResult]]:
-    """Parse `templates/artifacts/manifest.yaml` via the Pydantic model.
+    """Parse `templates/artifacts/manifest.yaml` via the shared loader.
 
     Returns (manifest, findings). A missing manifest file is not an error
-    (returns `(None, [])`). YAML parse errors and schema violations — including
-    unknown `produced_by` / `owned_by` agent types — surface as
-    `manifest_schema/*` findings so `check_manifest_schema` can emit them.
+    (returns `(None, [])`). YAML parse errors, schema violations, and enum
+    violations (unknown `produced_at` / `produced_by` / `owned_by`) surface
+    as `manifest_schema/*` findings so `check_manifest_schema` can emit them.
     """
+    from tripwire.core.manifest_loader import load_artifact_manifest
+
     manifest_path = paths.templates_artifacts_manifest_path(ctx.project_dir)
-    if not manifest_path.exists():
-        return None, []
     rel = paths.TEMPLATES_ARTIFACTS_MANIFEST
-    try:
-        raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError as exc:
-        return None, [
-            CheckResult(
-                code="manifest_schema/parse_error",
-                severity="error",
-                file=rel,
-                message=f"manifest.yaml failed to parse: {exc}",
-            )
-        ]
-    try:
-        manifest = ArtifactManifest.model_validate(raw)
-    except ValidationError as exc:
-        findings: list[CheckResult] = []
-        for err in exc.errors():
-            loc = err.get("loc", ())
-            field_name = loc[-1] if loc else None
-            code = "manifest_schema/invalid"
-            if field_name == "produced_by":
-                code = "manifest_schema/produced_by_valid"
-            elif field_name == "owned_by":
-                code = "manifest_schema/owned_by_valid"
-            findings.append(
-                CheckResult(
-                    code=code,
-                    severity="error",
-                    file=rel,
-                    field=str(field_name) if field_name is not None else None,
-                    message=err.get("msg", "manifest.yaml failed schema validation."),
-                )
-            )
-        return None, findings
-    return manifest, []
+    manifest, load_findings = load_artifact_manifest(ctx.project_dir, manifest_path)
+    findings = [
+        CheckResult(
+            code=f.code,
+            severity="error",
+            file=rel,
+            field=f.field,
+            message=f.message,
+        )
+        for f in load_findings
+    ]
+    return manifest, findings
 
 
 def check_manifest_schema(ctx: ValidationContext) -> list[CheckResult]:

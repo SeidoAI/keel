@@ -131,6 +131,42 @@ def _default_enum(enum_name: str) -> LoadedEnum | None:
     )
 
 
+def _package_template_enum_path(enum_name: str) -> Path:
+    """Path to the enum YAML shipped inside the tripwire package."""
+    import tripwire
+
+    return Path(tripwire.__file__).parent / "templates" / "enums" / f"{enum_name}.yaml"
+
+
+def load_enum(project_dir: Path, enum_name: str) -> list[str]:
+    """Load one enum's value IDs, preferring project override over packaged default.
+
+    Lookup order:
+      1. `<project_dir>/enums/<enum_name>.yaml` (project override)
+      2. `src/tripwire/templates/enums/<enum_name>.yaml` (packaged default)
+      3. `DEFAULT_ENUMS[enum_name]` (StrEnum fallback, for enums without a YAML
+         template — e.g. legacy enums)
+
+    Raises FileNotFoundError if none of the above exist.
+    """
+    project_path = project_dir / ENUMS_DIRNAME / f"{enum_name}.yaml"
+    if project_path.is_file():
+        return list(_load_enum_yaml(project_path, enum_name).value_ids())
+
+    pkg_path = _package_template_enum_path(enum_name)
+    if pkg_path.is_file():
+        return list(_load_enum_yaml(pkg_path, enum_name).value_ids())
+
+    default = _default_enum(enum_name)
+    if default is not None:
+        return list(default.value_ids())
+
+    raise FileNotFoundError(
+        f"No enum definition found for {enum_name!r} (looked in project override, "
+        f"packaged template, and StrEnum defaults)."
+    )
+
+
 def load_enums(project_dir: Path) -> EnumRegistry:
     """Load all active enums for a project.
 
