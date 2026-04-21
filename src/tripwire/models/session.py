@@ -104,6 +104,21 @@ class EngagementEntry(BaseModel):
     outcome: str | None = None
 
 
+class SpawnConfig(BaseModel):
+    """Per-session spawn override — any subset of SpawnDefaults.
+
+    Merged on top of the resolved project + tripwire-default spawn config
+    at launch time. See `tripwire.core.spawn_config.load_resolved_spawn_config`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    invocation: dict[str, Any] = Field(default_factory=dict)
+    config: dict[str, Any] = Field(default_factory=dict)
+    prompt_template: str | None = None
+    system_prompt_append: str | None = None
+
+
 class AgentSession(BaseModel):
     """An agent session — one logical agent invocation that may span many
     container restarts (re-engagements).
@@ -145,6 +160,10 @@ class AgentSession(BaseModel):
 
     # Per-session artifact overrides on top of templates/artifacts/manifest.yaml.
     artifact_overrides: list[ArtifactSpec] = Field(default_factory=list)
+
+    # v0.7b: per-session spawn config override. Merged with project and
+    # tripwire defaults at launch time; session wins.
+    spawn_config: SpawnConfig | None = None
 
     runtime_state: RuntimeState = Field(default_factory=RuntimeState)
 

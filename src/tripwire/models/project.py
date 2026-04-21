@@ -143,5 +143,10 @@ class ProjectConfig(BaseModel):
     # unblocked and parses freely.
     issue_artifact_manifest_overrides: list[dict] = Field(default_factory=list)
 
+    # v0.7b: project-level spawn config override. Free-form mapping merged
+    # on top of tripwire defaults; deep-merged with session-level overrides
+    # by the spawn config resolver.
+    spawn_defaults: dict[str, Any] | None = None
+
     # Free-form per-project metadata, never used by the package itself.
     metadata: dict[str, Any] = Field(default_factory=dict)
