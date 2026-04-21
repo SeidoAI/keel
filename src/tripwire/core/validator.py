@@ -1193,10 +1193,10 @@ def check_manifest_schema(ctx: ValidationContext) -> list[CheckResult]:
 def check_manifest_phase_ownership_consistent(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
-    """Warn if pm owns an artifact produced during implementing/verifying.
+    """Warn if pm owns an artifact produced during in_progress/in_review.
 
     The PM agent steers scoping and planning; once a session is in
-    `implementing` or `verifying`, the execution/verification agent owns
+    `in_progress` or `in_review`, the execution/verification agent owns
     what gets written. A manifest that assigns `owned_by: pm` to such
     artifacts likely encodes the v0.5 bug where the PM wrote files the
     execution agent should have written.
@@ -1207,8 +1207,8 @@ def check_manifest_phase_ownership_consistent(
     results: list[CheckResult] = []
     for entry in manifest.artifacts:
         if entry.owned_by == "pm" and entry.produced_at in (
-            "implementing",
-            "verifying",
+            "in_progress",
+            "in_review",
         ):
             results.append(
                 CheckResult(

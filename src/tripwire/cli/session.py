@@ -250,12 +250,12 @@ def session_progress_cmd(
 ) -> None:
     """Aggregate task-checklist status across active sessions.
 
-    Active = session.status in {queued, implementing, verifying}.
+    Active = session.status in {queued, executing, active}.
     """
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
-    active_states = {"queued", "implementing", "verifying"}
+    active_states = {"queued", "executing", "active"}
     sessions = [s for s in list_sessions(resolved) if s.status in active_states]
     if focus:
         sessions = [s for s in sessions if focus in s.id]

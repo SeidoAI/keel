@@ -87,7 +87,7 @@ class ArtifactSpec(BaseModel):
     name: str
     file: str
     template: str | None = None
-    produced_at: str  # planning | implementing | completion (free-form per project)
+    produced_at: str  # validated against artifact_phase enum at manifest load
     required: bool = True
     approval_gate: bool = False
 
