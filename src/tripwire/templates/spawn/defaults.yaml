@@ -29,8 +29,10 @@ prompt_template: |
   agents in this area would benefit from inheriting? Not "what did I do"
   (that's developer.md) but "what insight would I want the next agent
   working near this to start from?" If yes, propose it in insights.yaml
-  as a node addition or update. If nothing qualifies — if every insight
-  is either obvious, already in a node, or specific to this session —
+  as a node addition or update. For new_node proposals, set `type:` to
+  one of the project's active node_type enum values (e.g. `decision`,
+  `contract`, `pattern`). If nothing qualifies — if every insight is
+  either obvious, already in a node, or specific to this session —
   leave the file absent. Do not force it.
 
 system_prompt_append: |

@@ -19,6 +19,7 @@ def test_insights_list_prints_proposals(tmp_path_project: Path, save_test_sessio
                 NodeProposal(
                     kind="new_node",
                     id="pg-tuning",
+                    type="decision",
                     name="PG Tuning",
                     body="body",
                     rationale="useful",
@@ -57,6 +58,7 @@ def test_insights_apply_new_node_writes_file(tmp_path_project: Path, save_test_s
                 NodeProposal(
                     kind="new_node",
                     id="pg-tuning",
+                    type="decision",
                     name="PG Tuning",
                     body="tuning notes",
                     rationale="useful",
@@ -80,6 +82,13 @@ def test_insights_apply_new_node_writes_file(tmp_path_project: Path, save_test_s
     )
     assert result.exit_code == 0, result.output
     assert (tmp_path_project / "nodes" / "pg-tuning.yaml").is_file()
+    assert "type=decision" in result.output
+
+    # Node has the proposed type, not a hardcoded default.
+    from tripwire.core.node_store import load_node
+
+    created = load_node(tmp_path_project, "pg-tuning")
+    assert created.type == "decision"
 
     # Applied proposal removed from insights.yaml
     remaining = load_insights(tmp_path_project, "s1")
@@ -143,6 +152,7 @@ def test_insights_reject_records_rejection(tmp_path_project: Path, save_test_ses
                 NodeProposal(
                     kind="new_node",
                     id="meh-node",
+                    type="decision",
                     name="Meh",
                     body="x",
                     rationale="too vague",

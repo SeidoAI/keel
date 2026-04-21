@@ -1377,16 +1377,18 @@ def session_insights_apply_cmd(
         raise click.ClickException(f"Unknown proposal id {proposal_id!r}")
 
     if proposal.kind == "new_node":
+        # `type` is required on new_node proposals (enforced by the model
+        # validator); no hardcoded fallback here.
         node = ConceptNode(
             id=proposal.id,
-            type="model",
+            type=proposal.type,
             name=proposal.name or proposal.id,
             status="active",
             body=proposal.body or "",
             related=proposal.related,
         )
         save_node(resolved, node, update_cache=False)
-        click.echo(f"Created node {proposal.id}")
+        click.echo(f"Created node {proposal.id} (type={proposal.type})")
     else:
         try:
             node = load_node(resolved, proposal.id)

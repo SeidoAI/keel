@@ -14,12 +14,19 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class NodeProposal(BaseModel):
-    """One proposed node addition or update."""
+    """One proposed node addition or update.
+
+    ``type`` is required for ``new_node`` (it becomes the `ConceptNode.type`);
+    ``update_node`` leaves it blank and preserves the existing node's type.
+    The value is validated against the project's active ``node_type`` enum
+    when insights are loaded by ``load_insights``.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["new_node", "update_node"]
     id: str
+    type: str | None = None
     name: str | None = None
     body: str | None = None
     delta: str | None = None
@@ -33,6 +40,8 @@ class NodeProposal(BaseModel):
                 raise ValueError("new_node proposals require `body`")
             if not self.name:
                 raise ValueError("new_node proposals require `name`")
+            if not self.type:
+                raise ValueError("new_node proposals require `type`")
         elif self.kind == "update_node":
             if not self.delta:
                 raise ValueError("update_node proposals require `delta`")

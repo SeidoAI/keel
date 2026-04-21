@@ -19,8 +19,21 @@ def test_new_node_proposal_requires_name_and_body():
         NodeProposal(
             kind="new_node",
             id="x",
+            type="decision",
             # missing name + body
             rationale="r",
+        )
+
+
+def test_new_node_proposal_requires_type():
+    with pytest.raises(ValidationError):
+        NodeProposal(
+            kind="new_node",
+            id="pg-tuning",
+            # missing type
+            name="PG Tuning",
+            body="notes",
+            rationale="why",
         )
 
 
@@ -38,11 +51,13 @@ def test_new_node_proposal_valid():
     p = NodeProposal(
         kind="new_node",
         id="pg-tuning",
+        type="decision",
         name="PG Tuning",
         body="notes",
         rationale="why",
     )
     assert p.body == "notes"
+    assert p.type == "decision"
     assert p.delta is None
 
 
@@ -65,6 +80,7 @@ def test_insights_file_roundtrip(tmp_path_project: Path, save_test_session):
             NodeProposal(
                 kind="new_node",
                 id="pg-vacuum",
+                type="decision",
                 name="PG VACUUM tuning",
                 body="tuning notes",
                 related=["database"],
