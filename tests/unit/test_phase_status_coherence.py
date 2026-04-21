@@ -10,7 +10,6 @@ from pathlib import Path
 
 import yaml
 
-
 SESSION_ONLY_PHASES = frozenset({"planning"})
 
 
