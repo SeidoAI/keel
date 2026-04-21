@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import re
 
-from keel.core.linter import LintFinding, register_rule
-from keel.core.node_store import list_nodes
-from keel.core.store import list_issues
+from tripwire.core.linter import LintFinding, register_rule
+from tripwire.core.node_store import list_nodes
+from tripwire.core.store import list_issues
 
 # Multi-word Title-Case proper nouns: "Auth System", "Stripe", "OAuth Token"
 _PROPER_NOUN = re.compile(r"\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\b")

@@ -8,14 +8,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from keel.cli.init import (
+from tripwire.cli.init import (
     CREATED_DIRS,
     JINJA_RENDERED_SUBDIRS,
     ROOT_J2_FILES,
     VERBATIM_TEMPLATE_MAPPINGS,
     _jinja_env,
 )
-from keel.templates import get_templates_dir
+from tripwire.templates import get_templates_dir
 
 
 @dataclass

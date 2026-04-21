@@ -16,7 +16,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from keel.cli.main import cli
+from tripwire.cli.main import cli
 
 
 @pytest.fixture

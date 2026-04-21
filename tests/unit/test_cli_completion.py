@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.main import cli
+from tripwire.cli.main import cli
 
 
 @pytest.fixture

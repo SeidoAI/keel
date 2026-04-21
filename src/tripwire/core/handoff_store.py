@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from keel.core.parser import (
+from tripwire.core.parser import (
     ParseError,
     parse_frontmatter_body,
     serialize_frontmatter_body,
 )
-from keel.core.paths import handoff_path
-from keel.models.handoff import SessionHandoff
+from tripwire.core.paths import handoff_path
+from tripwire.models.handoff import SessionHandoff
 
 
 def handoff_exists(project_dir: Path, session_id: str) -> bool:

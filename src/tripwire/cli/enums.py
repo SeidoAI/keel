@@ -14,8 +14,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from keel.cli._utils import require_project as _require_project
-from keel.core.enum_loader import load_enums
+from tripwire.cli._utils import require_project as _require_project
+from tripwire.core.enum_loader import load_enums
 
 console = Console()
 

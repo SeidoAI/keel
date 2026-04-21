@@ -27,13 +27,13 @@ from typing import Any
 import click
 import yaml
 
-from keel.core import paths
-from keel.core.enum_loader import load_enums
-from keel.core.id_generator import format_key
-from keel.core.node_store import list_nodes
-from keel.core.session_store import list_sessions
-from keel.core.store import ProjectNotFoundError, list_issues, load_project
-from keel.models.project import ProjectConfig
+from tripwire.core import paths
+from tripwire.core.enum_loader import load_enums
+from tripwire.core.id_generator import format_key
+from tripwire.core.node_store import list_nodes
+from tripwire.core.session_store import list_sessions
+from tripwire.core.store import ProjectNotFoundError, list_issues, load_project
+from tripwire.models.project import ProjectConfig
 
 ARTIFACT_MANIFEST_REL = paths.TEMPLATES_ARTIFACTS_MANIFEST
 ORCHESTRATION_DIR = paths.ORCHESTRATION_DIR

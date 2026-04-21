@@ -48,7 +48,7 @@ def ui_cmd(
     """Start the Keel dashboard (localhost only)."""
     # 1. Import check — graceful degradation on minimal installs.
     try:
-        from keel.ui.server import start_server  # noqa: F401
+        from tripwire.ui.server import start_server  # noqa: F401
     except ModuleNotFoundError as exc:
         missing = getattr(exc, "name", "") or ""
         if any(mod in missing for mod in _UI_MODULES):
@@ -63,7 +63,7 @@ def ui_cmd(
         raise
 
     # 2. Load user config.
-    from keel.ui.config import load_user_config
+    from tripwire.ui.config import load_user_config
 
     config = load_user_config()
 
@@ -71,7 +71,7 @@ def ui_cmd(
     if project_dir is not None:
         project_dirs = [project_dir.expanduser().resolve()]
     else:
-        from keel.ui.services.project_service import discover_projects
+        from tripwire.ui.services.project_service import discover_projects
 
         projects = discover_projects(config)
         if not projects:

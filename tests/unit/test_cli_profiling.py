@@ -16,8 +16,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli._profiling import DEFAULT_PROFILE_PATH
-from keel.cli.main import cli
+from tripwire.cli._profiling import DEFAULT_PROFILE_PATH
+from tripwire.cli.main import cli
 
 
 @pytest.fixture

@@ -12,12 +12,12 @@ included because they are not dependencies.
 
 from __future__ import annotations
 
-from keel.models.graph import (
+from tripwire.models.graph import (
     DependencyGraphResult,
     GraphEdge,
     GraphNode,
 )
-from keel.models.issue import Issue
+from tripwire.models.issue import Issue
 
 
 def build_dependency_graph(issues: list[Issue]) -> DependencyGraphResult:

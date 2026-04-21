@@ -10,7 +10,7 @@ from pathlib import Path
 
 import click
 
-from keel.core.store import ProjectNotFoundError, load_project
+from tripwire.core.store import ProjectNotFoundError, load_project
 
 
 def require_project(project_dir: Path) -> None:

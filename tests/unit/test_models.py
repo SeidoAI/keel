@@ -16,7 +16,7 @@ from uuid import UUID
 
 import pytest
 
-from keel.models import (
+from tripwire.models import (
     AgentSession,
     ArtifactSpec,
     Comment,

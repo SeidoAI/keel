@@ -24,9 +24,9 @@ import logging
 import subprocess
 from pathlib import Path
 
-from keel.models.graph import FreshnessResult, FreshnessStatus
-from keel.models.node import ConceptNode, NodeSource
-from keel.models.project import ProjectConfig
+from tripwire.models.graph import FreshnessResult, FreshnessStatus
+from tripwire.models.node import ConceptNode, NodeSource
+from tripwire.models.project import ProjectConfig
 
 logger = logging.getLogger(__name__)
 

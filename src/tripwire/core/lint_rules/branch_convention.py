@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import yaml
 
-from keel.core.branch_naming import is_valid_branch_name
-from keel.core.linter import LintFinding, register_rule
-from keel.core.paths import handoff_path
+from tripwire.core.branch_naming import is_valid_branch_name
+from tripwire.core.linter import LintFinding, register_rule
+from tripwire.core.paths import handoff_path
 
 
 @register_rule(stage="handoff", code="lint/branch_convention", severity="error")

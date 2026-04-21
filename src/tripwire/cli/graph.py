@@ -17,14 +17,14 @@ from pathlib import Path
 
 import click
 
-from keel.cli._profiling import profileable
-from keel.core.concept_graph import build_full_graph
-from keel.core.dependency_graph import (
+from tripwire.cli._profiling import profileable
+from tripwire.core.concept_graph import build_full_graph
+from tripwire.core.dependency_graph import (
     build_dependency_graph,
     to_dot,
     to_mermaid,
 )
-from keel.core.store import (
+from tripwire.core.store import (
     ProjectNotFoundError,
     list_issues,
     load_project,

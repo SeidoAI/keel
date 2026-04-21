@@ -9,8 +9,8 @@ shortcutting the scoping workflow.
 
 from __future__ import annotations
 
-from keel.core.linter import LintFinding, register_rule
-from keel.core.store import list_issues
+from tripwire.core.linter import LintFinding, register_rule
+from tripwire.core.store import list_issues
 
 GAP_DOC = "docs/gap-analysis.md"
 MIN_ROWS_PER_ISSUE = 3

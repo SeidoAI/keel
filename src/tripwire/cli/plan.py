@@ -12,8 +12,8 @@ import json
 
 import click
 
-from keel.cli.init import _extract_key_prefix
-from keel.core.planner import preview_init
+from tripwire.cli.init import _extract_key_prefix
+from tripwire.core.planner import preview_init
 
 
 @click.command(name="plan")

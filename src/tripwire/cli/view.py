@@ -17,9 +17,9 @@ from pathlib import Path
 
 import click
 
-from keel.core.concept_graph import build_full_graph
-from keel.core.dependency_graph import build_dependency_graph
-from keel.core.store import (
+from tripwire.core.concept_graph import build_full_graph
+from tripwire.core.dependency_graph import build_dependency_graph
+from tripwire.core.store import (
     ProjectNotFoundError,
     list_issues,
     load_project,

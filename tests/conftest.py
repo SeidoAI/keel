@@ -50,8 +50,8 @@ def save_test_issue():
     """Factory fixture: save a minimal valid Issue via `store.save_issue`."""
 
     def _factory(project_dir: Path, key: str, **kwargs: Any) -> None:
-        from keel.core.store import save_issue
-        from keel.models import Issue
+        from tripwire.core.store import save_issue
+        from tripwire.models import Issue
 
         default_body = (
             "## Context\nWith [[user-model]] reference.\n"
@@ -87,9 +87,9 @@ def save_test_session():
     def _factory(
         project_dir: Path, session_id: str, *, plan: bool = False, **kwargs: Any
     ) -> None:
-        from keel.core import paths
-        from keel.core.session_store import save_session
-        from keel.models import AgentSession
+        from tripwire.core import paths
+        from tripwire.core.session_store import save_session
+        from tripwire.models import AgentSession
 
         fm: dict[str, Any] = {
             "id": session_id,
@@ -120,8 +120,8 @@ def save_test_node():
         body: str = "Description.\n",
         **kwargs: Any,
     ) -> None:
-        from keel.core.node_store import save_node
-        from keel.models import ConceptNode
+        from tripwire.core.node_store import save_node
+        from tripwire.models import ConceptNode
 
         fm: dict[str, Any] = {
             "id": node_id,
@@ -146,8 +146,8 @@ def write_handoff_yaml():
         from datetime import datetime, timezone
         from uuid import uuid4
 
-        from keel.core.handoff_store import save_handoff
-        from keel.models.handoff import SessionHandoff
+        from tripwire.core.handoff_store import save_handoff
+        from tripwire.models.handoff import SessionHandoff
 
         h = SessionHandoff(
             uuid=uuid4(),
@@ -195,9 +195,9 @@ def fresh_workspace():
         from datetime import datetime, timezone
         from uuid import uuid4
 
-        from keel.core.paths import workspace_nodes_dir
-        from keel.core.workspace_store import save_workspace
-        from keel.models.workspace import Workspace
+        from tripwire.core.paths import workspace_nodes_dir
+        from tripwire.core.workspace_store import save_workspace
+        from tripwire.models.workspace import Workspace
 
         ws_dir.mkdir(parents=True, exist_ok=True)
         workspace_nodes_dir(ws_dir).mkdir(parents=True, exist_ok=True)

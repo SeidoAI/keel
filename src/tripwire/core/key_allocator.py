@@ -16,9 +16,9 @@ from typing import Literal
 
 import yaml
 
-from keel.core import paths
-from keel.core.id_generator import format_key
-from keel.core.locks import DEFAULT_LOCK_TIMEOUT_S, LockTimeout, project_lock
+from tripwire.core import paths
+from tripwire.core.id_generator import format_key
+from tripwire.core.locks import DEFAULT_LOCK_TIMEOUT_S, LockTimeout, project_lock
 
 # Backwards-compatible alias — prefer `keel.core.paths.PROJECT_LOCK`.
 LOCK_FILENAME = paths.PROJECT_LOCK

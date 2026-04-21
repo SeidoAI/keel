@@ -12,10 +12,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from keel.core import graph_cache, paths
-from keel.core.node_store import list_nodes
-from keel.core.store import list_issues
-from keel.models.graph import (
+from tripwire.core import graph_cache, paths
+from tripwire.core.node_store import list_nodes
+from tripwire.core.store import list_issues
+from tripwire.models.graph import (
     FullGraphResult,
     GraphEdge,
     GraphIndex,
@@ -51,7 +51,7 @@ def _from_cache(cache: GraphIndex, project_dir: Path) -> FullGraphResult:
         issue_path = project_dir / rel
         if issue_path.is_file():
             try:
-                from keel.core.parser import parse_frontmatter_body
+                from tripwire.core.parser import parse_frontmatter_body
 
                 fm, _ = parse_frontmatter_body(issue_path.read_text(encoding="utf-8"))
                 label = fm.get("title")
@@ -114,7 +114,7 @@ def _from_scan(project_dir: Path) -> FullGraphResult:
     )
 
     edges: list[GraphEdge] = []
-    from keel.core.graph_cache import _issue_edges, _node_edges
+    from tripwire.core.graph_cache import _issue_edges, _node_edges
 
     for issue in issues:
         rel = f"{paths.ISSUES_DIR}/{issue.id}/{paths.ISSUE_FILENAME}"

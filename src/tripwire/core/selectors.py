@@ -22,8 +22,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from keel.core.concept_graph import build_full_graph
-from keel.models.graph import FullGraphResult
+from tripwire.core.concept_graph import build_full_graph
+from tripwire.models.graph import FullGraphResult
 
 
 @dataclass

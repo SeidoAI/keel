@@ -9,13 +9,13 @@ severity, so this bump is transparent to the CLI.
 
 from __future__ import annotations
 
-from keel.core.linter import LintFinding, register_rule
-from keel.core.node_store import list_nodes
+from tripwire.core.linter import LintFinding, register_rule
+from tripwire.core.node_store import list_nodes
 
 
 def _has_linked_workspace(ctx) -> bool:
     try:
-        from keel.core.store import load_project
+        from tripwire.core.store import load_project
 
         cfg = load_project(ctx.project_dir)
     except Exception:

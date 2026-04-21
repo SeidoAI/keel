@@ -24,7 +24,7 @@ from pathlib import Path
 
 import yaml
 
-from keel.models.enums import DEFAULT_ENUMS
+from tripwire.models.enums import DEFAULT_ENUMS
 
 logger = logging.getLogger(__name__)
 

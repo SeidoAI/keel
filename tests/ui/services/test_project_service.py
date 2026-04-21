@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
-from keel.ui.config import UserConfig
-from keel.ui.services.project_service import (
+from tripwire.ui.config import UserConfig
+from tripwire.ui.services.project_service import (
     _project_id,
     discover_projects,
     get_project_dir,
@@ -70,7 +70,7 @@ def _clear_cache():
 class TestDiscoverProjects:
     def test_empty_config_no_projects(self, tmp_path: Path):
         with patch(
-            "keel.ui.services.project_service.Path"
+            "tripwire.ui.services.project_service.Path"
         ) as mock_path_cls:
             # Make CWD point to tmp_path (no project.yaml there)
             mock_path_cls.cwd.return_value = tmp_path
@@ -83,7 +83,7 @@ class TestDiscoverProjects:
 
     def test_project_in_cwd(self, tmp_path: Path):
         proj = _make_project(tmp_path / "myproj")
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = proj
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
@@ -96,7 +96,7 @@ class TestDiscoverProjects:
         _make_project(root / "alpha", name="alpha", key_prefix="A")
         _make_project(root / "beta", name="beta", key_prefix="B")
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = tmp_path / "empty"
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
@@ -112,7 +112,7 @@ class TestDiscoverProjects:
         root.mkdir()
         _make_project(root / ".hidden" / "proj")
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = tmp_path / "empty"
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
@@ -127,7 +127,7 @@ class TestDiscoverProjects:
         _make_project(root / "node_modules" / "proj")
         _make_project(root / ".git" / "proj")
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = tmp_path / "empty"
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
@@ -141,7 +141,7 @@ class TestDiscoverProjects:
         link = tmp_path / "link"
         link.symlink_to(proj)
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = proj
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
@@ -157,12 +157,12 @@ class TestDiscoverProjects:
         proj.mkdir()
         (proj / "project.yaml").write_text("not: valid: yaml: [", encoding="utf-8")
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = tmp_path / "empty"
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
             with caplog.at_level(
-                logging.WARNING, logger="keel.ui.services.project_service"
+                logging.WARNING, logger="tripwire.ui.services.project_service"
             ):
                 cfg = UserConfig(project_roots=[tmp_path])
                 result = discover_projects(cfg)
@@ -182,7 +182,7 @@ class TestDiscoverProjects:
             tmp_path / "proj", issues=3, nodes=2, sessions=1
         )
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = proj
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
@@ -198,7 +198,7 @@ class TestCache:
     def test_cache_hit(self, tmp_path: Path):
         proj = _make_project(tmp_path / "proj")
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = proj
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
@@ -211,7 +211,7 @@ class TestCache:
     def test_reload_clears_cache(self, tmp_path: Path):
         proj = _make_project(tmp_path / "proj")
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = proj
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
@@ -225,14 +225,14 @@ class TestCache:
     def test_cache_expires(self, tmp_path: Path):
         proj = _make_project(tmp_path / "proj")
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = proj
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
             cfg = UserConfig()
             r1 = discover_projects(cfg)
 
-            with patch("keel.ui.services.project_service.time") as mock_time:
+            with patch("tripwire.ui.services.project_service.time") as mock_time:
                 mock_time.monotonic.return_value = time.monotonic() + 61
                 r2 = discover_projects(cfg)
 
@@ -243,7 +243,7 @@ class TestProjectIndex:
     def test_get_project_dir_after_discovery(self, tmp_path: Path):
         proj = _make_project(tmp_path / "proj")
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = proj
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path
@@ -258,7 +258,7 @@ class TestProjectIndex:
     def test_index_cleared_on_reload(self, tmp_path: Path):
         proj = _make_project(tmp_path / "proj")
 
-        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = proj
             mock_path_cls.home.return_value = tmp_path / "fakehome"
             mock_path_cls.side_effect = Path

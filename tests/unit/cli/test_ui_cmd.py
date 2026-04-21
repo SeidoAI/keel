@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from keel.cli.main import cli
+from tripwire.cli.main import cli
 
 runner = CliRunner()
 
@@ -47,7 +47,7 @@ class TestGracefulDegradation:
 class TestNoProjects:
     def test_no_projects_found_prints_hint(self, tmp_path: Path):
         with patch(
-            "keel.ui.services.project_service.discover_projects",
+            "tripwire.ui.services.project_service.discover_projects",
             return_value=[],
         ):
             result = runner.invoke(cli, ["ui"])
@@ -96,7 +96,7 @@ def _make_import_blocker(blocked_module: str):
     _real_import = builtins.__import__
 
     def _blocker(name, *args, **kwargs):
-        if name == "keel.ui.server":
+        if name == "tripwire.ui.server":
             exc = ModuleNotFoundError(
                 f"No module named '{blocked_module}'"
             )

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from keel.core.linter import LintFinding, register_rule
-from keel.core.session_store import load_session
+from tripwire.core.linter import LintFinding, register_rule
+from tripwire.core.session_store import load_session
 
 STALE_DAYS = 3
 

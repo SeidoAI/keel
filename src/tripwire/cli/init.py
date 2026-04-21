@@ -32,8 +32,8 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from rich.console import Console
 from rich.panel import Panel
 
-from keel.core import paths
-from keel.templates import get_templates_dir
+from tripwire.core import paths
+from tripwire.templates import get_templates_dir
 
 KEY_PREFIX_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*$")
 CREATED_DIRS = [
@@ -403,16 +403,16 @@ def _link_to_workspace(
     """
     import os
 
-    from keel.core.store import load_project as _load_project
-    from keel.core.store import save_project as _save_project
-    from keel.core.workspace_store import (
+    from tripwire.core.store import load_project as _load_project
+    from tripwire.core.store import save_project as _save_project
+    from tripwire.core.workspace_store import (
         add_project as _ws_add_project,
     )
-    from keel.core.workspace_store import (
+    from tripwire.core.workspace_store import (
         workspace_exists as _ws_exists,
     )
-    from keel.models.project import ProjectWorkspacePointer
-    from keel.models.workspace import WorkspaceProjectEntry
+    from tripwire.models.project import ProjectWorkspacePointer
+    from tripwire.models.workspace import WorkspaceProjectEntry
 
     slug = key_prefix.lower()
 
@@ -457,7 +457,7 @@ def _link_to_workspace(
     if copy_nodes:
         from datetime import datetime, timezone
 
-        from keel.core.node_store import node_exists, save_node
+        from tripwire.core.node_store import node_exists, save_node
 
         node_ids = [nid.strip() for nid in copy_nodes.split(",") if nid.strip()]
         head_sha = _git_head_short(workspace_path)
@@ -469,9 +469,9 @@ def _link_to_workspace(
                 )
                 continue
             try:
-                from keel.core.parser import parse_frontmatter_body
-                from keel.core.paths import workspace_node_path
-                from keel.models.node import ConceptNode
+                from tripwire.core.parser import parse_frontmatter_body
+                from tripwire.core.paths import workspace_node_path
+                from tripwire.models.node import ConceptNode
 
                 ws_node_path = workspace_node_path(workspace_path, nid)
                 if not ws_node_path.is_file():

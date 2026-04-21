@@ -20,9 +20,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from keel.cli._utils import require_project as _require_project
-from keel.cli.artifacts import artifacts_list
-from keel.core.session_store import list_sessions, load_session
+from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.artifacts import artifacts_list
+from tripwire.core.session_store import list_sessions, load_session
 
 console = Console()
 
@@ -130,7 +130,7 @@ def session_show_cmd(session_id: str, project_dir: Path, output_format: str) -> 
         click.echo(session.model_dump_json(indent=2, exclude_none=True))
         return
 
-    from keel.core.session_store import session_yaml_path
+    from tripwire.core.session_store import session_yaml_path
 
     yaml_path = session_yaml_path(resolved, session_id)
     click.echo(yaml_path.read_text(encoding="utf-8"))
@@ -148,7 +148,7 @@ def _load_manifest_for_check(project_dir: Path):
     """Load ArtifactManifest; raises ClickException on parse failure."""
     import yaml as _yaml
 
-    from keel.models.manifest import ArtifactManifest
+    from tripwire.models.manifest import ArtifactManifest
 
     manifest_path = project_dir / "templates" / "artifacts" / "manifest.yaml"
     if not manifest_path.exists():
@@ -164,8 +164,8 @@ def _compute_readiness(project_dir: Path, session_id: str) -> list[ReadinessItem
     Checks required planning artifacts (per manifest.yaml, owned_by=pm),
     blockers on the session's issues, handoff.yaml presence + validity.
     """
-    from keel.core.handoff_store import handoff_exists, load_handoff
-    from keel.core.store import load_issue
+    from tripwire.core.handoff_store import handoff_exists, load_handoff
+    from tripwire.core.store import load_issue
 
     items: list[ReadinessItem] = []
 
@@ -406,8 +406,8 @@ def session_derive_branch_cmd(session_id: str, project_dir: Path) -> None:
     Format: <kind>/<session-slug> where kind is the primary issue's
     kind (first item in session.yaml.issues).
     """
-    from keel.core.branch_naming import BranchNameError, derive_branch_name
-    from keel.core.store import load_issue
+    from tripwire.core.branch_naming import BranchNameError, derive_branch_name
+    from tripwire.core.store import load_issue
 
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)

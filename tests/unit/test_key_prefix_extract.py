@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from keel.cli.init import KEY_PREFIX_PATTERN, _extract_key_prefix
+from tripwire.cli.init import KEY_PREFIX_PATTERN, _extract_key_prefix
 
 
 @pytest.mark.parametrize(

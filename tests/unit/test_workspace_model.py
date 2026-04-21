@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from keel.models.workspace import Workspace, WorkspaceProjectEntry
+from tripwire.models.workspace import Workspace, WorkspaceProjectEntry
 
 
 def _now():

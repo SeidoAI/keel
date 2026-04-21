@@ -10,8 +10,8 @@ Validation against the active project enums happens in the validator
 (see `core/validator.py`), not in the models themselves.
 """
 
-from keel.models.comment import Comment
-from keel.models.enums import (
+from tripwire.models.comment import Comment
+from tripwire.models.enums import (
     AgentState,
     CommentType,
     Executor,
@@ -24,7 +24,7 @@ from keel.models.enums import (
     SessionStatus,
     Verifier,
 )
-from keel.models.graph import (
+from tripwire.models.graph import (
     EdgeType,
     FreshnessResult,
     FreshnessStatus,
@@ -33,16 +33,16 @@ from keel.models.graph import (
     GraphIndex,
     GraphNode,
 )
-from keel.models.issue import Issue
-from keel.models.node import ConceptNode, NodeSource
-from keel.models.project import (
+from tripwire.models.issue import Issue
+from tripwire.models.node import ConceptNode, NodeSource
+from tripwire.models.project import (
     GraphSettings,
     LabelCategories,
     OrchestrationConfig,
     ProjectConfig,
     RepoEntry,
 )
-from keel.models.session import (
+from tripwire.models.session import (
     AgentSession,
     ArtifactSpec,
     EngagementEntry,

@@ -21,9 +21,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from keel.core import graph_cache
-from keel.core.dependency_graph import build_dependency_graph
-from keel.core.store import (
+from tripwire.core import graph_cache
+from tripwire.core.dependency_graph import build_dependency_graph
+from tripwire.core.store import (
     ProjectNotFoundError,
     list_issues,
     load_project,

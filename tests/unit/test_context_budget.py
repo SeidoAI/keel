@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from keel.templates import get_templates_dir
+from tripwire.templates import get_templates_dir
 
 TEMPLATES_DIR = get_templates_dir()
 

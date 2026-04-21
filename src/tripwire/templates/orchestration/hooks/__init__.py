@@ -7,7 +7,7 @@ into its decision state.
 
 Example — `custom_verifier.py`:
 
-    from keel.orchestration import Event, Context
+    from tripwire.orchestration import Event, Context
 
     def maybe_skip_verifier(event: Event, ctx: Context) -> dict:
         \"\"\"Skip verifier for trivial PRs (e.g. only docs changed).\"\"\"

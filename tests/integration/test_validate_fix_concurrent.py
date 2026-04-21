@@ -20,8 +20,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from keel.cli.main import cli
-from keel.core.parser import parse_frontmatter_body
+from tripwire.cli.main import cli
+from tripwire.core.parser import parse_frontmatter_body
 
 
 @pytest.fixture
@@ -105,7 +105,7 @@ def _run_fix(project_dir_str: str) -> int:
         [
             sys.executable,
             "-m",
-            "keel.cli.main",
+            "tripwire.cli.main",
             "validate",
             "--fix",
             "--project-dir",

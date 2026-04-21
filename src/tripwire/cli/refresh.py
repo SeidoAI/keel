@@ -11,7 +11,7 @@ from pathlib import Path
 
 import click
 
-from keel.core.graph_cache import ensure_fresh
+from tripwire.core.graph_cache import ensure_fresh
 
 
 @click.command(name="refresh")

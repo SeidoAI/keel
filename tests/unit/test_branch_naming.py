@@ -2,7 +2,7 @@
 
 import pytest
 
-from keel.core.branch_naming import (
+from tripwire.core.branch_naming import (
     ALLOWED_TYPES,
     BranchNameError,
     derive_branch_name,
@@ -41,14 +41,14 @@ class TestIsValidBranchName:
         assert is_valid_branch_name("feat/") is False
 
     def test_accepts_exact_max_length(self):
-        from keel.core.branch_naming import MAX_BRANCH_LENGTH
+        from tripwire.core.branch_naming import MAX_BRANCH_LENGTH
 
         # feat/ = 5 chars; fill rest with 'a' up to the limit.
         slug = "a" * (MAX_BRANCH_LENGTH - len("feat/"))
         assert is_valid_branch_name(f"feat/{slug}") is True
 
     def test_rejects_one_over_max_length(self):
-        from keel.core.branch_naming import MAX_BRANCH_LENGTH
+        from tripwire.core.branch_naming import MAX_BRANCH_LENGTH
 
         slug = "a" * (MAX_BRANCH_LENGTH - len("feat/") + 1)
         assert is_valid_branch_name(f"feat/{slug}") is False

@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-logger = logging.getLogger("keel.ui.config")
+logger = logging.getLogger("tripwire.ui.config")
 
 _DEFAULT_CONFIG_PATH = Path.home() / ".keel" / "config.yaml"
 

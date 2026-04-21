@@ -16,7 +16,7 @@ from pathlib import Path
 
 import click
 
-from keel.core.key_allocator import (
+from tripwire.core.key_allocator import (
     KeyAllocationError,
     allocate_keys,
 )

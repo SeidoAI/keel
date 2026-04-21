@@ -15,8 +15,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from keel.cli.main import cli
-from keel.core.validator import validate_project
+from tripwire.cli.main import cli
+from tripwire.core.validator import validate_project
 
 
 @pytest.fixture

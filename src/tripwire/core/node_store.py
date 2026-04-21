@@ -10,13 +10,13 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from keel.core import paths
-from keel.core.parser import (
+from tripwire.core import paths
+from tripwire.core.parser import (
     ParseError,
     parse_frontmatter_body,
     serialize_frontmatter_body,
 )
-from keel.models.node import ConceptNode
+from tripwire.models.node import ConceptNode
 
 # Backwards-compatible alias — prefer importing from `keel.core.paths`.
 NODES_DIRNAME = paths.NODES_DIR
@@ -59,7 +59,7 @@ def save_node(
     path.write_text(text, encoding="utf-8")
 
     if update_cache:
-        from keel.core.graph_cache import update_cache_for_file
+        from tripwire.core.graph_cache import update_cache_for_file
 
         update_cache_for_file(project_dir, str(path.relative_to(project_dir)))
 

@@ -10,28 +10,28 @@ import logging
 
 import click
 
-from keel import __version__
-from keel.cli.agenda import agenda_cmd
-from keel.cli.artifacts import artifacts_cmd
-from keel.cli.completion import completion_cmd
-from keel.cli.enums import enums_cmd
-from keel.cli.graph import graph_cmd
-from keel.cli.init import init_cmd
-from keel.cli.lint import lint_cmd
-from keel.cli.next_key import next_key_cmd
-from keel.cli.node import node_cmd
-from keel.cli.plan import plan_cmd
-from keel.cli.refresh import refresh_cmd
-from keel.cli.refs import refs_cmd
-from keel.cli.scaffold import brief_cmd, scaffold_cmd
-from keel.cli.session import session_cmd
-from keel.cli.status import status_cmd
-from keel.cli.templates import templates_cmd
-from keel.cli.ui import ui_cmd
-from keel.cli.uuid_cmd import uuid_cmd
-from keel.cli.validate import validate_cmd
-from keel.cli.view import view_cmd
-from keel.cli.workspace import workspace_cmd
+from tripwire import __version__
+from tripwire.cli.agenda import agenda_cmd
+from tripwire.cli.artifacts import artifacts_cmd
+from tripwire.cli.completion import completion_cmd
+from tripwire.cli.enums import enums_cmd
+from tripwire.cli.graph import graph_cmd
+from tripwire.cli.init import init_cmd
+from tripwire.cli.lint import lint_cmd
+from tripwire.cli.next_key import next_key_cmd
+from tripwire.cli.node import node_cmd
+from tripwire.cli.plan import plan_cmd
+from tripwire.cli.refresh import refresh_cmd
+from tripwire.cli.refs import refs_cmd
+from tripwire.cli.scaffold import brief_cmd, scaffold_cmd
+from tripwire.cli.session import session_cmd
+from tripwire.cli.status import status_cmd
+from tripwire.cli.templates import templates_cmd
+from tripwire.cli.ui import ui_cmd
+from tripwire.cli.uuid_cmd import uuid_cmd
+from tripwire.cli.validate import validate_cmd
+from tripwire.cli.view import view_cmd
+from tripwire.cli.workspace import workspace_cmd
 
 # Verbose count → logging level. -v = INFO, -vv = DEBUG, default = WARNING.
 LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}

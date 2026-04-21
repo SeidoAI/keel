@@ -2,7 +2,7 @@
 
 from click.testing import CliRunner
 
-from keel.cli.session import session_cmd
+from tripwire.cli.session import session_cmd
 
 
 class TestDeriveBranch:

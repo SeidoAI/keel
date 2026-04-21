@@ -30,7 +30,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from keel.core import paths
+from tripwire.core import paths
 
 logger = logging.getLogger(__name__)
 

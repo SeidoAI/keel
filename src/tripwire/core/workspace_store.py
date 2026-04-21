@@ -10,14 +10,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from keel.core.locks import project_lock
-from keel.core.parser import (
+from tripwire.core.locks import project_lock
+from tripwire.core.parser import (
     ParseError,
     parse_frontmatter_body,
     serialize_frontmatter_body,
 )
-from keel.core.paths import workspace_yaml_path
-from keel.models.workspace import Workspace, WorkspaceProjectEntry
+from tripwire.core.paths import workspace_yaml_path
+from tripwire.models.workspace import Workspace, WorkspaceProjectEntry
 
 
 def workspace_exists(workspace_dir: Path) -> bool:

@@ -38,12 +38,12 @@ from typing import TYPE_CHECKING
 
 import yaml
 
-from keel.core import paths
-from keel.core.parser import parse_frontmatter_body
-from keel.core.reference_parser import extract_references
-from keel.models.graph import FileFingerprint, GraphEdge, GraphIndex
-from keel.models.issue import Issue
-from keel.models.node import ConceptNode
+from tripwire.core import paths
+from tripwire.core.parser import parse_frontmatter_body
+from tripwire.core.reference_parser import extract_references
+from tripwire.models.graph import FileFingerprint, GraphEdge, GraphIndex
+from tripwire.models.issue import Issue
+from tripwire.models.node import ConceptNode
 
 if TYPE_CHECKING:
     pass

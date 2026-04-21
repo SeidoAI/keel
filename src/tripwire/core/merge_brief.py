@@ -21,8 +21,8 @@ from typing import Any, Literal
 
 import yaml
 
-from keel.core.paths import merge_brief_path, merge_briefs_dir
-from keel.core.workspace_sync import EXCLUDED_FROM_MERGE
+from tripwire.core.paths import merge_brief_path, merge_briefs_dir
+from tripwire.core.workspace_sync import EXCLUDED_FROM_MERGE
 
 
 class MergeType(Enum):

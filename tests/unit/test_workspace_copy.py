@@ -8,10 +8,10 @@ from uuid import uuid4
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.workspace import workspace_cmd
-from keel.core.paths import workspace_nodes_dir
-from keel.core.workspace_store import save_workspace
-from keel.models.workspace import Workspace
+from tripwire.cli.workspace import workspace_cmd
+from tripwire.core.paths import workspace_nodes_dir
+from tripwire.core.workspace_store import save_workspace
+from tripwire.models.workspace import Workspace
 
 
 def _git_commit_all(repo: Path, message: str = "test commit") -> str:
@@ -114,7 +114,7 @@ class TestWorkspaceCopy:
         assert result.exit_code == 0, result.output
 
         # Verify the node was copied with workspace metadata stamped.
-        from keel.core.node_store import load_node
+        from tripwire.core.node_store import load_node
 
         node = load_node(proj_dir, "auth-system")
         assert node.origin == "workspace"

@@ -2,7 +2,7 @@
 
 This package provides the web dashboard for browsing and managing keel
 projects. Heavy dependencies (FastAPI, uvicorn, watchdog) are imported
-lazily inside submodules so that ``import keel.ui`` works even on a
+lazily inside submodules so that ``import tripwire.ui`` works even on a
 minimal ``keel[projects]`` install.
 """
 

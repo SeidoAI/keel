@@ -17,8 +17,8 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from keel.cli._utils import require_project as _require_project
-from keel.core import paths
+from tripwire.cli._utils import require_project as _require_project
+from tripwire.core import paths
 
 console = Console()
 

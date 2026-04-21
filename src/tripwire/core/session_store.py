@@ -22,13 +22,13 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from keel.core import paths
-from keel.core.parser import (
+from tripwire.core import paths
+from tripwire.core.parser import (
     ParseError,
     parse_frontmatter_body,
     serialize_frontmatter_body,
 )
-from keel.models.session import AgentSession
+from tripwire.models.session import AgentSession
 
 
 def session_dir(project_dir: Path, session_id: str) -> Path:

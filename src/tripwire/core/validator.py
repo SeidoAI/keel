@@ -47,25 +47,25 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from keel.core import freshness as freshness_mod
-from keel.core import paths
-from keel.core.enum_loader import EnumRegistry, load_enums
-from keel.core.id_generator import parse_key
-from keel.core.locks import LockTimeout, project_lock
-from keel.core.parser import ParseError, parse_frontmatter_body
-from keel.core.reference_parser import extract_references
-from keel.core.status import is_status_reachable
-from keel.core.store import (
+from tripwire.core import freshness as freshness_mod
+from tripwire.core import paths
+from tripwire.core.enum_loader import EnumRegistry, load_enums
+from tripwire.core.id_generator import parse_key
+from tripwire.core.locks import LockTimeout, project_lock
+from tripwire.core.parser import ParseError, parse_frontmatter_body
+from tripwire.core.reference_parser import extract_references
+from tripwire.core.status import is_status_reachable
+from tripwire.core.store import (
     PROJECT_CONFIG_FILENAME,
     ProjectNotFoundError,
     load_project,
 )
-from keel.models.comment import Comment
-from keel.models.issue import Issue
-from keel.models.manifest import ArtifactManifest
-from keel.models.node import ConceptNode
-from keel.models.project import ProjectConfig
-from keel.models.session import AgentSession
+from tripwire.models.comment import Comment
+from tripwire.models.issue import Issue
+from tripwire.models.manifest import ArtifactManifest
+from tripwire.models.node import ConceptNode
+from tripwire.models.project import ProjectConfig
+from tripwire.models.session import AgentSession
 
 logger = logging.getLogger(__name__)
 
@@ -1586,7 +1586,7 @@ def _fix_sequence_drift(ctx: ValidationContext) -> CheckResult | None:
 
 def _rewrite_entity_file(project_dir: Path, entity: LoadedEntity) -> None:
     """Write a fixed entity back to disk, preserving uuid-first key order."""
-    from keel.core.parser import serialize_frontmatter_body
+    from tripwire.core.parser import serialize_frontmatter_body
 
     abs_path = project_dir / entity.rel_path
     text = serialize_frontmatter_body(entity.raw_frontmatter, entity.body)
@@ -1655,7 +1655,7 @@ def _apply_fixes_locked(ctx: ValidationContext) -> list[CheckResult]:
     # read inside the same process sees the new state. Comments and
     # sessions are no-ops (graph_cache._classify ignores them).
     if dirty:
-        from keel.core.graph_cache import update_cache_for_file
+        from tripwire.core.graph_cache import update_cache_for_file
 
         for rel in dirty:
             update_cache_for_file(ctx.project_dir, rel)
@@ -1795,7 +1795,7 @@ def check_phase_requirements(ctx: ValidationContext) -> list[CheckResult]:
       and be marked ``complete``.  All sessions must have ``plan.md``.
     - **executing** / **reviewing**: same as scoped.
     """
-    from keel.models.project import ProjectPhase
+    from tripwire.models.project import ProjectPhase
 
     if ctx.project_config is None:
         return []
@@ -1941,7 +1941,7 @@ def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
 
         branch = frontmatter.get("branch") if isinstance(frontmatter, dict) else None
         if isinstance(branch, str):
-            from keel.core.branch_naming import is_valid_branch_name
+            from tripwire.core.branch_naming import is_valid_branch_name
 
             if not is_valid_branch_name(branch):
                 results.append(
@@ -1968,7 +1968,7 @@ def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
         # function already handled that code above, so any ValidationError
         # here is structural.
         try:
-            from keel.core.handoff_store import load_handoff
+            from tripwire.core.handoff_store import load_handoff
 
             load_handoff(ctx.project_dir, session.id)
         except ValidationError as exc:
@@ -2145,7 +2145,7 @@ def validate_project(
     the cache is missing or corrupt.
     """
     # Import lazily to avoid a circular import at module load time.
-    from keel.core import graph_cache
+    from tripwire.core import graph_cache
 
     started = time.monotonic()
     logger.info(

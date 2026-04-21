@@ -14,7 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from keel.core.branch_naming import is_valid_branch_name
+from tripwire.core.branch_naming import is_valid_branch_name
 
 HandedOffBy = Literal["pm", "execution-agent", "verification-agent"]
 

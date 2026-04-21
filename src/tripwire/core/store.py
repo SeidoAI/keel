@@ -18,15 +18,15 @@ from pathlib import Path
 
 import yaml
 
-from keel.core import paths
-from keel.core.parser import (
+from tripwire.core import paths
+from tripwire.core.parser import (
     ParseError,
     parse_frontmatter_body,
     serialize_frontmatter_body,
 )
-from keel.models.comment import Comment
-from keel.models.issue import Issue
-from keel.models.project import ProjectConfig
+from tripwire.models.comment import Comment
+from tripwire.models.issue import Issue
+from tripwire.models.project import ProjectConfig
 
 # Backwards-compatible aliases — prefer importing from `keel.core.paths`.
 ISSUES_DIRNAME = paths.ISSUES_DIR
@@ -114,7 +114,7 @@ def save_issue(project_dir: Path, issue: Issue, *, update_cache: bool = True) ->
     path.write_text(text, encoding="utf-8")
 
     if update_cache:
-        from keel.core.graph_cache import update_cache_for_file
+        from tripwire.core.graph_cache import update_cache_for_file
 
         update_cache_for_file(project_dir, str(path.relative_to(project_dir)))
 

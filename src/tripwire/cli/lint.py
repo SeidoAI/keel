@@ -21,11 +21,11 @@ from pathlib import Path
 
 import click
 
-from keel.cli._utils import require_project as _require_project
+from tripwire.cli._utils import require_project as _require_project
 
 # Importing the rules package triggers @register_rule for each rule.
-from keel.core import lint_rules  # noqa: F401
-from keel.core.linter import Linter, exit_code_for
+from tripwire.core import lint_rules  # noqa: F401
+from tripwire.core.linter import Linter, exit_code_for
 
 
 @click.group(name="lint")

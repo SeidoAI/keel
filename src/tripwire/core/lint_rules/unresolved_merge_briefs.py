@@ -8,8 +8,8 @@ before launching execution.
 
 from __future__ import annotations
 
-from keel.core.linter import LintFinding, register_rule
-from keel.core.merge_brief import list_pending_briefs
+from tripwire.core.linter import LintFinding, register_rule
+from tripwire.core.merge_brief import list_pending_briefs
 
 
 @register_rule(

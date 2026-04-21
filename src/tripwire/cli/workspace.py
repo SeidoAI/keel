@@ -27,18 +27,18 @@ from uuid import uuid4
 
 import click
 
-from keel import __version__ as KEEL_VERSION
-from keel.cli._utils import require_project as _require_project
-from keel.core.paths import workspace_nodes_dir
-from keel.core.store import load_project as load_project_config
-from keel.core.workspace_store import (
+from tripwire import __version__ as KEEL_VERSION
+from tripwire.cli._utils import require_project as _require_project
+from tripwire.core.paths import workspace_nodes_dir
+from tripwire.core.store import load_project as load_project_config
+from tripwire.core.workspace_store import (
     add_project,
     load_workspace,
     remove_project,
     save_workspace,
     workspace_exists,
 )
-from keel.models.workspace import Workspace, WorkspaceProjectEntry
+from tripwire.models.workspace import Workspace, WorkspaceProjectEntry
 
 
 @click.group(name="workspace")
@@ -140,8 +140,8 @@ def workspace_link_cmd(workspace_path: Path, project_dir: Path, slug: str) -> No
     except ValueError:
         ws_relative_back = str(proj_resolved)
 
-    from keel.core.store import save_project
-    from keel.models.project import ProjectWorkspacePointer
+    from tripwire.core.store import save_project
+    from tripwire.models.project import ProjectWorkspacePointer
 
     # Write workspace-side FIRST. If it fails (e.g. duplicate slug,
     # lock timeout, write error) the project-side pointer hasn't been
@@ -184,7 +184,7 @@ def workspace_unlink_cmd(project_dir: Path, force: bool) -> None:
     proj = project_dir.expanduser().resolve()
     _require_project(proj)
 
-    from keel.core.store import save_project
+    from tripwire.core.store import save_project
 
     cfg = load_project_config(proj)
     if cfg.workspace is None:
@@ -360,7 +360,7 @@ def _status_project(proj_dir: Path, output_format: str) -> None:
 
     ws_resolved = (proj_dir / cfg.workspace.path).resolve()
 
-    from keel.core.node_store import list_nodes
+    from tripwire.core.node_store import list_nodes
 
     nodes = list_nodes(proj_dir)
     workspace_origin = [n for n in nodes if n.origin == "workspace"]
@@ -464,9 +464,9 @@ def _git_show_node(ws_dir: Path, sha: str, node_id: str) -> dict:
 
 def _load_workspace_node(ws_dir: Path, node_id: str):
     """Load a node from <ws_dir>/nodes/<node_id>.yaml (working tree)."""
-    from keel.core.parser import ParseError, parse_frontmatter_body
-    from keel.core.paths import workspace_node_path
-    from keel.models.node import ConceptNode
+    from tripwire.core.parser import ParseError, parse_frontmatter_body
+    from tripwire.core.paths import workspace_node_path
+    from tripwire.models.node import ConceptNode
 
     path = workspace_node_path(ws_dir, node_id)
     if not path.is_file():
@@ -522,7 +522,7 @@ def workspace_copy_cmd(node_ids: tuple[str, ...], project_dir: Path) -> None:
     already exists locally — use `pull` (to refresh) or `fork` (to
     detach) instead.
     """
-    from keel.core.node_store import node_exists, save_node
+    from tripwire.core.node_store import node_exists, save_node
 
     proj = project_dir.expanduser().resolve()
     _require_project(proj)
@@ -598,10 +598,10 @@ def workspace_pull_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> N
     automatically. Conflicts produce merge briefs (v0.6b T19) and the
     command exits 10 signalling "merges pending".
     """
-    from keel.core.node_store import list_nodes, save_node
-    from keel.core.workspace_store import update_project_pull_state
-    from keel.core.workspace_sync import MergeStatus, merge_nodes
-    from keel.models.node import ConceptNode
+    from tripwire.core.node_store import list_nodes, save_node
+    from tripwire.core.workspace_store import update_project_pull_state
+    from tripwire.core.workspace_sync import MergeStatus, merge_nodes
+    from tripwire.models.node import ConceptNode
 
     proj = project_dir.expanduser().resolve()
     _require_project(proj)
@@ -710,7 +710,7 @@ def workspace_pull_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> N
     # Conflicts present — generate structured briefs for each and write
     # a draft merge (auto-merged fields applied; conflicting fields left
     # as ours as a starting point for the agent).
-    from keel.core.merge_brief import MergeType, build_merge_brief, save_merge_brief
+    from tripwire.core.merge_brief import MergeType, build_merge_brief, save_merge_brief
 
     for node_id, result in conflicts:
         base_dict, ours_dict, theirs_dict = conflict_context[node_id]
@@ -790,9 +790,9 @@ def workspace_push_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> N
     pull on the same node) causes push to refuse with exit 11.
     """
 
-    from keel.core.node_store import list_nodes
-    from keel.core.paths import workspace_node_path
-    from keel.core.workspace_sync import MergeStatus, merge_nodes
+    from tripwire.core.node_store import list_nodes
+    from tripwire.core.paths import workspace_node_path
+    from tripwire.core.workspace_sync import MergeStatus, merge_nodes
 
     proj = project_dir.expanduser().resolve()
     _require_project(proj)
@@ -871,7 +871,7 @@ def workspace_push_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> N
     # Acquire the workspace lock for the entire write-commit-bookkeep
     # sequence. Without this, concurrent pushes from different project
     # repos race on git's own index.lock and one or more may fail.
-    from keel.core.locks import project_lock
+    from tripwire.core.locks import project_lock
 
     with project_lock(ws_dir):
         _apply_pushes(proj, ws_dir, pushes)
@@ -884,10 +884,10 @@ def _apply_pushes(
 
     Called while holding the workspace lock.
     """
-    from keel.core.node_store import save_node
-    from keel.core.parser import serialize_frontmatter_body
-    from keel.core.paths import workspace_node_path
-    from keel.models.node import ConceptNode
+    from tripwire.core.node_store import save_node
+    from tripwire.core.parser import serialize_frontmatter_body
+    from tripwire.core.paths import workspace_node_path
+    from tripwire.models.node import ConceptNode
 
     # Write each push to the workspace working tree.
     for node_id, _action, final_dict in pushes:
@@ -964,7 +964,7 @@ def _apply_pushes(
     # Update workspace.yaml's last_pushed_sha for this project.
     # We already hold the workspace lock via the enclosing context
     # manager — inline the mutation to avoid re-entering project_lock.
-    from keel.core.workspace_store import load_workspace, save_workspace
+    from tripwire.core.workspace_store import load_workspace, save_workspace
 
     entry = _find_workspace_entry_for_project(ws_dir, proj)
     if entry is not None:
@@ -1003,7 +1003,7 @@ def workspace_fork_cmd(node_id: str, project_dir: Path) -> None:
     and push skip it. Useful when a project needs to specialize a node
     without tracking upstream changes.
     """
-    from keel.core.node_store import load_node, save_node
+    from tripwire.core.node_store import load_node, save_node
 
     proj = project_dir.expanduser().resolve()
     _require_project(proj)
@@ -1052,8 +1052,8 @@ def workspace_promote_cmd(ctx: click.Context, node_id: str, project_dir: Path) -
     node is already workspace-origin (use pull/push directly) or if the
     workspace already has a node with the same id.
     """
-    from keel.core.node_store import load_node, save_node
-    from keel.core.paths import workspace_node_path
+    from tripwire.core.node_store import load_node, save_node
+    from tripwire.core.paths import workspace_node_path
 
     proj = project_dir.expanduser().resolve()
     _require_project(proj)
@@ -1110,12 +1110,12 @@ def workspace_merge_resolve_cmd(node_id: str, project_dir: Path) -> None:
     merge brief. If validation fails, the brief is preserved so the
     agent can fix the node and retry.
     """
-    from keel.core.merge_brief import (
+    from tripwire.core.merge_brief import (
         delete_merge_brief,
         list_pending_briefs,
         load_merge_brief,
     )
-    from keel.core.node_store import load_node, save_node
+    from tripwire.core.node_store import load_node, save_node
 
     proj = project_dir.expanduser().resolve()
     _require_project(proj)

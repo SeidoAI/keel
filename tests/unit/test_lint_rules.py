@@ -2,8 +2,8 @@
 
 from datetime import datetime, timedelta, timezone
 
-from keel.core import lint_rules  # noqa: F401 — registers rules
-from keel.core.linter import Linter
+from tripwire.core import lint_rules  # noqa: F401 — registers rules
+from tripwire.core.linter import Linter
 
 
 class TestGapAnalysisRowDensity:

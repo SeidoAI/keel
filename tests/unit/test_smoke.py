@@ -3,7 +3,7 @@
 Replaced/supplemented by real unit tests in subsequent steps.
 """
 
-import keel
+import tripwire
 
 
 def test_package_imports() -> None:

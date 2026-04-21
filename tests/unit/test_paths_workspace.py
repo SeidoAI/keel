@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from keel.core import paths
+from tripwire.core import paths
 
 
 def test_workspace_yaml_path():

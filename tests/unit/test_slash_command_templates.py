@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from keel.templates import get_templates_dir
+from tripwire.templates import get_templates_dir
 
 COMMANDS_DIR = get_templates_dir() / "commands"
 

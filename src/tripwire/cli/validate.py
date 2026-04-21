@@ -25,8 +25,8 @@ from pathlib import Path
 import click
 from rich.console import Console
 
-from keel.cli._profiling import profileable
-from keel.core.validator import (
+from tripwire.cli._profiling import profileable
+from tripwire.core.validator import (
     CheckResult,
     ValidationReport,
     validate_project,
@@ -113,7 +113,7 @@ def _filter_report_by_selector(
 ) -> None:
     """Filter a validation report in-place to only findings matching
     the selector's entity set."""
-    from keel.core.selectors import resolve_selector
+    from tripwire.core.selectors import resolve_selector
 
     try:
         result = resolve_selector(select_expr, project_dir)

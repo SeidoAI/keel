@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import subprocess
 
-from keel.core.linter import LintFinding, register_rule
-from keel.core.node_store import list_nodes
-from keel.core.store import load_project
+from tripwire.core.linter import LintFinding, register_rule
+from tripwire.core.node_store import list_nodes
+from tripwire.core.store import load_project
 
 
 def _check(ctx):

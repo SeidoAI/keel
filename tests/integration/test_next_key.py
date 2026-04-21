@@ -19,7 +19,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from keel.cli.main import cli
+from tripwire.cli.main import cli
 
 
 @pytest.fixture
@@ -189,7 +189,7 @@ def _allocate_via_subprocess(project_dir_str: str) -> str:
         [
             sys.executable,
             "-m",
-            "keel.cli.main",
+            "tripwire.cli.main",
             "next-key",
             "--project-dir",
             project_dir_str,

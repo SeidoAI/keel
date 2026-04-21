@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import deque
 
-from keel.models.project import ProjectConfig
+from tripwire.models.project import ProjectConfig
 
 # The implicit starting state for every issue. Projects can rename
 # `backlog` in their enums but the transition graph still must have a node

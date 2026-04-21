@@ -16,10 +16,10 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from keel.core.freshness import check_all_nodes, check_node_freshness
-from keel.core.node_store import load_node
-from keel.core.store import ProjectNotFoundError, load_project
-from keel.models.graph import FreshnessResult, FreshnessStatus
+from tripwire.core.freshness import check_all_nodes, check_node_freshness
+from tripwire.core.node_store import load_node
+from tripwire.core.store import ProjectNotFoundError, load_project
+from tripwire.models.graph import FreshnessResult, FreshnessStatus
 
 console = Console()
 
@@ -64,7 +64,7 @@ def node_check_cmd(node_id: str | None, project_dir: Path, output_format: str) -
             raise click.ClickException(str(exc)) from exc
         results = [check_node_freshness(node, project)]
     else:
-        from keel.core.node_store import list_nodes
+        from tripwire.core.node_store import list_nodes
 
         results = check_all_nodes(list_nodes(resolved), project)
 

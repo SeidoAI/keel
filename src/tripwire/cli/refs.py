@@ -22,11 +22,11 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from keel.cli._utils import require_project as _require_project
-from keel.core import graph_cache
-from keel.core.node_store import list_nodes, node_exists
-from keel.core.reference_parser import extract_references
-from keel.core.store import (
+from tripwire.cli._utils import require_project as _require_project
+from tripwire.core import graph_cache
+from tripwire.core.node_store import list_nodes, node_exists
+from tripwire.core.reference_parser import extract_references
+from tripwire.core.store import (
     issue_exists,
     list_issues,
     load_issue,
@@ -222,10 +222,10 @@ def refs_check(project_dir: Path, output_format: str) -> None:
 
 
 def _collect_refs_check(project_dir: Path) -> RefsCheckReport:
-    from keel.core.concept_graph import (
+    from tripwire.core.concept_graph import (
         orphan_issues as concept_orphan_issues,
     )
-    from keel.core.concept_graph import (
+    from tripwire.core.concept_graph import (
         orphan_nodes as concept_orphan_nodes,
     )
 

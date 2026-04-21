@@ -14,9 +14,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from keel.ui.config import UserConfig
+from tripwire.ui.config import UserConfig
 
-logger = logging.getLogger("keel.ui.services.project_service")
+logger = logging.getLogger("tripwire.ui.services.project_service")
 
 _CACHE_TTL_SECONDS = 60
 
@@ -90,7 +90,7 @@ def _try_load_summary(abs_dir: Path) -> ProjectSummary | None:
 
     Returns ``None`` and logs a warning on any failure.
     """
-    from keel.core.store import load_project
+    from tripwire.core.store import load_project
 
     try:
         config = load_project(abs_dir)

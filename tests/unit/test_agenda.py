@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from keel.cli.agenda import _collect_agenda
-from keel.core.parser import serialize_frontmatter_body
+from tripwire.cli.agenda import _collect_agenda
+from tripwire.core.parser import serialize_frontmatter_body
 
 
 def write_project_yaml(project_dir: Path) -> None:
