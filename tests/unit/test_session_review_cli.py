@@ -66,9 +66,7 @@ def test_review_with_issue_writes_verified(
     assert "Verified by" in text
 
 
-def test_review_writes_review_json(
-    tmp_path_project: Path, save_test_session
-):
+def test_review_writes_review_json(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="in_review")
     runner = CliRunner()
     with patch("tripwire.cli.session.subprocess.run", side_effect=_stub_gh):
@@ -100,9 +98,7 @@ def test_review_verified_md_rendered_from_template(
     tmp_path_project: Path, save_test_session, save_test_issue
 ):
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
-    save_test_session(
-        tmp_path_project, "s1", status="in_review", issues=["TMP-1"]
-    )
+    save_test_session(tmp_path_project, "s1", status="in_review", issues=["TMP-1"])
     runner = CliRunner()
     with patch("tripwire.cli.session.subprocess.run", side_effect=_stub_gh):
         result = runner.invoke(

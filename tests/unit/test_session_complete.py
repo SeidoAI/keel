@@ -38,9 +38,7 @@ def test_complete_refuses_non_completable_status(
     assert exc.value.code == "complete/not_active"
 
 
-def test_complete_refuses_in_progress_status(
-    tmp_path_project: Path, save_test_session
-):
+def test_complete_refuses_in_progress_status(tmp_path_project: Path, save_test_session):
     """`in_progress`, `executing`, `active` require going through review first."""
     save_test_session(tmp_path_project, "s1", status="executing")
     with pytest.raises(CompleteError) as exc:
@@ -186,9 +184,7 @@ def test_complete_closes_issues_and_transitions_session(
     assert session.status == "done"
 
 
-def test_complete_force_bypasses_gates(
-    tmp_path_project: Path, save_test_session
-):
+def test_complete_force_bypasses_gates(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="planned")
     result = complete_session(
         tmp_path_project,

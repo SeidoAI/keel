@@ -9,10 +9,7 @@ shapes without client updates.
 from __future__ import annotations
 
 import json
-import time
-from collections.abc import Iterator
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 _KNOWN_KINDS = {"tool_use", "tool_result", "assistant", "error", "usage"}
@@ -53,18 +50,3 @@ def parse_event(line: str) -> StreamEvent | None:
         cost_usd=data.get("cost_usd"),
         raw=data,
     )
-
-
-def tail_events(log_path: Path, poll_interval: float = 0.5) -> Iterator[StreamEvent]:
-    """Yield StreamEvents as they're appended to the log (tail -f semantics)."""
-    log = Path(log_path)
-    with log.open("r", encoding="utf-8") as f:
-        f.seek(0, 2)  # start at end
-        while True:
-            line = f.readline()
-            if not line:
-                time.sleep(poll_interval)
-                continue
-            event = parse_event(line)
-            if event is not None:
-                yield event

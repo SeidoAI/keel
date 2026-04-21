@@ -430,7 +430,6 @@ def _launch_claude(
         agent=session.agent,
         session_id=session.id,
         session_name=session_name,
-        session_slug=session.id,
         branch_type=branch_type,
     )
     system_append = render_system_append(
@@ -1067,12 +1066,11 @@ def _render_verified_md(
     *, issue, criteria: list[str], verdict: str, stamp: str, deviations: list[str]
 ) -> str:
     """Render the shipped verified.md.j2 template with review context."""
-    import tripwire
     from jinja2 import Environment, FileSystemLoader
 
-    template_root = (
-        Path(tripwire.__file__).parent / "templates" / "issue_artifacts"
-    )
+    import tripwire
+
+    template_root = Path(tripwire.__file__).parent / "templates" / "issue_artifacts"
     env = Environment(
         loader=FileSystemLoader(str(template_root)),
         keep_trailing_newline=True,
@@ -1284,9 +1282,7 @@ def _write_review_json(project_dir: Path, session, report) -> None:
     """Persist sessions/<id>/review.json for the complete-time gate."""
     import json as _json
 
-    review_path = (
-        project_dir / "sessions" / session.id / "review.json"
-    )
+    review_path = project_dir / "sessions" / session.id / "review.json"
     review_path.parent.mkdir(parents=True, exist_ok=True)
 
     head_sha = None
@@ -1313,9 +1309,7 @@ def _write_review_json(project_dir: Path, session, report) -> None:
         "head_sha": head_sha,
         "timestamp": datetime.now(tz=timezone.utc).isoformat(),
     }
-    review_path.write_text(
-        _json.dumps(payload, indent=2), encoding="utf-8"
-    )
+    review_path.write_text(_json.dumps(payload, indent=2), encoding="utf-8")
 
 
 # ----------------------------------------------------------------------------

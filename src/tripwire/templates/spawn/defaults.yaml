@@ -23,7 +23,7 @@ prompt_template: |
 
   You are the {agent} agent for session {session_id}.
   Execute the plan. Stop at stop-and-ask points.
-  Open a PR titled '{branch_type}({session_slug}): {session_name}' when done.
+  Open a PR titled '{branch_type}({session_id}): {session_name}' when done.
 
   Before you end the session: ask honestly — did you learn anything future
   agents in this area would benefit from inheriting? Not "what did I do"
