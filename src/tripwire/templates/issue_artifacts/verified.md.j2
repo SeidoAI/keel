@@ -1,0 +1,19 @@
+# Verification notes — {{ issue.id }}
+
+**Verified by**: {# pm-agent | verification-agent | human #}
+**Verified at**: {# date #}
+**Verdict**: {# approved | approved-with-followups | rejected #}
+
+## Acceptance criteria
+
+{% for criterion in issue.acceptance_criteria -%}
+- [ ] {{ criterion }} — {# evidence: file:line, test name, or "manual smoke" #}
+{% endfor %}
+
+## Deviations found
+
+{# Files touched outside scope, dependencies added beyond spec, layout changes. #}
+
+## Follow-up issues created
+
+{# Bulleted list of new issue keys created from verification findings. #}
