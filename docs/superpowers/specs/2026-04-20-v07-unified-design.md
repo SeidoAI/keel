@@ -38,77 +38,189 @@ v0.7 closes all of this and re-asserts the configurability principle.
 
 ## 2. Design principles
 
-These principles apply to every feature in v0.7 and are the standard
-v0.8+ work measures against. They belong in the README too.
+These principles are the stance tripwire takes. They're what a user
+adopts when they adopt the tool. Every v0.7 feature is grounded in
+one or more of them, and every v0.8+ design decision measures against
+them. The five key principles go in the README verbatim; supporting
+principles live in CONTRIBUTING / ARCHITECTURE docs.
 
-### 2.1 Config over convention
+### 2.1 The graph is the synchronization layer that makes drift impossible
 
-Every domain concept users might want to customize — statuses, phases,
-agent types, branch conventions, artifact requirements, spawn flags,
-slash command bodies — lives in YAML, not Python. Python code consumes
+**Problem**: AI-driven development across multiple systems (issue
+trackers, docs, code comments, PR descriptions, ADRs) produces
+redundant descriptions of the same concept. Every copy drifts. Agents
+burn tokens reconciling, or pick one source and produce work against
+stale understanding. This is the tax that kills multi-system
+AI-assisted workflows.
+
+**Stance**: Tripwire's concept graph is not a documentation tool.
+It's the *single source of truth* for every domain concept the project
+models. Everything else — issues, PR descriptions, code comments,
+READMEs, workspace nodes across repos — references nodes by pointer
+(`[[node-id]]`). There is one place to update; there is no alternative
+location for the same information to live.
+
+Structurally, drift is impossible because there is nothing to sync:
+only one copy of each concept exists. Workspaces extend the same
+principle across repos — shared concepts live once in a workspace,
+referenced by many projects.
+
+Adopting tripwire means committing to maintain a single canonical
+answer to "what does this system include and what does it mean?"
+The graph is ontological infrastructure; nodes are how the system
+knows itself.
+
+### 2.2 Deviation is expected; tripwires catch what prevention can't
+
+**Problem**: Agents drift during execution. Prevention requires
+crippling autonomy; tolerance produces wrong PRs. You can't stop
+drift, and you can't live with it.
+
+**Stance**: Design for the failure, not against it. Validators emit
+warnings into the agent's most recent context. Recent context carries
+more weight in LLM attention, so warnings placed there have a higher
+probability of being addressed before the agent proceeds. Flow
+resumes with the deviation surfaced, not halted.
+
+Tripwires are sensors, not locks — lightweight enough to not kill
+autonomy, explicit enough to redirect cleanly. This is the mechanism
+the tool is named for.
+
+### 2.3 Config over convention, with opinions
+
+**Problem**: Tools that hardcode workflows become obstacles for any
+team that doesn't match them. Tools with no opinions push every
+decision back onto the team and waste their attention on plumbing.
+
+**Stance**: Tripwire ships opinionated defaults in YAML — our best
+current guess at how sessions should spawn, what artifacts are
+required, what statuses mean, what the agent spawn prompt should say.
+Projects override where they legitimately differ.
+
+Tripwire is opinionated about **what matters for the mechanism**:
+validation as a gate, artifacts as evidence, single-agent sessions,
+the graph as canon. These are not configurable because softening them
+breaks the model.
+
+Tripwire is configurable about **what legitimately varies per team**:
+status vocabularies, branch conventions, slash command bodies, spawn
+invocation details, artifact specs. The override hierarchy is
+universal:
+
+1. Session-level YAML (highest)
+2. Project-level YAML (`project.yaml`, `<project>/enums/`, `<project>/.tripwire/`)
+3. Tripwire-shipped defaults (lowest)
+
+The opinions live in the YAML, not in Python code. Python consumes
 the YAML; it doesn't enumerate the values.
 
-**What counts as a "domain concept":** anything a reasonable project
-might want to change to fit its workflow. Status values, branch type
-prefixes, artifact manifests, spawn invocation, prompt templates,
-agent personas.
+### 2.4 Work compounds; sessions are knowledge-producing events
 
-**What stays in Python:** the schema (what *shape* a domain concept
-takes), validation mechanics, CLI plumbing, store logic.
+**Problem**: Most AI-agent workflows produce code without producing
+understanding. Session 3 can't benefit from Session 1 because Session
+1 left behind commits but nothing else. The codebase accretes; the
+understanding does not.
 
-**Override hierarchy (universal):**
-1. Session-level YAML (highest; `session.yaml.<field>`)
-2. Project-level YAML (`project.yaml` or `<project>/enums/`, `<project>/.tripwire/`)
-3. Tripwire-shipped defaults (lowest; `src/tripwire/templates/...`)
+**Stance**: The deliverable of a session is the PR *plus* the updated
+concept nodes, developer notes, and verified notes. A session that
+ships code without updating what the project knows about itself has
+made the project worse — the next agent inherits more confusion, not
+less.
 
-### 2.2 Slash command wrapper pattern
+Status advancement is gated on artifact production because artifacts
+are where the knowledge lives. "Done" means "the code is merged *and*
+the understanding is updated." Sessions that can't produce meaningful
+updates to the graph are probably sessions that should have been
+scoped differently.
 
-Every feature ships in two layers:
+### 2.5 Decomposition is a first-class product
 
-- **CLI command** (`tripwire <verb>`): deterministic. Does the
-  mechanical work. Enforces rules. Exits with a code. No LLM required.
-- **Slash command wrapper** (`/pm-<verb>`): workflow harness. Orchestrates
-  CLI calls, injects LLM judgment at decision points, produces
-  PM-level outputs (comments, summaries, next-action recommendations).
+**Problem**: Execution quality is bounded by framing quality. Bad
+decomposition — vague goals, missing acceptance criteria, wrong
+dependencies — means agents work hard on misframed problems. This is
+the most common cause of poor AI-agent output.
 
-Rationale: systemise the deterministic parts so they're reproducible and
-testable; preserve LLM intelligence for the judgment-heavy parts. The
-CLI is the source of truth; the slash command layers interpretation on
-top. Every new feature declares both layers.
+**Stance**: PM work — scoping, plan writing, session layout,
+acceptance criteria, dependency DAGs — is the highest-leverage work
+in the project. Not overhead. Not planning-before-real-work. The
+decomposition *is* a deliverable that deserves quality, review, and
+iteration.
 
-### 2.3 Single-agent session constraint
+This is why tripwire has more PM-facing features than execution-facing
+ones, why `/pm-scope` is its own slash command, why agendas have
+critical paths, and why `/pm-session-review` is a structured process
+rather than rubber-stamping.
 
-One agent per session. Agents cannot spawn sub-agents via the Agent
-tool or `/batch`. The PM decomposes work into sessions; sessions don't
-re-decompose at runtime.
+---
 
-Enforced at spawn time via `--disallowedTools Agent`. Measured quality
-degradation when this constraint is relaxed (context loss, weaker
-synthesis, cost multiplication, invisible to PM monitor).
+### Supporting principles
 
-### 2.4 Clean cut on breaking changes
+These are load-bearing for specific features but less central to the
+overall stance. They live in CONTRIBUTING / ARCHITECTURE rather than
+the README.
 
-No grandfather clauses, no legacy aliases, no dual-mode parsers. When
-a field, vocabulary, or convention changes, every YAML in the
-codebase changes in one migration PR. Pre-1.0 means we own every
-downstream project; there is no legitimate legacy data to preserve.
+**Agents forget; the repo remembers.** Every piece of shared
+understanding lives in versioned files. Agents rebuild context from
+the repo at session start. No sidecar state, no stowed memory, no
+hosted service holding truth. The repo is the externalized long-term
+memory of the team — humans, PM agents, execution agents, and whatever
+comes next.
 
-### 2.5 Tripwire mechanism — post-validation context injection
+**Reasoning must be written, not just performed.** Agents do enormous
+amounts of reasoning in a session; the code captures outcomes, not
+rationale. Every session produces explicit reasoning artifacts
+(`plan.md`, `developer.md`, `verified.md`, comments). Reasoning that
+isn't written is reasoning that didn't happen.
 
-The core mechanism that gives the project its name. When an agent
-deviates (quality drop, convention violation, scope creep), tripwire
-doesn't block — it injects a warning into the agent's most recent
-context. LLMs over-weight recency; agents read the warning first when
-they resume work. This is how tripwire enforces standards without
-halting autonomy.
+**Raise the floor, not the ceiling.** Across 100 agent sessions,
+variance is enormous. We optimize for the bottom quartile. Tripwires
+catch the disasters. Required artifacts catch skipped reasoning.
+Validation catches hallucinations. Strong spawn defaults mean even a
+weak session starts from a good invocation. The best sessions don't
+need tripwire and won't notice it; the worst sessions are the reason
+tripwire exists.
 
-### 2.6 Non-principles (explicitly not claims)
+**PM throughput is the bottleneck; tool it accordingly.** Agents are
+already faster than PMs can review. PMs need tools that operate at
+PM speed: monitor (self-paced), review (structured, evidence-based),
+complete (orchestrated close-out), agenda (DAG interpretation). The
+CLI + slash wrapper pattern (below) is specifically so PM judgment
+only enters where judgment is required; mechanical work stays
+mechanical.
+
+**Verification is explicit, attributable, and checked.** Every
+artifact declares who produced it. Verification produces its own
+artifact with evidence mapped to acceptance criteria. "Done" means
+"verified with evidence," not "merged."
+
+**One substrate for humans and agents.** Humans and agents read the
+same files, make the same commits, follow the same conventions. No
+human-only channels (no Slack threads carrying decisions, no external
+docs carrying truth). Human interventions are visible in git history
+identically to agent work.
+
+**Single-agent sessions.** One agent per session. Agents cannot spawn
+sub-agents via the Agent tool or `/batch`. The PM decomposes work into
+sessions; sessions don't re-decompose at runtime. Enforced at spawn
+time via `--disallowedTools Agent`.
+
+**Slash command wrapper pattern.** Every feature ships in two layers:
+a deterministic CLI command (`tripwire <verb>`) that does mechanical
+work and exits with a code, and a slash command wrapper (`/pm-<verb>`)
+that orchestrates CLI calls, injects LLM judgment at decision points,
+and produces PM-level outputs. The CLI is the source of truth; the
+slash command layers interpretation.
+
+### Explicit non-principles
 
 - Not "zero Python hardcoding." Schema, validation mechanics, and CLI
   plumbing live in Python.
-- Not "every workflow configurable." The shipped workflows are opinions.
-  Projects can override slash command bodies if they need to diverge.
-- Not "backwards compatible." See §2.4.
+- Not "every workflow configurable." The shipped workflows are
+  opinions. Projects can override slash command bodies if they need
+  to diverge.
+- Not "backwards compatible." Pre-1.0 means no legitimate legacy data
+  to preserve; breaking changes happen as one clean migration PR, not
+  as dual-mode parsers. (Engineering discipline; see CONTRIBUTING.)
 
 ---
 
@@ -144,7 +256,7 @@ The current name `keel` collides with multiple adjacent Python packages;
 AI agents routinely hallucinate keel-named libraries. Renaming before
 any PyPI publish is cheap (downstream = only 3 test projects).
 
-The new name encodes the core mechanism (§2.5).
+The new name encodes the core mechanism (§2.2).
 
 ### 4.2 Changes
 
@@ -185,7 +297,7 @@ Check `tripwire` availability at the start of Phase 8. Fallback:
 ### 5.1 The problem
 
 Drift audit (2026-04-20) found these items hardcoded in ways that
-violate §2.1:
+violate §2.3:
 
 | Item | Current location | New YAML home |
 |---|---|---|
@@ -332,7 +444,7 @@ because it'll matter when the QA agent lands.
 | `done` | `done` |
 
 Old phase names (`implementing`, `verifying`, `completion`) are gone —
-clean cut per §2.4.
+no grandfather or alias layer (see "Explicit non-principles" in §2).
 
 ### 6.3 Layer-2 coherence test
 
@@ -453,6 +565,105 @@ verdict: `approved`).
 
 Stub template includes a "This artifact was created retroactively
 during v0.7 migration. See PR <number>." paragraph.
+
+### 7.8 Agent insights capture
+
+**Problem**: The executing agent holds privileged knowledge about
+what it just did — decisions, paths not taken, lessons — that no one
+else has direct access to. Most of it is implicit in the code. A
+small but valuable subset is durable insight that future agents in
+the same area would benefit from inheriting. This is currently lost
+when the session ends.
+
+**Mechanism**: At session end, the executing agent optionally
+produces `sessions/<session-id>/insights.yaml` proposing concept-node
+additions or updates based on what it learned.
+
+**Schema**:
+
+```yaml
+# Only written if the agent has genuine insights worth elevating.
+# Absent or empty file is the expected default — silence is valid.
+proposals:
+  - kind: new_node
+    id: pg-vacuum-tuning
+    name: PostgreSQL VACUUM tuning for high-write workloads
+    body: |
+      During <session-id> we found the default autovacuum settings
+      don't keep up with our write volume. Changed
+      autovacuum_vacuum_scale_factor 0.2 → 0.02, autovacuum_naptime
+      60s → 10s. Documenting so future perf work on PG tables inherits.
+    related: [database, postgres-config]
+    rationale: >
+      Operational tuning that would otherwise live in tribal knowledge.
+
+  - kind: update_node
+    id: auth-system
+    delta: |
+      Session added refresh-token rotation on suspicious IP change.
+      Current node description doesn't mention rotation policy at all.
+    rationale: >
+      Node description is stale w.r.t. security property now enforced.
+```
+
+Fields:
+- `kind`: `new_node` or `update_node`
+- `id`: existing node id (update) or proposed new id (new_node)
+- `body` or `delta`: full body (new_node) or described change (update_node)
+- `related`: other node ids this connects to (new_node only)
+- `rationale`: why this deserves to be durable
+
+**Agent prompt instruction** (added to spawn system prompt):
+
+> Before you end the session: ask honestly — did you learn anything
+> future agents in this area would benefit from inheriting? Not "what
+> did I do" (that's `developer.md`) but "what insight would I want
+> the next agent working near this to start from?" If yes, propose it
+> in `insights.yaml` as a node addition or update. If nothing
+> qualifies — if every insight is either obvious, already in a node,
+> or specific to this session — leave the file absent. **Do not
+> force it.** Overeager proposals add noise to the graph. Silence is
+> a valid answer.
+
+**PM review at complete time**: `/pm-session-complete` surfaces
+proposed insights alongside the existing node-reconciliation diffs.
+For each proposal, the PM agent decides:
+- **Accept**: add or update node as proposed (may edit wording
+  before committing).
+- **Reject**: insight is noise, ephemeral, or already captured
+  elsewhere.
+- **Defer**: interesting but needs more context; the PM logs a new
+  curation issue and dismisses for now.
+
+Accept/reject rates per agent get tracked in engagement records —
+useful signal for tuning agent prompts over time.
+
+**CLI**:
+
+```
+tripwire issue insights list <session-id> [--format text|json]
+tripwire issue insights apply <session-id> --proposal <id>
+tripwire issue insights reject <session-id> --proposal <id> [--reason TEXT]
+```
+
+`apply` writes the node (new) or node update (existing), with
+commit attribution tying back to the session. `reject` records the
+dismissal in `sessions/<session-id>/insights.rejected.yaml` for
+audit.
+
+**Risks and mitigations**:
+- Overproduction → explicit "do not force it" in prompt; PM rejection
+  discipline; accept/reject ratio tracked.
+- Duplicate proposals → validator warns if proposed node id collides
+  with existing; PM can reject or redirect as an update.
+- Gestural insights ("X is important" without content) → PM rejects
+  with a templated reason ("insufficient specificity").
+- Mutually contradictory proposals across parallel sessions → caught
+  at PM merge time; PM reconciles before applying.
+
+This is the concrete mechanism for principle §2.4 (work compounds)
+— the durable knowledge artifact that ensures sessions leave the
+project knowing more about itself than before.
 
 ---
 
@@ -806,11 +1017,12 @@ Single branch (`feature/v0.7b`), 8 phases, each mergeable independently:
 Phase 0 includes updating the tripwire README to establish §2 as
 foundational. Specifically:
 
-- Add "Design principles" section pulling in §2.1–§2.5 verbatim.
+- Add "Design principles" section pulling in §2.1–§2.5 verbatim
+  (the five key principles).
+- Supporting principles stay in this spec and migrate to
+  CONTRIBUTING.md / ARCHITECTURE.md rather than the README.
 - Add "How tripwire is configured" subsection pointing to the enum
   override mechanism, spawn config, slash command overrides.
-- Add "Slash command wrapper pattern" subsection with the
-  `tripwire <verb>` + `/pm-<verb>` duality as a core idea.
 - Update examples to reflect the `tripwire` / `tw` CLI.
 
 ---
