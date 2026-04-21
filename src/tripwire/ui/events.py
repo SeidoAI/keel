@@ -127,6 +127,7 @@ ContainerStatus = Literal["running", "exited", "stopped"]
 
 class ContainerStatusEvent(Event):
     type: Literal["container_status"] = "container_status"
+    project_id: str
     session_id: str
     container_id: str
     status: ContainerStatus
@@ -140,6 +141,7 @@ MessageDirection = Literal["agent_to_human", "human_to_agent"]
 
 class MessageReceivedEvent(Event):
     type: Literal["message_received"] = "message_received"
+    project_id: str
     session_id: str
     message_id: str
     direction: MessageDirection
@@ -156,6 +158,7 @@ GitHubEventType = Literal[
 
 class GitHubEvent(Event):
     type: Literal["github_event"] = "github_event"
+    project_id: str
     event_type: GitHubEventType
     repo: str
     pr_number: int
@@ -164,6 +167,7 @@ class GitHubEvent(Event):
 
 class StatusUpdateEvent(Event):
     type: Literal["status_update"] = "status_update"
+    project_id: str
     session_id: str
     state: str
     summary: str
@@ -171,6 +175,7 @@ class StatusUpdateEvent(Event):
 
 class PmReviewCompletedEvent(Event):
     type: Literal["pm_review_completed"] = "pm_review_completed"
+    project_id: str
     repo: str
     pr_number: int
     passed: bool
@@ -179,6 +184,7 @@ class PmReviewCompletedEvent(Event):
 
 class ApprovalPendingEvent(Event):
     type: Literal["approval_pending"] = "approval_pending"
+    project_id: str
     session_id: str
     artifact_name: str
     agent: str

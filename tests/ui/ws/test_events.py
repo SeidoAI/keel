@@ -149,6 +149,7 @@ class TestPingPong:
 class TestV2Stubs:
     def test_container_status_required(self):
         ev = ContainerStatusEvent(
+            project_id="p",
             session_id="s",
             container_id="c",
             status="running",
@@ -163,6 +164,7 @@ class TestV2Stubs:
         # exit_code is required (may be None, but must be present).
         with pytest.raises(ValidationError):
             ContainerStatusEvent(  # type: ignore[call-arg]
+                project_id="p",
                 session_id="s",
                 container_id="c",
                 status="exited",
@@ -172,6 +174,7 @@ class TestV2Stubs:
 
     def test_message_received(self):
         ev = MessageReceivedEvent(
+            project_id="p",
             session_id="s",
             message_id="m",
             direction="agent_to_human",
@@ -181,9 +184,11 @@ class TestV2Stubs:
             preview="…",
         )
         assert ev.type == "message_received"
+        assert ev.project_id == "p"
 
     def test_github_event(self):
         ev = GitHubEvent(
+            project_id="p",
             event_type="checks_completed",
             repo="SeidoAI/tripwire",
             pr_number=42,
@@ -194,12 +199,16 @@ class TestV2Stubs:
 
     def test_status_update(self):
         ev = StatusUpdateEvent(
-            session_id="s", state="implementing", summary="writing tests"
+            project_id="p",
+            session_id="s",
+            state="implementing",
+            summary="writing tests",
         )
         assert ev.type == "status_update"
 
     def test_pm_review_completed(self):
         ev = PmReviewCompletedEvent(
+            project_id="p",
             repo="SeidoAI/tripwire",
             pr_number=7,
             passed=False,
@@ -209,7 +218,10 @@ class TestV2Stubs:
 
     def test_approval_pending(self):
         ev = ApprovalPendingEvent(
-            session_id="s", artifact_name="plan", agent="pm"
+            project_id="p",
+            session_id="s",
+            artifact_name="plan",
+            agent="pm",
         )
         assert ev.type == "approval_pending"
 
@@ -275,6 +287,7 @@ class TestRoundTrip:
             PingEvent(),
             PongEvent(),
             ContainerStatusEvent(
+                project_id="p",
                 session_id="s",
                 container_id="c",
                 status="running",
@@ -283,6 +296,7 @@ class TestRoundTrip:
                 memory_usage="1",
             ),
             MessageReceivedEvent(
+                project_id="p",
                 session_id="s",
                 message_id="m",
                 direction="agent_to_human",
@@ -292,19 +306,30 @@ class TestRoundTrip:
                 preview="…",
             ),
             GitHubEvent(
+                project_id="p",
                 event_type="pr_merged",
                 repo="r",
                 pr_number=1,
                 details={},
             ),
             StatusUpdateEvent(
-                session_id="s", state="implementing", summary="x"
+                project_id="p",
+                session_id="s",
+                state="implementing",
+                summary="x",
             ),
             PmReviewCompletedEvent(
-                repo="r", pr_number=1, passed=True, failed_checks=[]
+                project_id="p",
+                repo="r",
+                pr_number=1,
+                passed=True,
+                failed_checks=[],
             ),
             ApprovalPendingEvent(
-                session_id="s", artifact_name="plan", agent="pm"
+                project_id="p",
+                session_id="s",
+                artifact_name="plan",
+                agent="pm",
             ),
         ],
     )
