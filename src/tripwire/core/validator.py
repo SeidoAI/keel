@@ -2081,6 +2081,135 @@ def check_quality_consistency(ctx: ValidationContext) -> list[CheckResult]:
 # ============================================================================
 
 
+# v0.7b Layer-3 coherence matrix: session_status → {issue_status: verdict}.
+# verdict:
+#   "ok"           — aligned
+#   "ahead_warn"   — issue is ahead of session (issue later in lifecycle than session);
+#                    surfaces as `coherence/issue_status_ahead_of_session` (warning).
+#                    Typical: session still in_progress but issue closed by another path.
+#   "behind_error" — issue is behind session (session has moved past issue state);
+#                    surfaces as `coherence/issue_status_lags_session` (error).
+#                    Typical: session says in_review but issue still backlog → contradiction.
+#
+# Based on spec §6.4:
+#   planning     → warn on later
+#   in_progress  → warn on later
+#   in_review    → error on earlier
+#   verified     → error on earlier
+#   completed    → error on anything else
+_COHERENCE_MATRIX: dict[str, dict[str, str]] = {
+    "planning": {
+        "backlog": "ok",
+        "todo": "ok",
+        "in_progress": "ahead_warn",
+        "in_review": "ahead_warn",
+        "verified": "ahead_warn",
+        "done": "ahead_warn",
+    },
+    "queued": {
+        "backlog": "ok",
+        "todo": "ok",
+        "in_progress": "ok",
+        "in_review": "ahead_warn",
+        "verified": "ahead_warn",
+        "done": "ahead_warn",
+    },
+    "executing": {
+        "backlog": "behind_error",
+        "todo": "ok",
+        "in_progress": "ok",
+        "in_review": "ok",
+        "verified": "ahead_warn",
+        "done": "ahead_warn",
+    },
+    "active": {
+        "backlog": "behind_error",
+        "todo": "ok",
+        "in_progress": "ok",
+        "in_review": "ok",
+        "verified": "ahead_warn",
+        "done": "ahead_warn",
+    },
+    "in_review": {
+        "backlog": "behind_error",
+        "todo": "behind_error",
+        "in_progress": "behind_error",
+        "in_review": "ok",
+        "verified": "ok",
+        "done": "ok",
+    },
+    "verified": {
+        "backlog": "behind_error",
+        "todo": "behind_error",
+        "in_progress": "behind_error",
+        "in_review": "behind_error",
+        "verified": "ok",
+        "done": "ok",
+    },
+    "completed": {
+        "backlog": "behind_error",
+        "todo": "behind_error",
+        "in_progress": "behind_error",
+        "in_review": "behind_error",
+        "verified": "behind_error",
+        "done": "ok",
+    },
+}
+
+
+def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
+    """Layer-3 coherence: session.status vs. referenced issue statuses.
+
+    Emits `coherence/issue_status_lags_session` (error) when an issue is
+    behind where the session claims it should be; and
+    `coherence/issue_status_ahead_of_session` (warning) when an issue is
+    further along than the session stage would suggest.
+
+    Sessions in statuses not listed in the matrix (`failed`, `waiting_for_*`,
+    `paused`, `abandoned`, `re_engaged`) are skipped — those are off-lifecycle
+    states where alignment isn't meaningful.
+    """
+    results: list[CheckResult] = []
+    issues_by_key = {entity.model.id: entity.model for entity in ctx.issues}
+    for entity in ctx.sessions:
+        session: AgentSession = entity.model
+        session_row = _COHERENCE_MATRIX.get(session.status, None)
+        if session_row is None:
+            continue
+        for issue_key in session.issues:
+            issue = issues_by_key.get(issue_key)
+            if issue is None:
+                continue
+            verdict = session_row.get(issue.status, "ok")
+            if verdict == "ok":
+                continue
+            if verdict == "behind_error":
+                code = "coherence/issue_status_lags_session"
+                severity = "error"
+                direction = "issue lags session"
+            else:  # "ahead_warn"
+                code = "coherence/issue_status_ahead_of_session"
+                severity = "warning"
+                direction = "issue is ahead of session"
+            results.append(
+                CheckResult(
+                    code=code,
+                    severity=severity,
+                    file=entity.rel_path,
+                    field="status",
+                    message=(
+                        f"Session {session.id!r} ({session.status}) has issue "
+                        f"{issue_key!r} at {issue.status!r} — {direction}."
+                    ),
+                    fix_hint=(
+                        "Advance the issue status to match, or step the session "
+                        "status back to a phase that matches the issue."
+                    ),
+                )
+            )
+    return results
+
+
 ALL_CHECKS = [
     check_uuid_present,
     check_uuid_v4_version,
@@ -2103,6 +2232,7 @@ ALL_CHECKS = [
     check_phase_requirements,
     check_handoff_artifact,
     check_quality_consistency,
+    check_session_issue_coherence,
 ]
 
 

@@ -69,14 +69,22 @@ class NodeStatus(StrEnum):
 
 
 class SessionStatus(StrEnum):
+    """Canonical session states — see `templates/enums/session_status.yaml`."""
+
     PLANNED = "planned"
+    QUEUED = "queued"
+    EXECUTING = "executing"
     ACTIVE = "active"
     WAITING_FOR_CI = "waiting_for_ci"
     WAITING_FOR_REVIEW = "waiting_for_review"
     WAITING_FOR_DEPLOY = "waiting_for_deploy"
     RE_ENGAGED = "re_engaged"
+    IN_REVIEW = "in_review"
+    VERIFIED = "verified"
     COMPLETED = "completed"
     FAILED = "failed"
+    PAUSED = "paused"
+    ABANDONED = "abandoned"
 
 
 class ReEngagementTrigger(StrEnum):

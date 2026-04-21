@@ -114,8 +114,30 @@ def _load_enum_yaml(path: Path, enum_name: str) -> LoadedEnum:
     )
 
 
+def _package_template_enum_path(enum_name: str) -> Path:
+    """Path to the enum YAML shipped inside the tripwire package."""
+    import tripwire
+
+    return Path(tripwire.__file__).parent / "templates" / "enums" / f"{enum_name}.yaml"
+
+
 def _default_enum(enum_name: str) -> LoadedEnum | None:
-    """Build a LoadedEnum from a packaged StrEnum default."""
+    """Load the packaged default for an enum.
+
+    Prefers the shipped YAML at `src/tripwire/templates/enums/<name>.yaml`
+    (richer than StrEnum: carries labels, colors, descriptions). Falls back
+    to the in-code StrEnum if no template ships.
+    """
+    pkg_path = _package_template_enum_path(enum_name)
+    if pkg_path.is_file():
+        loaded = _load_enum_yaml(pkg_path, enum_name)
+        return LoadedEnum(
+            name=loaded.name,
+            description=loaded.description,
+            values=loaded.values,
+            source="default",
+        )
+
     cls = DEFAULT_ENUMS.get(enum_name)
     if cls is None:
         return None
@@ -129,13 +151,6 @@ def _default_enum(enum_name: str) -> LoadedEnum | None:
         values=values,
         source="default",
     )
-
-
-def _package_template_enum_path(enum_name: str) -> Path:
-    """Path to the enum YAML shipped inside the tripwire package."""
-    import tripwire
-
-    return Path(tripwire.__file__).parent / "templates" / "enums" / f"{enum_name}.yaml"
 
 
 def load_enum(project_dir: Path, enum_name: str) -> list[str]:
