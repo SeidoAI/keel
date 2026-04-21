@@ -1,16 +1,15 @@
 """Global action routes — validate, rebuild-index, advance-phase, finalize.
 
 Only ``POST /api/actions/validate`` is wired in v1; the others land with
-KUI-23. The validate route enqueues a
-:class:`~tripwire.ui.events.ValidationCompletedEvent` so the realtime
-delivery path (queue → broadcaster → hub → clients) is live.
+KUI-23. The validate route runs ``tripwire.core.validator.validate_project``
+and enqueues a :class:`~tripwire.ui.events.ValidationCompletedEvent` so the
+realtime delivery path (queue → broadcaster → hub → clients) is live.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import time
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -29,25 +28,32 @@ class ValidateRequest(BaseModel):
 
 @router.post("/validate")
 async def validate(body: ValidateRequest, request: Request) -> dict:
-    """Run project validation and enqueue a ValidationCompletedEvent.
+    """Run ``validate_project(strict=True)`` and broadcast the result.
 
-    The full ``tripwire.core.validator`` wiring lands with KUI-23. Until
-    then, this route enqueues a placeholder event (errors=0, warnings=0)
-    so every UI surface that listens for ``validation_completed`` is
-    already on the live delivery path.
+    The validator is CPU/IO-bound and synchronous, so it runs on the
+    default thread pool via :func:`asyncio.to_thread`. The emitted event
+    carries real ``errors``/``warnings`` counts and ``duration_ms`` from
+    the report — not placeholder zeros.
+
+    KUI-23 will later move this wiring into a dedicated action service;
+    the emission path stays the same.
     """
-    if get_project_dir(body.project_id) is None:
+    # Lazy import — ``tripwire.core.validator`` transitively imports a
+    # chunk of the core, and we don't want to pay that cost on route
+    # registration for apps that never run a validate.
+    from tripwire.core.validator import validate_project
+
+    project_dir = get_project_dir(body.project_id)
+    if project_dir is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    start = time.monotonic()
-    errors, warnings = 0, 0  # TODO(KUI-23): invoke tripwire.core.validator
-    duration_ms = int((time.monotonic() - start) * 1000)
+    report = await asyncio.to_thread(validate_project, project_dir, strict=True)
 
     event = ValidationCompletedEvent(
         project_id=body.project_id,
-        errors=errors,
-        warnings=warnings,
-        duration_ms=duration_ms,
+        errors=len(report.errors),
+        warnings=len(report.warnings),
+        duration_ms=report.duration_ms,
     )
     queue: asyncio.Queue = request.app.state.event_queue
     await queue.put(event)

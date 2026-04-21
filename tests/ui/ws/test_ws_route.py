@@ -84,6 +84,29 @@ class TestConnectionHandshake:
             # If we got here, the server accepted the handshake.
             pass
 
+    def test_disconnect_removes_from_hub(self, app_and_client, ui_project):
+        """AC: Connections are added to WebSocketHub and removed on disconnect."""
+        _project, pid = ui_project
+        app, client = app_and_client
+        hub = app.state.hub
+        assert hub.connection_count(pid) == 0
+
+        with client.websocket_connect(f"/api/ws?project={pid}") as _ws:
+            # Give the server's connect() coroutine a tick to run.
+            for _ in range(20):
+                if hub.connection_count(pid) == 1:
+                    break
+                time.sleep(0.01)
+            assert hub.connection_count(pid) == 1
+
+        # After the context manager exits the route's finally: runs
+        # hub.disconnect(). Poll briefly for the async disconnect.
+        for _ in range(100):
+            if hub.connection_count(pid) == 0:
+                break
+            time.sleep(0.01)
+        assert hub.connection_count(pid) == 0
+
 
 # ---------------------------------------------------------------------------
 # Event delivery through the full pipeline
@@ -170,14 +193,20 @@ class TestValidationEvent:
                 "/api/actions/validate", json={"project_id": pid}
             )
             assert r.status_code == 200
-            assert r.json()["type"] == "validation_completed"
+            body = r.json()
+            assert body["type"] == "validation_completed"
 
             event = _poll_event(ws, "validation_completed", timeout=2.0)
 
         assert event is not None
         assert event["project_id"] == pid
-        assert event["errors"] == 0
-        assert event["warnings"] == 0
+        # The counts reflect whatever validate_project found on the
+        # fixture — assert shape, not specific values.
+        assert isinstance(event["errors"], int)
+        assert isinstance(event["warnings"], int)
+        assert isinstance(event["duration_ms"], int)
+        assert event["duration_ms"] >= 0
+        assert event == body
 
     def test_validate_unknown_project_404(self, app_and_client):
         _app, client = app_and_client
