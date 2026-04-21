@@ -1055,12 +1055,43 @@ def _gather_pr_files(pr_number: int) -> list[str]:
     return []
 
 
-def _write_verified_for_session(project_dir: Path, session, report) -> None:
-    from tripwire.core import paths as _paths
+def _render_verified_md(
+    *, issue, criteria: list[str], verdict: str, stamp: str, deviations: list[str]
+) -> str:
+    """Render the shipped verified.md.j2 template with review context."""
+    import tripwire
+    from jinja2 import Environment, FileSystemLoader
 
+    template_root = (
+        Path(tripwire.__file__).parent / "templates" / "issue_artifacts"
+    )
+    env = Environment(
+        loader=FileSystemLoader(str(template_root)),
+        keep_trailing_newline=True,
+    )
+    template = env.get_template("verified.md.j2")
+    return template.render(
+        issue=issue,
+        criteria=criteria,
+        verdict=verdict,
+        verified_by="pm-agent",
+        verified_at=stamp,
+        deviations=deviations,
+    )
+
+
+def _write_verified_for_session(project_dir: Path, session, report) -> None:
+    """For each issue in the session, write or append issues/<key>/verified.md.
+
+    New file: rendered via ``templates/issue_artifacts/verified.md.j2``.
+    Existing file: append a ``## Re-review <date>`` section preserving history.
+    """
+    from tripwire.core import paths as _paths
+    from tripwire.core.store import load_issue
+
+    stamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
     for ir in report.issue_reviews:
         verified_path = _paths.issue_dir(project_dir, ir.key) / "verified.md"
-        stamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
         if verified_path.is_file():
             existing = verified_path.read_text(encoding="utf-8")
             addition = (
@@ -1068,18 +1099,21 @@ def _write_verified_for_session(project_dir: Path, session, report) -> None:
                 f"Verdict: {report.verdict}\n"
             )
             verified_path.write_text(existing + addition, encoding="utf-8")
-        else:
-            content = (
-                f"# Verification notes — {ir.key}\n\n"
-                f"**Verified by**: pm-agent\n"
-                f"**Verified at**: {stamp}\n"
-                f"**Verdict**: {report.verdict}\n\n"
-                f"## Acceptance criteria\n\n"
-            )
-            for crit in ir.criteria:
-                content += f"- [ ] {crit} — manual verification needed\n"
-            verified_path.parent.mkdir(parents=True, exist_ok=True)
-            verified_path.write_text(content, encoding="utf-8")
+            continue
+
+        try:
+            issue = load_issue(project_dir, ir.key)
+        except FileNotFoundError:
+            continue
+        rendered = _render_verified_md(
+            issue=issue,
+            criteria=ir.criteria,
+            verdict=report.verdict,
+            stamp=stamp,
+            deviations=report.deviations.unspec_files,
+        )
+        verified_path.parent.mkdir(parents=True, exist_ok=True)
+        verified_path.write_text(rendered, encoding="utf-8")
 
 
 @session_cmd.command("review")
@@ -1230,7 +1264,50 @@ def session_review_cmd(
     if write_verified:
         _write_verified_for_session(resolved, session, report)
 
+    # Write review.json artifact for session_complete's review-exit-code gate
+    # (spec §11.2 step 4). Always — regardless of output_format or other flags —
+    # so that subsequent `session complete` can consult a deterministic record.
+    _write_review_json(resolved, session, report)
+
     raise click.exceptions.Exit(report.exit_code)
+
+
+def _write_review_json(project_dir: Path, session, report) -> None:
+    """Persist sessions/<id>/review.json for the complete-time gate."""
+    import json as _json
+
+    review_path = (
+        project_dir / "sessions" / session.id / "review.json"
+    )
+    review_path.parent.mkdir(parents=True, exist_ok=True)
+
+    head_sha = None
+    if session.runtime_state.worktrees:
+        wt_path = Path(session.runtime_state.worktrees[0].worktree_path)
+        if wt_path.is_dir():
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(wt_path), "rev-parse", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    head_sha = result.stdout.strip() or None
+            except (subprocess.SubprocessError, OSError):
+                pass
+
+    payload = {
+        "session_id": session.id,
+        "verdict": report.verdict,
+        "exit_code": report.exit_code,
+        "pr_number": report.pr_number,
+        "head_sha": head_sha,
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+    }
+    review_path.write_text(
+        _json.dumps(payload, indent=2), encoding="utf-8"
+    )
 
 
 # ----------------------------------------------------------------------------
