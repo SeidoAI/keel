@@ -50,19 +50,30 @@ def complete_session(
     *,
     dry_run: bool = False,
     force: bool = False,
+    force_review: bool = False,
     skip_artifact_check: bool = False,
     skip_worktree_cleanup: bool = False,
     skip_pr_merge_check: bool = False,
 ) -> CompleteResult:
-    """Run the close-out gates then transition the session to `done`."""
+    """Run the close-out gates then transition the session to `done`.
+
+    Gates per spec §11.2:
+      1. Status in {in_review, verified} (unless --force).
+      2. PR merged (unless --force).
+      3. Per-issue required artifacts present (no override; §7.3).
+      4. Most recent review exit_code ≤ 1 (unless --force-review).
+    """
     session = load_session(project_dir, session_id)
     result = CompleteResult(session_id=session_id)
 
-    completable = {"in_progress", "in_review", "verified", "executing", "active"}
+    # Spec §11.2 step 1 — narrow status gate. `in_progress`, `executing`,
+    # `active` must go through /pm-session-review first.
+    completable = {"in_review", "verified"}
     if session.status not in completable and not force:
         raise CompleteError(
             "complete/not_active",
-            f"Session status is {session.status!r}, not completable.",
+            f"Session status is {session.status!r}; expected one of "
+            f"{sorted(completable)}. Run /pm-session-review first, or pass --force.",
         )
 
     if not skip_pr_merge_check and not force:
@@ -70,6 +81,10 @@ def complete_session(
 
     if not skip_artifact_check:
         _verify_issue_artifacts(project_dir, session)
+
+    # Spec §11.2 step 4 — review exit-code gate.
+    if not force and not force_review:
+        _verify_review_ok(project_dir, session)
 
     result.node_diffs = _compute_node_diffs(project_dir, session)
 
@@ -140,6 +155,42 @@ def _verify_pr_merged(session) -> None:
         "complete/pr_not_merged",
         "No merged PR found for any session branch.",
     )
+
+
+def _verify_review_ok(project_dir: Path, session) -> None:
+    """Spec §11.2 step 4: most recent review exit_code must be ≤ 1.
+
+    Reads ``sessions/<id>/review.json`` produced by ``session review``.
+    Missing file means review never ran → refuse unless --force-review.
+    """
+    review_path = paths.session_dir(project_dir, session.id) / "review.json"
+    if not review_path.is_file():
+        raise CompleteError(
+            "complete/no_review",
+            f"No review.json for session {session.id!r} — run "
+            f"`tripwire session review {session.id}` first, "
+            f"or pass --force-review to bypass.",
+        )
+    try:
+        data = json.loads(review_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CompleteError(
+            "complete/no_review",
+            f"review.json for session {session.id!r} is unreadable: {exc}",
+        ) from exc
+    exit_code = data.get("exit_code")
+    if not isinstance(exit_code, int):
+        raise CompleteError(
+            "complete/no_review",
+            f"review.json for session {session.id!r} missing a valid exit_code.",
+        )
+    if exit_code > 1:
+        verdict = data.get("verdict", "?")
+        raise CompleteError(
+            "complete/review_failed",
+            f"Last review reported verdict={verdict!r} (exit_code={exit_code}). "
+            f"Fix findings and re-review, or pass --force-review.",
+        )
 
 
 def _verify_issue_artifacts(project_dir: Path, session) -> None:

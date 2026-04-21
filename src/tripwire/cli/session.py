@@ -955,6 +955,12 @@ session_cmd.add_command(artifacts_list, name="artifacts")
     default=False,
     help="Bypass all gates (use sparingly).",
 )
+@click.option(
+    "--force-review",
+    is_flag=True,
+    default=False,
+    help="Proceed even if the most recent review failed or was never run.",
+)
 @click.option("--skip-artifact-check", is_flag=True, default=False)
 @click.option("--skip-worktree-cleanup", is_flag=True, default=False)
 @click.option("--skip-pr-merge-check", is_flag=True, default=False)
@@ -963,6 +969,7 @@ def session_complete_cmd(
     project_dir: Path,
     dry_run: bool,
     force: bool,
+    force_review: bool,
     skip_artifact_check: bool,
     skip_worktree_cleanup: bool,
     skip_pr_merge_check: bool,
@@ -982,6 +989,7 @@ def session_complete_cmd(
             session_id,
             dry_run=dry_run,
             force=force,
+            force_review=force_review,
             skip_artifact_check=skip_artifact_check,
             skip_worktree_cleanup=skip_worktree_cleanup,
             skip_pr_merge_check=skip_pr_merge_check,
