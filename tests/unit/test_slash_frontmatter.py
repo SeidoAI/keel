@@ -17,9 +17,11 @@ ALLOWED_NAMES = {
     # Entity-scoped (7)
     "pm-issue-close",
     "pm-session-create",
-    "pm-session-launch",
+    "pm-session-queue",
+    "pm-session-spawn",  # v0.6c
     "pm-session-check",
     "pm-session-progress",
+    "pm-session-agenda",  # v0.6c
     "pm-project-create",  # v0.6b
     "pm-project-sync",  # v0.6b
     # Non-entity verbs (7)
@@ -45,6 +47,7 @@ ALLOWED_NAMES = {
 COMMANDS_THAT_TAKE_ARGS = ALLOWED_NAMES - {
     "pm-status",
     "pm-agenda",
+    "pm-session-agenda",
     "pm-graph",
     "pm-triage",
     "pm-validate",

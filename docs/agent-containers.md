@@ -3,7 +3,7 @@
 ## Context
 
 This is the execution layer of the agent development platform, living
-at `src/keel/containers/` within the tripwire package. Installed as part
+at `src/keel/containers/` within the keel package. Installed as part
 of `pip install tripwire`. See `overarching-plan.md` for how it fits with
 `keel.core` (data) and `keel.ui` (visibility).
 
@@ -21,7 +21,7 @@ Core responsibility: launch containerised agents that work autonomously, with st
 - **Enums** — `<project>/enums/`
 - **Templates** (artifacts, issues, comments, sessions) — `<project>/templates/`
 
-The project repo is the single source of truth and the centre of customisability, auditability, and version control. `tripwire-containers` clones the project repo, mounts what it needs, runs the orchestration pattern the project repo defines, and stays out of the way.
+The project repo is the single source of truth and the centre of customisability, auditability, and version control. `keel-containers` clones the project repo, mounts what it needs, runs the orchestration pattern the project repo defines, and stays out of the way.
 
 ---
 
@@ -269,7 +269,7 @@ jobs:
         run: |
           # Find the session for this issue key in the project repo
           # Call tripwire session re-engage
-          # Call tripwire-containers launch to restart the agent
+          # Call keel-containers launch to restart the agent
 
           # For now, post to PR as a structured comment
           PR=$(gh pr list --head "${{ github.event.check_suite.head_branch }}" --json number --jq '.[0].number')
@@ -328,7 +328,7 @@ jobs:
           echo "Re-engaging agent for ${{ steps.parse.outputs.issue_key }}"
           echo "Review: ${{ steps.review.outputs.body }}"
           # tripwire session re-engage <session-id> --trigger human_review_changes --context "..."
-          # tripwire-containers launch <session-id>
+          # keel-containers launch <session-id>
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -346,7 +346,7 @@ Event: CI failure on agent branch
     2. Find session for this issue key
     3. Write re-engagement context file
     4. Call: tripwire session re-engage <id> --trigger ci_failure --context-file <path>
-    5. Call: tripwire-containers launch <id>
+    5. Call: keel-containers launch <id>
     6. Update session status: re_engaged
 
 Event: Verifier submits "request-changes" review
@@ -356,7 +356,7 @@ Event: Verifier submits "request-changes" review
     3. Find session for this issue key
     4. Write re-engagement context with failed criteria
     5. Call: tripwire session re-engage <id> --trigger verifier_rejection --context-file <path>
-    6. Call: tripwire-containers launch <id>
+    6. Call: keel-containers launch <id>
 
 Event: Human submits "request-changes" review
   PM action:
@@ -364,7 +364,7 @@ Event: Human submits "request-changes" review
     2. Find session for this issue key
     3. Write re-engagement context with review comments
     4. Call: tripwire session re-engage <id> --trigger human_review_changes --context-file <path>
-    5. Call: tripwire-containers launch <id>
+    5. Call: keel-containers launch <id>
 
 Event: Deploy to test fails
   PM action:
@@ -477,9 +477,9 @@ docker volume rm vol-api-endpoints-core  # only after session marked completed
 
 ## Skills — Loaded from the Project Repo
 
-`tripwire-containers` ships **no skills**. Every skill an agent reads comes from the project repo's `.claude/skills/` directory at container launch time. There is no "packaged default skill" baked into the runtime image.
+`keel-containers` ships **no skills**. Every skill an agent reads comes from the project repo's `.claude/skills/` directory at container launch time. There is no "packaged default skill" baked into the runtime image.
 
-How skills get into the project repo: the `tripwire` package ships them as defaults under `templates/skills/`. `tripwire init` copies the entire `templates/skills/` tree into the new project's `.claude/skills/`. After init, the project owns them — they are committed to git, version-controlled, auditable, and freely editable per project. Two projects can have completely different rules for messaging, both fully under their own control.
+How skills get into the project repo: the `keel` package ships them as defaults under `templates/skills/`. `tripwire init` copies the entire `templates/skills/` tree into the new project's `.claude/skills/`. After init, the project owns them — they are committed to git, version-controlled, auditable, and freely editable per project. Two projects can have completely different rules for messaging, both fully under their own control.
 
 ### `setup_skills()` — workspace.py
 
@@ -626,7 +626,7 @@ Unlike other message types where `body` is free Markdown, `status` has a structu
 }
 ```
 
-- **`state`** — drawn from the `AgentState` enum. The enum is defined in `tripwire` and is customisable per project via `<project>/enums/agent_state.yaml`. Default states: `investigating`, `planning`, `awaiting_plan_approval`, `implementing`, `testing`, `debugging`, `refactoring`, `documenting`, `self_verifying`, `blocked`, `handed_off`, `done`.
+- **`state`** — drawn from the `AgentState` enum. The enum is defined in `keel` and is customisable per project via `<project>/enums/agent_state.yaml`. Default states: `investigating`, `planning`, `awaiting_plan_approval`, `implementing`, `testing`, `debugging`, `refactoring`, `documenting`, `self_verifying`, `blocked`, `handed_off`, `done`.
 - **`summary`** — 1-2 sentences, plain text. Captures what just happened and what's next.
 - **Priority** — always `informational`. A status message never blocks the agent — it sends and keeps working.
 
@@ -729,12 +729,12 @@ IMPLICIT_EGRESS = [
 ### Single-container launch and lifecycle
 
 ```
-tripwire-containers launch <session-id>          # foreground attached to current terminal
-tripwire-containers launch <session-id> --detach # background
-tripwire-containers stop <session-id>
-tripwire-containers list
-tripwire-containers status <session-id>
-tripwire-containers cleanup <session-id>
+keel-containers launch <session-id>          # foreground attached to current terminal
+keel-containers launch <session-id> --detach # background
+keel-containers stop <session-id>
+keel-containers list
+keel-containers status <session-id>
+keel-containers cleanup <session-id>
 ```
 
 The `--iterm` flag has been removed from `launch`. The user already runs the CLI from a terminal — spawning another one to attach to the same agent is pointless. Default is foreground; `--detach` runs the container in the background.
@@ -742,8 +742,8 @@ The `--iterm` flag has been removed from `launch`. The user already runs the CLI
 ### Batch launch
 
 ```
-tripwire-containers launch-batch <session-id> [<session-id> ...]  # all detached
-tripwire-containers launch-batch <session-id> [<session-id> ...] --terminal  # spawn one terminal per agent
+keel-containers launch-batch <session-id> [<session-id> ...]  # all detached
+keel-containers launch-batch <session-id> [<session-id> ...] --terminal  # spawn one terminal per agent
 ```
 
 `launch-batch` brings up multiple containers at once. With `--terminal`, the configured terminal launcher (see below) opens a tab/window per agent.
@@ -751,18 +751,18 @@ tripwire-containers launch-batch <session-id> [<session-id> ...] --terminal  # s
 ### Open a terminal for a running container
 
 ```
-tripwire-containers terminal <session-id>      # opens a terminal attached to one container
-tripwire-containers terminal-all               # opens terminals for all running containers
+keel-containers terminal <session-id>      # opens a terminal attached to one container
+keel-containers terminal-all               # opens terminals for all running containers
 ```
 
 These replace the removed `iterm` and `iterm-all` subcommands. Both use the configured terminal launcher and run `docker exec -it <container> /bin/bash` inside.
 
 ### Terminal launcher — configurable
 
-Different users use different terminals. The launcher is configured in `~/.tripwire-containers/config.yaml`:
+Different users use different terminals. The launcher is configured in `~/.keel-containers/config.yaml`:
 
 ```yaml
-# ~/.tripwire-containers/config.yaml
+# ~/.keel-containers/config.yaml
 terminal_launcher:
   command: iterm           # iterm | terminal | ghostty | alacritty | kitty | wezterm | tmux | none
   # OR fully custom:
@@ -791,9 +791,9 @@ For fully custom setups, set `terminal_launcher.custom` with a shell command tem
 
 ## Orchestration Runtime
 
-A new Python module `keel_containers/core/orchestration.py` is the orchestration runtime. It **lives in tripwire-containers but is configured by the project repo**. The patterns and hooks live in `<project>/orchestration/`. The runtime reads them on every event.
+A new Python module `keel_containers/core/orchestration.py` is the orchestration runtime. It **lives in keel-containers but is configured by the project repo**. The patterns and hooks live in `<project>/orchestration/`. The runtime reads them on every event.
 
-This matches the broader principle: the project repo is the configuration; `tripwire-containers` is the engine that executes that configuration.
+This matches the broader principle: the project repo is the configuration; `keel-containers` is the engine that executes that configuration.
 
 ### Key functions
 
@@ -849,10 +849,10 @@ When a coding agent opens a PR to the project repo, the PM agent runs the follow
 
 ### Invocation
 
-The PM agent invokes the tripwire CLI:
+The PM agent invokes the keel CLI:
 
 ```
-tripwire pm review-pr <pr-number> --repo <project-repo>
+keel pm review-pr <pr-number> --repo <project-repo>
 ```
 
 This command runs all checks against the diff, prints results, and returns a non-zero exit code on any failure. The PM agent (containerised or not) calls it directly.
@@ -862,7 +862,7 @@ This command runs all checks against the diff, prints results, and returns a non
 ## Package structure
 
 ```
-tripwire-containers/
+keel-containers/
 ├── pyproject.toml
 ├── src/
 │   └── keel_containers/
@@ -897,7 +897,7 @@ tripwire-containers/
 │       │   └── docker_cli.py        # Docker CLI wrapper (subprocess-based)
 │       └── templates/                # Jinja2 templates for shell scripts ONLY.
 │                                     # No skills, no agent defaults — those live in the
-│                                     # project repo (shipped via the tripwire package).
+│                                     # project repo (shipped via the keel package).
 │           ├── entrypoint-claude.sh.j2
 │           ├── entrypoint-langgraph.sh.j2
 │           └── entrypoint-custom.sh.j2

@@ -1,7 +1,7 @@
 """lint/unresolved_merge_briefs — error when handoff is attempted with
 pending merge briefs in the project.
 
-Prevents /pm-session-launch when .tripwire/merge-briefs/*.yaml files exist.
+Prevents /pm-session-queue when .tripwire/merge-briefs/*.yaml files exist.
 Forces the agent to resolve (via /pm-project-sync) or explicitly abandon
 before launching execution.
 """

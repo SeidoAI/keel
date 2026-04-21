@@ -3,7 +3,7 @@
 Separate from the validator: validator is mechanical (schema/refs);
 lint is heuristic (did someone actually do the work). Stages are:
 - scoping  — during /pm-scope or /pm-rescope
-- handoff  — before /pm-session-launch
+- handoff  — before /pm-session-queue
 - session  — in-flight session health check
 
 Rules are registered via ``@register_rule`` and matched by stage at

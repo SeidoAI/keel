@@ -8,7 +8,7 @@ Exercises the new primitives end-to-end through the CLI:
 - tripwire session check passes
 - tripwire validate --strict passes (handoff required at queued, so we
   keep status=planned — launching would be a write operation the CLI
-  doesn't do yet in v0.6a; /pm-session-launch's work lives in the
+  doesn't do yet in v0.6a; /pm-session-queue's work lives in the
   slash-command body)
 """
 

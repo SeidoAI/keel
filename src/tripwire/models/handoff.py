@@ -31,7 +31,7 @@ class WorkspaceContext(BaseModel):
 
 
 class SessionHandoff(BaseModel):
-    """Handoff record written at /pm-session-launch."""
+    """Handoff record written at /pm-session-queue."""
 
     model_config = ConfigDict(extra="forbid")
 

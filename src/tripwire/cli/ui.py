@@ -1,4 +1,4 @@
-"""`tripwire ui` — start the Tripwire dashboard.
+"""`tripwire ui` — start the Keel dashboard.
 
 Heavy imports (FastAPI, uvicorn) happen inside the command body so that
 ``tripwire --help`` works even on a minimal ``tripwire[projects]`` install.
@@ -48,7 +48,7 @@ def ui_cmd(
     """Start the Tripwire dashboard (localhost only)."""
     # 1. Import check — graceful degradation on minimal installs.
     try:
-        from tripwire.ui.server import start_server  # noqa: F401
+        from tripwire.ui.server import start_server
     except ModuleNotFoundError as exc:
         missing = getattr(exc, "name", "") or ""
         if any(mod in missing for mod in _UI_MODULES):
@@ -83,8 +83,11 @@ def ui_cmd(
             sys.exit(1)
         project_dirs = [Path(p.dir) for p in projects]
 
-    # 4. Server stub — not yet implemented (lands in KUI-9).
-    click.echo(
-        f"tripwire ui: found {len(project_dirs)} project(s). "
-        "Backend server not yet implemented."
+    # 4. Launch the server.
+    start_server(
+        host="127.0.0.1",
+        port=port,
+        project_dirs=project_dirs,
+        dev_mode=dev,
+        open_browser=not no_browser,
     )
