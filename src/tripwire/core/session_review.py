@@ -47,9 +47,7 @@ class ReviewReport:
 
 def parse_acceptance_criteria(body: str) -> list[str]:
     """Extract checkbox bullets under `## Acceptance criteria`."""
-    pattern = re.compile(
-        r"##\s+Acceptance criteria\s*\n(.*?)(?:\n##\s|$)", re.S
-    )
+    pattern = re.compile(r"##\s+Acceptance criteria\s*\n(.*?)(?:\n##\s|$)", re.S)
     m = pattern.search(body)
     if not m:
         return []
@@ -89,9 +87,7 @@ def detect_deviations(pr_files: list[str], scope_paths: list[str]) -> dict:
     return {"unspec_files": unspec}
 
 
-def check_plan_adherence(
-    plan_md: str, pr_files: list[str]
-) -> tuple[bool, list[str]]:
+def check_plan_adherence(plan_md: str, pr_files: list[str]) -> tuple[bool, list[str]]:
     """Return (ok, list of paths named in the plan that aren't in pr_files)."""
     paths_in_plan = re.findall(
         r"`([a-zA-Z0-9_./\-]+\.(?:py|ts|tsx|js|md|yaml|yml))`", plan_md

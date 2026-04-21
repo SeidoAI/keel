@@ -940,6 +940,237 @@ session_cmd.add_command(artifacts_list, name="artifacts")
 
 
 # ----------------------------------------------------------------------------
+# `tripwire session review` — PR diff vs. issue specs
+# ----------------------------------------------------------------------------
+
+
+def _gather_pr_number(session) -> int | None:
+    import json as _json
+
+    for wt in session.runtime_state.worktrees:
+        try:
+            result = subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "list",
+                    "--head",
+                    wt.branch,
+                    "--json",
+                    "number",
+                    "--limit",
+                    "1",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                prs = _json.loads(result.stdout)
+                if prs:
+                    return int(prs[0]["number"])
+        except (subprocess.SubprocessError, OSError, _json.JSONDecodeError):
+            continue
+    return None
+
+
+def _gather_pr_files(pr_number: int) -> list[str]:
+    import json as _json
+
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", str(pr_number), "--json", "files"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode == 0:
+            data = _json.loads(result.stdout)
+            return [f["path"] for f in data.get("files", [])]
+    except (subprocess.SubprocessError, OSError, _json.JSONDecodeError):
+        pass
+    return []
+
+
+def _write_verified_for_session(project_dir: Path, session, report) -> None:
+    from tripwire.core import paths as _paths
+
+    for ir in report.issue_reviews:
+        verified_path = _paths.issue_dir(project_dir, ir.key) / "verified.md"
+        stamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+        if verified_path.is_file():
+            existing = verified_path.read_text(encoding="utf-8")
+            addition = (
+                f"\n\n## Re-review {stamp} (session {session.id})\n"
+                f"Verdict: {report.verdict}\n"
+            )
+            verified_path.write_text(existing + addition, encoding="utf-8")
+        else:
+            content = (
+                f"# Verification notes — {ir.key}\n\n"
+                f"**Verified by**: pm-agent\n"
+                f"**Verified at**: {stamp}\n"
+                f"**Verdict**: {report.verdict}\n\n"
+                f"## Acceptance criteria\n\n"
+            )
+            for crit in ir.criteria:
+                content += f"- [ ] {crit} — manual verification needed\n"
+            verified_path.parent.mkdir(parents=True, exist_ok=True)
+            verified_path.write_text(content, encoding="utf-8")
+
+
+@session_cmd.command("review")
+@click.argument("session_id")
+@click.option(
+    "--pr",
+    "pr_number",
+    type=int,
+    default=None,
+    help="PR number (auto-detected from worktree branch if omitted).",
+)
+@click.option("--project-dir", type=click.Path(path_type=Path), default=".")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+)
+@click.option(
+    "--post-pr-comments/--no-post-pr-comments",
+    default=False,
+    help="Post review findings as a PR comment via `gh`.",
+)
+@click.option(
+    "--write-verified/--no-write-verified",
+    default=True,
+    help="Write/update issues/<key>/verified.md for each issue in the session.",
+)
+def session_review_cmd(
+    session_id: str,
+    pr_number: int | None,
+    project_dir: Path,
+    output_format: str,
+    post_pr_comments: bool,
+    write_verified: bool,
+) -> None:
+    """Review a session's PR against the session's issue specs."""
+    import json as _json
+    from dataclasses import asdict
+
+    from tripwire.core import paths as _paths
+    from tripwire.core.session_review import (
+        IssueReview,
+        ReviewReport,
+        check_plan_adherence,
+        detect_deviations,
+        parse_acceptance_criteria,
+        parse_repo_scope,
+    )
+    from tripwire.core.store import load_issue
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    session = load_session(resolved, session_id)
+
+    if pr_number is None:
+        pr_number = _gather_pr_number(session)
+
+    pr_files = _gather_pr_files(pr_number) if pr_number is not None else []
+
+    report = ReviewReport(session_id=session_id, pr_number=pr_number)
+
+    scope_paths: list[str] = []
+    for issue_key in session.issues:
+        try:
+            issue = load_issue(resolved, issue_key)
+        except FileNotFoundError:
+            continue
+        criteria = parse_acceptance_criteria(issue.body)
+        report.issue_reviews.append(
+            IssueReview(
+                key=issue_key,
+                criteria=criteria,
+                criteria_met=[False] * len(criteria),
+                criteria_evidence=[None] * len(criteria),
+            )
+        )
+        scope_paths.extend(parse_repo_scope(issue.body))
+
+    devs = detect_deviations(pr_files, scope_paths)
+    report.deviations.unspec_files = devs["unspec_files"]
+
+    plan_path = _paths.session_plan_path(resolved, session_id)
+    if plan_path.is_file():
+        ok, unmatched = check_plan_adherence(
+            plan_path.read_text(encoding="utf-8"), pr_files
+        )
+        report.plan_adherence_ok = ok
+        report.plan_unmatched_steps = unmatched
+
+    if report.deviations.unspec_files or not report.plan_adherence_ok:
+        report.verdict = "approved_with_notes"
+
+    if output_format == "json":
+        click.echo(_json.dumps(asdict(report), indent=2, default=str))
+    else:
+        click.echo(
+            f"Session Review: {session_id} (PR "
+            f"{f'#{pr_number}' if pr_number else 'not found'})\n"
+        )
+        click.echo(f"Verdict: {report.verdict}")
+        click.echo("\nIssues:")
+        for ir in report.issue_reviews:
+            click.echo(
+                f"  {ir.key}: {len(ir.criteria)} criteria (manual verification needed)"
+            )
+        if report.deviations.unspec_files:
+            click.echo("\nDeviations (unspec'd files):")
+            for f in report.deviations.unspec_files:
+                click.echo(f"  - {f}")
+        if report.plan_unmatched_steps:
+            click.echo("\nPlan adherence issues:")
+            for s in report.plan_unmatched_steps:
+                click.echo(f"  - {s} (named in plan, absent from PR)")
+
+    if post_pr_comments and pr_number:
+        comment_lines = [
+            "## Tripwire session review",
+            "",
+            f"Verdict: `{report.verdict}`",
+        ]
+        if report.deviations.unspec_files:
+            comment_lines.append("")
+            comment_lines.append("**Files outside issue scope:**")
+            for f in report.deviations.unspec_files:
+                comment_lines.append(f"- `{f}`")
+        try:
+            subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "comment",
+                    str(pr_number),
+                    "--body",
+                    "\n".join(comment_lines),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            if output_format == "text":
+                click.echo(f"\n(posted to PR #{pr_number})")
+        except (subprocess.SubprocessError, OSError):
+            if output_format == "text":
+                click.echo(f"\n(failed to post to PR #{pr_number})")
+
+    if write_verified:
+        _write_verified_for_session(resolved, session, report)
+
+    raise click.exceptions.Exit(report.exit_code)
+
+
+# ----------------------------------------------------------------------------
 # `tripwire session monitor` — one-shot runtime snapshot
 # ----------------------------------------------------------------------------
 

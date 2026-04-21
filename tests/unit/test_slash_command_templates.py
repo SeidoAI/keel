@@ -50,6 +50,8 @@ EXPECTED_COMMANDS: tuple[str, ...] = (
     "pm-issue-artifact",
     # v0.7b session monitor:
     "pm-session-monitor",
+    # v0.7b session review:
+    "pm-session-review",
     # Deprecated forwarders (still shipped, removed in v0.7):
     "pm-close",
     "pm-handoff",
