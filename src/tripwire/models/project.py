@@ -148,5 +148,9 @@ class ProjectConfig(BaseModel):
     # by the spawn config resolver.
     spawn_defaults: dict[str, Any] | None = None
 
+    # v0.7b: pinned tripwire CLI version for project CI. Set at `tripwire init`
+    # time and used by the generated `.github/workflows/tripwire.yml`.
+    tripwire_version: str | None = None
+
     # Free-form per-project metadata, never used by the package itself.
     metadata: dict[str, Any] = Field(default_factory=dict)

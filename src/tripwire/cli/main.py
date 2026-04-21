@@ -13,6 +13,7 @@ import click
 from tripwire import __version__
 from tripwire.cli.agenda import agenda_cmd
 from tripwire.cli.artifacts import artifacts_cmd
+from tripwire.cli.ci import ci_cmd
 from tripwire.cli.completion import completion_cmd
 from tripwire.cli.enums import enums_cmd
 from tripwire.cli.graph import graph_cmd
@@ -81,6 +82,7 @@ def cli(ctx: click.Context, verbose: int) -> None:
 cli.add_command(agenda_cmd)
 cli.add_command(init_cmd)
 cli.add_command(issue_cmd)
+cli.add_command(ci_cmd)
 cli.add_command(brief_cmd)
 cli.add_command(scaffold_cmd)  # hidden alias — prefer `brief`
 cli.add_command(next_key_cmd)
