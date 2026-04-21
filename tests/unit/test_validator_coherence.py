@@ -7,12 +7,19 @@ from pathlib import Path
 
 from tripwire.core.validator import (
     _COHERENCE_MATRIX,
+    _SESSION_STATUS_TO_PHASE,
     validate_project,
 )
 
 
-def test_matrix_shape():
-    """Every session status in the matrix must list every known issue status."""
+def test_matrix_shape_matches_spec_5_phases():
+    """Matrix is keyed by spec §6.4's 5 phases — no extras."""
+    expected_phases = {"planning", "in_progress", "in_review", "verified", "done"}
+    assert set(_COHERENCE_MATRIX.keys()) == expected_phases
+
+
+def test_matrix_rows_cover_all_issue_statuses():
+    """Every phase row must list every known issue status."""
     expected_issue_statuses = {
         "backlog",
         "todo",
@@ -21,9 +28,25 @@ def test_matrix_shape():
         "verified",
         "done",
     }
-    for session_status, row in _COHERENCE_MATRIX.items():
+    for phase, row in _COHERENCE_MATRIX.items():
         missing = expected_issue_statuses - set(row.keys())
-        assert not missing, f"matrix row {session_status!r} missing: {missing}"
+        assert not missing, f"matrix row {phase!r} missing: {missing}"
+
+
+def test_session_status_to_phase_maps_all_in_lifecycle_statuses():
+    """Working states (queued/executing/active) collapse to in_progress; completed → done."""
+    assert _SESSION_STATUS_TO_PHASE["planning"] == "planning"
+    assert _SESSION_STATUS_TO_PHASE["queued"] == "in_progress"
+    assert _SESSION_STATUS_TO_PHASE["executing"] == "in_progress"
+    assert _SESSION_STATUS_TO_PHASE["active"] == "in_progress"
+    assert _SESSION_STATUS_TO_PHASE["in_review"] == "in_review"
+    assert _SESSION_STATUS_TO_PHASE["verified"] == "verified"
+    assert _SESSION_STATUS_TO_PHASE["completed"] == "done"
+    # Off-lifecycle statuses deliberately absent.
+    assert "failed" not in _SESSION_STATUS_TO_PHASE
+    assert "paused" not in _SESSION_STATUS_TO_PHASE
+    assert "abandoned" not in _SESSION_STATUS_TO_PHASE
+    assert "re_engaged" not in _SESSION_STATUS_TO_PHASE
 
 
 def test_issue_behind_session_is_error(

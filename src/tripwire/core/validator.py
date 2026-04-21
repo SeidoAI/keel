@@ -2081,22 +2081,43 @@ def check_quality_consistency(ctx: ValidationContext) -> list[CheckResult]:
 # ============================================================================
 
 
-# v0.7b Layer-3 coherence matrix: session_status → {issue_status: verdict}.
-# verdict:
-#   "ok"           — aligned
-#   "ahead_warn"   — issue is ahead of session (issue later in lifecycle than session);
-#                    surfaces as `coherence/issue_status_ahead_of_session` (warning).
-#                    Typical: session still in_progress but issue closed by another path.
-#   "behind_error" — issue is behind session (session has moved past issue state);
-#                    surfaces as `coherence/issue_status_lags_session` (error).
-#                    Typical: session says in_review but issue still backlog → contradiction.
+# v0.7b Layer-3 coherence matrix — spec §6.4.
 #
-# Based on spec §6.4:
+# Matrix is keyed by *phase* (5 values per spec table), not by the full
+# SessionStatus enum. SessionStatus values map to a phase via
+# _SESSION_STATUS_TO_PHASE. Session statuses not in the mapping are
+# off-lifecycle (failed, paused, abandoned, re_engaged, waiting_for_*)
+# and skip coherence checking entirely.
+#
+# Verdict:
+#   "ok"           — aligned
+#   "ahead_warn"   — issue later in lifecycle than session; surfaces as
+#                    `coherence/issue_status_ahead_of_session` (warning).
+#   "behind_error" — issue earlier than session; surfaces as
+#                    `coherence/issue_status_lags_session` (error).
+#
+# Spec §6.4 table:
 #   planning     → warn on later
 #   in_progress  → warn on later
 #   in_review    → error on earlier
 #   verified     → error on earlier
-#   completed    → error on anything else
+#   done         → error on anything else
+
+_SESSION_STATUS_TO_PHASE: dict[str, str] = {
+    "planning": "planning",
+    # Working states (queued waiting to launch, executing locally, active
+    # in orchestrator) all represent the in_progress phase.
+    "queued": "in_progress",
+    "executing": "in_progress",
+    "active": "in_progress",
+    "in_review": "in_review",
+    "verified": "verified",
+    # completed = tripwire session's terminal state = phase `done`.
+    "completed": "done",
+    # Off-lifecycle statuses (failed, paused, abandoned, re_engaged,
+    # waiting_for_*) deliberately omitted — coherence is meaningless there.
+}
+
 _COHERENCE_MATRIX: dict[str, dict[str, str]] = {
     "planning": {
         "backlog": "ok",
@@ -2106,23 +2127,7 @@ _COHERENCE_MATRIX: dict[str, dict[str, str]] = {
         "verified": "ahead_warn",
         "done": "ahead_warn",
     },
-    "queued": {
-        "backlog": "ok",
-        "todo": "ok",
-        "in_progress": "ok",
-        "in_review": "ahead_warn",
-        "verified": "ahead_warn",
-        "done": "ahead_warn",
-    },
-    "executing": {
-        "backlog": "behind_error",
-        "todo": "ok",
-        "in_progress": "ok",
-        "in_review": "ok",
-        "verified": "ahead_warn",
-        "done": "ahead_warn",
-    },
-    "active": {
+    "in_progress": {
         "backlog": "behind_error",
         "todo": "ok",
         "in_progress": "ok",
@@ -2146,7 +2151,7 @@ _COHERENCE_MATRIX: dict[str, dict[str, str]] = {
         "verified": "ok",
         "done": "ok",
     },
-    "completed": {
+    "done": {
         "backlog": "behind_error",
         "todo": "behind_error",
         "in_progress": "behind_error",
@@ -2232,9 +2237,10 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
     issues_by_key = {entity.model.id: entity.model for entity in ctx.issues}
     for entity in ctx.sessions:
         session: AgentSession = entity.model
-        session_row = _COHERENCE_MATRIX.get(session.status, None)
-        if session_row is None:
+        phase = _SESSION_STATUS_TO_PHASE.get(session.status)
+        if phase is None:
             continue
+        session_row = _COHERENCE_MATRIX[phase]
         for issue_key in session.issues:
             issue = issues_by_key.get(issue_key)
             if issue is None:
