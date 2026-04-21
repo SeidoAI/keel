@@ -298,20 +298,53 @@ class TestReverseRefs:
             r.id == "TST-1" and r.kind == "issue" for r in result.referrers
         )
 
-    def test_falls_back_to_scan_without_cache(
+    def test_rebuilds_cache_lazily_when_absent(
         self, tmp_path_project: Path, save_test_node, save_test_issue
     ):
         save_test_node(tmp_path_project, "user-model")
         save_test_issue(tmp_path_project, "TST-1")
 
-        # Ensure no cache exists.
+        # Ensure no cache exists before the call.
         from tripwire.core import paths
 
         cache_path = paths.graph_cache_path(tmp_path_project)
         assert not cache_path.exists()
 
+        # Per KUI-16 execution constraint, reverse_refs triggers one
+        # rebuild of the missing cache. Verify the referrer is found AND
+        # the cache file now exists on disk.
         result = reverse_refs(tmp_path_project, "user-model")
         assert any(r.id == "TST-1" for r in result.referrers)
+        assert cache_path.exists()
+
+    def test_falls_back_to_scan_when_rebuild_fails(
+        self,
+        tmp_path_project: Path,
+        save_test_node,
+        save_test_issue,
+        monkeypatch,
+    ):
+        save_test_node(tmp_path_project, "user-model")
+        save_test_issue(tmp_path_project, "TST-1")
+
+        # Monkeypatch ensure_fresh to raise — simulates a cache rebuild
+        # that fails (lock timeout, disk IO error, etc). The service
+        # should log and fall back to a filesystem scan.
+        import tripwire.ui.services.node_service as svc
+        from tripwire.core import graph_cache as gc
+
+        def _boom(*a, **kw):
+            raise OSError("simulated lock failure")
+
+        monkeypatch.setattr(svc.graph_cache, "ensure_fresh", _boom)
+        # Also assert the top-level load returns None so the fallback
+        # actually fires.
+        monkeypatch.setattr(svc.graph_cache, "load_index", lambda *a, **kw: None)
+
+        result = reverse_refs(tmp_path_project, "user-model")
+        assert any(r.id == "TST-1" for r in result.referrers)
+        # Avoid lint complaint about unused import in tighter test.
+        assert gc is svc.graph_cache
 
     def test_detects_node_to_node_referrer(
         self, tmp_path_project: Path, save_test_node

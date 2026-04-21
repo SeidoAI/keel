@@ -139,8 +139,9 @@ def _classify_referrer(ref_id: str) -> ReferrerKind:
 def _scan_reverse_refs(project_dir: Path, node_id: str) -> list[str]:
     """Scan issue + node files for `[[node_id]]` references.
 
-    Fallback when the graph cache is missing. Reads every issue and
-    every node body and greps for the reference id.
+    Last-resort fallback when the graph cache is missing AND a rebuild
+    attempt also failed. Reads every issue and every node body and
+    greps for the reference id.
     """
     from tripwire.core.reference_parser import extract_references
     from tripwire.core.store import list_issues
@@ -157,6 +158,33 @@ def _scan_reverse_refs(project_dir: Path, node_id: str) -> list[str]:
         elif node_id in node.related:
             referrers.append(node.id)
     return referrers
+
+
+def _load_cache_ensuring_fresh(project_dir: Path):  # type: ignore[no-untyped-def]
+    """Load the graph cache, building it once if absent.
+
+    Per the KUI-16 execution constraint: *"If ``graph/index.yaml`` is
+    missing, call ``tripwire.core.graph_cache.ensure_fresh(project_dir)``
+    once per request — avoid infinite rebuild loops."*
+
+    We call ``ensure_fresh`` at most once per call. If the rebuild fails
+    (OSError, TimeoutError, or any other IO hazard during lock acquire)
+    we log a warning and return ``None``; callers then fall back to a
+    scan or empty result rather than 500-ing the route.
+    """
+    cache = graph_cache.load_index(project_dir)
+    if cache is not None:
+        return cache
+    try:
+        graph_cache.ensure_fresh(project_dir)
+    except (OSError, TimeoutError) as exc:
+        logger.warning(
+            "node_service: graph cache rebuild failed for %s: %s",
+            project_dir,
+            exc,
+        )
+        return None
+    return graph_cache.load_index(project_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -180,11 +208,13 @@ def list_nodes(
     - ``stale=True`` — restrict to the cache's ``stale_nodes`` list.
       ``stale=False`` excludes them; ``None`` (default) means no filter.
 
-    ``ref_count`` comes from the graph cache's ``referenced_by`` index
-    when available, else defaults to ``0``. Freshness is NOT computed
-    here — it's expensive — use :func:`check_all_freshness`.
+    ``ref_count`` comes from the graph cache's ``referenced_by`` index.
+    If the cache file is missing, we call ``graph_cache.ensure_fresh``
+    once to build it (per KUI-16 execution constraint); if that fails
+    we fall back to ``ref_count=0``. Freshness is NOT computed here —
+    it's expensive — use :func:`check_all_freshness`.
     """
-    cache = graph_cache.load_index(project_dir)
+    cache = _load_cache_ensuring_fresh(project_dir)
     stale_set: set[str] = set(cache.stale_nodes) if cache is not None else set()
     ref_counts: dict[str, int] = {}
     if cache is not None:
@@ -226,7 +256,7 @@ def get_node(project_dir: Path, node_id: str) -> NodeDetail:
     _require_valid_id(node_id)
     node = load_node(project_dir, node_id)
 
-    cache = graph_cache.load_index(project_dir)
+    cache = _load_cache_ensuring_fresh(project_dir)
     stale_set: set[str] = set(cache.stale_nodes) if cache is not None else set()
     ref_count = (
         len(cache.referenced_by.get(node_id, [])) if cache is not None else 0
@@ -297,12 +327,14 @@ def check_all_freshness(project_dir: Path) -> FreshnessReport:
 def reverse_refs(project_dir: Path, node_id: str) -> ReverseRefsResult:
     """Return every entity that references *node_id*.
 
-    Reads `graph/index.yaml`'s ``referenced_by`` when the cache is
-    available; otherwise falls back to a filesystem scan.
+    Reads ``graph/index.yaml``'s ``referenced_by`` when available. If
+    the cache is missing we rebuild it once (per KUI-16 execution
+    constraint); if the rebuild fails we fall back to a full
+    filesystem scan.
     """
     _require_valid_id(node_id)
 
-    cache = graph_cache.load_index(project_dir)
+    cache = _load_cache_ensuring_fresh(project_dir)
     if cache is not None:
         referrer_ids = list(cache.referenced_by.get(node_id, []))
     else:
