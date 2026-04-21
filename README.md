@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)"  srcset="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-light.svg">
-    <img alt="tripwire" src="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-light.svg" width="360">
+    <source media="(prefers-color-scheme: dark)"  srcset="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-mono-cream.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-mono-ink.svg">
+    <img alt="tripwire" src="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-mono-ink.svg" width="360">
   </picture>
 </p>
 
@@ -27,30 +27,17 @@ cd my-project
 claude
 ```
 
-_(Distribution name is `tripwire-pm` because PyPI prohibits `tripwire`; the CLI — `tripwire` or `tw` — and `import tripwire` are unchanged.)_
-
 Then in Claude Code:
 
 ```
 /pm-scope Build a knowledge base with nodes and edges. Planning docs in ./plans/.
 ```
 
-That's it. The agent reads your intent, scopes the project, writes the files,
-validates its own work, and hands you a clean project to commit.
+`tw init` creates issue keys from your project name (`my-project-cool` → `MPC`).
 
-To see your project in the web dashboard:
-
-```bash
-tw ui
-```
-
-`tw init` auto-derives a key prefix from the project name (`my-project-cool` →
-`MPC`), defaults to `main` as the base branch, and prompts for anything
-non-obvious. Pass `--key-prefix`, `--base-branch`, or `--repos` to override.
+Web dashboard: `tw ui`.
 
 ### Minimal install
-
-For CI pipelines or agents that only need the CLI (no web dashboard):
 
 ```bash
 pip install "tripwire-pm[projects]"
@@ -58,14 +45,14 @@ pip install "tripwire-pm[projects]"
 
 ## What you get
 
-- **One repo, everything inside.** Issues, concept nodes, sessions, skills, templates, enums — all version-controlled in git. No external DB, no SaaS.
-- **Dual ID system.** Canonical UUID + atomic human key (`MP-42`), allocated with `fcntl.flock`. Branch-merge safe.
-- **Content-hashed concept graph.** `[[node-id]]` references point at file regions with SHA-256 hashes. Move code → one node updates → every downstream issue catches up. Drift is a validation error.
-- **23-check validation gate.** Schema, references, bidirectional consistency, status transitions, freshness, per-issue artifact presence, Layer-3 session↔issue coherence, sequence drift. JSON output. Auto-fix subset. ~50 ms on a typical project. Rebuilds the graph cache as a side effect.
-- **Session lifecycle commands.** `queue → spawn → monitor → review → complete` — each step is a CLI verb + a matching `/pm-session-*` slash command. Sessions produce per-issue `developer.md` and `verified.md` artifacts gated by status.
-- **Agent insights capture.** Sessions propose concept-node additions/updates in `insights.yaml`; the PM reviews at complete time. Knowledge compounds across sessions rather than evaporating with the chat history.
-- **Canonical YAML spawn config.** One place (`templates/spawn/defaults.yaml`) decides model, effort, budget, prompt, flags. Projects and sessions override by deep-merge.
-- **Shipped PM skill.** 20 reference docs and 14 canonical example files ship into every `init`. The agent reads the example, not the schema doc.
+- **One repo, everything inside.** Issues, nodes, sessions, skills, templates — all git. No DB, no SaaS.
+- **Dual IDs.** UUID + atomic human key (`MP-42`). Branch-merge safe.
+- **Content-hashed concept graph.** `[[node-id]]` references pin to file regions with SHA-256. Move the code, the graph catches up.
+- **23-check validator.** ~50 ms. JSON by default. Rebuilds the graph cache as it runs.
+- **Session lifecycle.** `queue → spawn → monitor → review → complete`. Each stage gates the next.
+- **Insights capture.** Sessions propose graph updates in `insights.yaml`. PM reviews at close-out; knowledge compounds.
+- **Canonical YAML spawn config.** One place decides model, effort, budget, prompt. Override what matters.
+- **PM skill.** 20 reference docs and 14 examples ship with every project. The agent reads the example, not the schema.
 
 ## Principles
 
@@ -117,13 +104,13 @@ ones.
 
 ## How it works
 
-**The concept graph is coherence.** Instead of prose like "the auth endpoint," issues reference `[[auth-token-endpoint]]` — a node file pointing at a specific file and line range with a stored content hash. When the code moves, one node updates; every issue that referenced it stays correct. Stale hashes surface as validator errors.
+**The graph is coherence.** Issues reference `[[auth-token-endpoint]]`, not prose. Move the code, update the node, every reference catches up. Drift is a validator error.
 
-**Validation is the gate.** Every agent loop ends with `tw validate --strict --format=json`. The 23 checks cover schema, references, bidirectional consistency, status transitions, artifact presence, and session↔issue coherence. The same command rebuilds the graph cache incrementally. The loop is: write files → validate → fix → validate → commit.
+**Validation is the gate.** Every loop ends with `tw validate --strict`. Write → validate → fix → validate → commit.
 
-**Sessions are knowledge-producing events.** A session doesn't end at the PR; it ends at `tw session complete`, which gates on the PR being merged, on per-issue artifacts (`developer.md`, `verified.md`) being present, and on the most recent review exit-code being ≤ 1. Any proposed concept-node updates (`insights.yaml`) get PM-reviewed before the session closes.
+**Sessions are knowledge-producing events.** A session ends at `tw session complete`, which gates on PR merged, artifacts present, and review exit-code ≤ 1. Proposed graph updates get PM-reviewed before close-out.
 
-**The project ships its own instruction set.** `tw init` doesn't just create a data directory — it ships the PM skill (20 reference docs + 14 canonical examples), 23 slash commands, and the validation loop. The methodology is versioned in-tree with the project. Fork a project, fork the methodology. Evolve it in a PR, review it like code.
+**The project ships its own instruction set.** `tw init` ships the PM skill, slash commands, and validation loop into the repo. Fork the project, fork the methodology.
 
 ## v0.7 lifecycle flow
 
@@ -145,95 +132,86 @@ plan ──► queue ──► spawn ──► execute ──► monitor ──�
   └─ plan.md + verification-checklist.md written during scoping
 ```
 
-Each step is a CLI verb (`tw session queue|spawn|monitor|review|complete`) and a matching `/pm-session-*` slash command. The verbs are mechanical; the slash commands add PM judgment.
+Each step is a CLI verb and a matching `/pm-session-*` slash command. The verbs are mechanical; the slash commands add PM judgment.
 
 ## Commands
 
 ```text
-tw init              Bootstrap a project with templates + skills
-tw brief             Dump project context (agents use this on every loop)
-tw validate          23-check gate (--strict, --fix, --format=json)
-tw status            Dashboard: issues, nodes, sessions, critical path
-tw agenda            Aggregated view of everything in flight
-tw plan              Preview what init would produce (dry-run)
-tw next-key          Atomic ID/key allocation (fcntl.flock)
-tw uuid              Generate RFC 4122 UUID4 values (--count N)
+tw init              Bootstrap a project
+tw brief             Dump project context
+tw validate          23-check gate
+tw status            Dashboard
+tw agenda            In-flight view
+tw plan              Dry-run init
+tw next-key          Atomic key allocation
+tw uuid              Generate UUID4
 
-tw session …         Session lifecycle: list/show/check/queue/spawn/
-                     pause/abandon/cleanup/agenda/progress/monitor/
-                     review/complete/insights/artifacts
-tw issue …           Per-issue operations: artifact list/init/verify
-tw workspace …       Multi-project workspace operations (v0.6b)
-tw ci install        Render the project-side CI workflow
+tw session …         Session lifecycle
+tw issue …           Per-issue artifacts
+tw workspace …       Multi-project workspace
+tw ci install        Project CI workflow
 
-tw graph             Render dependency or concept graph (mermaid/dot/json)
-tw refs              Inspect references to a node or issue
-tw node              List, inspect, freshness-check concept nodes
-tw templates         List and instantiate Jinja2 templates
+tw graph             Render dependency or concept graph
+tw refs              Inspect references
+tw node              Freshness-check nodes
+tw templates         List and instantiate templates
 tw enums             List active enum values
-tw artifacts         List session artifact manifest
-tw refresh           Rebuild the graph cache from filesystem
-tw lint              Run per-stage lint rules (scoping/handoff/session)
-tw ui                Start the web dashboard on localhost
-tw view              Read-only HTML project viewer
-tw completion <sh>   Print bash/zsh/fish tab completion install snippet
+tw artifacts         List artifact manifest
+tw refresh           Rebuild the graph cache
+tw lint              Per-stage lint rules
+tw ui                Web dashboard
+tw view              HTML project viewer
+tw completion <sh>   Shell tab-completion
 ```
 
-All commands output JSON by default (agent-first). Add `--format=text`
-or `--format=rich` for human-readable output.
-
-Run `tw --help` or `tw <cmd> --help` for details. The long name `tripwire` is an alias for `tw` — use either.
+Default output is JSON; add `--format=text` or `--format=rich` for humans. Run `tw --help` for details.
 
 ## Slash commands
 
-After `tw init`, every project ships with `/pm-*` slash commands at
-`.claude/commands/`. Type `/pm` in Claude Code to see them all at once.
+After `tw init`, `/pm-*` commands ship at `.claude/commands/`. Type `/pm` in Claude Code to list them.
 
 ### Scoping
 | Command | Args | What it does |
 |---|---|---|
-| `/pm-scope` | `<intent>` | Scope a new project from your intent and planning docs |
-| `/pm-rescope` | `<intent>` | Expand an existing project with new scope |
-| `/pm-triage` | — | Process inbound suggestions, comments, and agent messages |
-| `/pm-edit` | `<entity> <change>` | Surgical edit — status change, new node, comment, etc. |
+| `/pm-scope` | `<intent>` | Scope a new project |
+| `/pm-rescope` | `<intent>` | Expand existing scope |
+| `/pm-triage` | — | Process inbound suggestions |
+| `/pm-edit` | `<entity> <change>` | Surgical edit |
 
 ### Sessions
 | Command | Args | What it does |
 |---|---|---|
-| `/pm-session-create` | `<session-id>` | Create session YAML + plan skeleton |
-| `/pm-session-queue` | `<session-id>` | Readiness check; transition planned → queued |
-| `/pm-session-spawn` | `<session-id>` | Create worktree + launch `claude -p` |
-| `/pm-session-check` | `<session-id>` | Readiness punch list (no transition) |
-| `/pm-session-agenda` | — | Session dependency DAG with launch recommendations |
-| `/pm-session-progress` | `[--focus ID]` | Task-checklist rollup across active sessions |
-| `/pm-session-monitor` | `[ids...]` | Self-paced runtime observation |
-| `/pm-session-review` | `<session-id>` | Review PR vs issue specs; writes `verified.md` |
-| `/pm-session-complete` | `<session-id>` | Close-out gates; transition to done |
+| `/pm-session-create` | `<session-id>` | Create session YAML |
+| `/pm-session-queue` | `<session-id>` | Readiness check; queue |
+| `/pm-session-spawn` | `<session-id>` | Worktree + launch `claude -p` |
+| `/pm-session-check` | `<session-id>` | Readiness punch list |
+| `/pm-session-agenda` | — | Session dependency DAG |
+| `/pm-session-progress` | `[--focus ID]` | Task-checklist rollup |
+| `/pm-session-monitor` | `[ids...]` | Runtime observation |
+| `/pm-session-review` | `<session-id>` | Review PR; write `verified.md` |
+| `/pm-session-complete` | `<session-id>` | Close-out gates |
 
 ### Issues
 | Command | Args | What it does |
 |---|---|---|
-| `/pm-issue-close` | `<issue-key>` | Mark issue done, write a closing comment |
-| `/pm-issue-artifact` | `<key> <name>` | Create or update a per-issue artifact |
+| `/pm-issue-close` | `<issue-key>` | Mark done; write close comment |
+| `/pm-issue-artifact` | `<key> <name>` | Create or update issue artifact |
 
 ### Project / workspace
 | Command | Args | What it does |
 |---|---|---|
-| `/pm-project-create` | `<name>` | Bootstrap a new project under a workspace |
-| `/pm-project-sync` | — | Pull workspace-canonical nodes into the project |
+| `/pm-project-create` | `<name>` | Bootstrap project under workspace |
+| `/pm-project-sync` | — | Pull canonical nodes from workspace |
 
 ### Interpretive
 | Command | Args | What it does |
 |---|---|---|
-| `/pm-status` | — | PM-flavoured project summary with next-step recommendations |
-| `/pm-agenda` | — | Interpreted summary of everything in flight |
-| `/pm-graph` | — | Critical path, parallelizable work, cycles |
-| `/pm-review` | `<PR>` | Review a PR against the project repo for quality + completeness |
-| `/pm-validate` | — | Run the validator, interpret errors, propose fixes |
-| `/pm-lint` | `<stage>` | Run a specific lint rule group (scoping/handoff/session) |
-
-Each slash command loads the project-manager skill, reads current state via
-`tw brief`, then executes the relevant workflow.
+| `/pm-status` | — | Summary + next-step recommendations |
+| `/pm-agenda` | — | In-flight summary |
+| `/pm-graph` | — | Critical path, parallel work, cycles |
+| `/pm-review` | `<PR>` | Review a PR |
+| `/pm-validate` | — | Run validator; interpret and fix |
+| `/pm-lint` | `<stage>` | Per-stage lint rules |
 
 ## Project layout
 
@@ -241,33 +219,33 @@ After `tw init`:
 
 ```text
 my-project/
-├── project.yaml                     # name, key_prefix, statuses, enum pointers, spawn_defaults
+├── project.yaml                     # project config
 ├── .tripwire/
-│   ├── commands/                    # project-level slash-command overrides
-│   └── spawn/                       # project-level spawn config overrides
-├── enums/*.yaml                     # override shipped defaults (issue_status, session_status, …)
+│   ├── commands/                    # slash-command overrides
+│   └── spawn/                       # spawn-config overrides
+├── enums/*.yaml                     # project-level enum overrides
 ├── issues/<KEY>/
-│   ├── issue.yaml                   # frontmatter + body
+│   ├── issue.yaml
 │   ├── developer.md                 # written at in_review
 │   ├── verified.md                  # written at verified
-│   └── comments/                    # one file per PM comment
-├── nodes/*.yaml                     # concept graph (top-level)
+│   └── comments/
+├── nodes/*.yaml                     # concept graph
 ├── sessions/<id>/
 │   ├── session.yaml
-│   ├── handoff.yaml                 # PM → execution-agent record
-│   ├── plan.md                      # written during scoping
-│   ├── task-checklist.md            # written during in_progress
-│   ├── verification-checklist.md    # written during scoping
+│   ├── handoff.yaml                 # PM → agent record
+│   ├── plan.md
+│   ├── task-checklist.md
+│   ├── verification-checklist.md
 │   ├── recommended-testing-plan.md
 │   ├── post-completion-comments.md
-│   ├── review.json                  # written by `tw session review`
-│   ├── insights.yaml                # agent-proposed node updates (optional)
-│   └── artifacts/                   # overflow / custom artifacts
-├── graph/index.yaml                 # derived cache (rebuildable)
-├── templates/                       # project-local Jinja templates
+│   ├── review.json                  # `tw session review` output
+│   ├── insights.yaml                # proposed node updates
+│   └── artifacts/
+├── graph/index.yaml                 # derived cache
+├── templates/
 └── .claude/
-    ├── commands/pm-*.md             # 23 slash commands shipped
-    └── skills/project-manager/      # 20 reference docs + 14 examples
+    ├── commands/pm-*.md             # 23 slash commands
+    └── skills/project-manager/      # 20 refs + 14 examples
 ```
 
 ---
@@ -310,67 +288,66 @@ f9e8d7c6-b5a4-4321-8765-432109876543
 </details>
 
 <details>
-<summary><b>Why drift matters</b> — the problem this solves</summary>
+<summary><b>Why drift matters</b></summary>
 
-You can't run a real software project on a stack of LLM agents yet, and the reason is drift.
+Agents can't build against a tracker that lies to them.
 
-- **Your issue tracker drifts from your code.** You write "the auth endpoint in the backend" today; six weeks later that endpoint moves and the issue text doesn't. The next agent builds against stale information.
-- **Your context is scattered.** The issue is in Linear, the decision is in Notion, the API contract is in a Google Doc, the schema is in a Terraform module. An agent piecing those together burns half its tokens on reconciliation.
-- **You can't run multiple coding agents in parallel without a coordinator.** Each needs a branch, an issue key, an awareness of who owns what. Without atomic key allocation, they stomp on each other.
-- **Drift is a tax on every future invocation.** Mechanical search-and-replace across docs, issues, code, and schemas is exactly what LLMs are bad at. Partial reconciliations leave the next agent with more drift to chase.
+- **Issue text drifts from code.** The endpoint moves; the issue doesn't. Next agent builds against stale info.
+- **Context is scattered.** Linear, Notion, Google Docs, Terraform. Agents burn tokens reconciling.
+- **Parallel agents stomp.** Without atomic key allocation, they collide on branches and IDs.
+- **Reconciliation is a tax.** Mechanical search-and-replace across docs is exactly what LLMs are bad at.
 
-Tripwire fixes this by putting everything in one git repo with cross-referenced YAML, content-hashed concept nodes, and a 23-check validator that catches drift before the next agent reads it.
+Tripwire puts everything in one repo, content-hashes the graph, and validates before the next agent reads it.
 
 </details>
 
 <details>
 <summary><b>Under the hood</b> — dual IDs, graph cache, freshness</summary>
 
-**Dual IDs.** Every entity has both a canonical `uuid4` (agent-generated, never changes) and a human key like `MP-42` (allocated atomically by `tw next-key` under `fcntl.flock`). Key collisions across branches are detected by the validator and resolved via the UUID, so references don't break.
+**Dual IDs.** Every entity has a `uuid4` and a human key like `MP-42`, allocated under `fcntl.flock`. Branch-merge collisions resolve via UUID.
 
-**Concept graph with content hashing.** A concept node points at a region of a file in a repo:
+**Concept graph with content hashing.** A node pins to a file region:
 
 ```yaml
 source:
   repo: myorg/backend
   path: src/api/routes/auth.py
   lines: [45, 82]
-  branch: main
   content_hash: "sha256:e2c5a..."
 ```
 
-`tw node check` fetches the current content (local clone preferred, `gh api` fallback) and compares SHA-256 hashes. Three outcomes: `FRESH`, `STALE`, `SOURCE_MISSING`. Stale nodes become validator errors.
+`tw node check` rehashes and compares. Outcomes: `FRESH` / `STALE` / `SOURCE_MISSING`.
 
-**Graph cache.** `graph/index.yaml` is an incremental cache of all edges, rebuilt under `fcntl.flock`. `validate` calls `ensure_fresh` which picks between incremental update and full rebuild based on current state.
+**Graph cache.** `graph/index.yaml` is an incremental edge cache, rebuilt under `fcntl.flock`. `validate` calls `ensure_fresh`.
 
-**Auto-fix subset.** `tw validate --fix` repairs: missing timestamps (from file mtime), drifted `next_issue_number`, missing UUIDs, bidirectional `related` mismatches, label/list normalisation, basic ID collision renames. Everything else is on the agent.
+**Auto-fix subset.** `tw validate --fix` repairs timestamps, drifted counters, missing UUIDs, and bidirectional mismatches. Everything else is on the agent.
 
-**Canonical spawn config.** `tw session spawn` builds the `claude -p` argv from a deep-merged YAML (`session.spawn_config` > `project.spawn_defaults` > `.tripwire/spawn/defaults.yaml` > shipped default). Every flag — `--name`, `--session-id`, `--effort`, `--model`, `--fallback-model`, `--permission-mode`, `--disallowedTools`, `--max-turns`, `--max-budget-usd`, `--output-format`, `--append-system-prompt` — is parameterised; override what matters, inherit the rest.
+**Canonical spawn config.** `claude -p` args come from deep-merged YAML (session > project > default). Override the keys you care about; inherit the rest.
 
-**The PM skill.** `.claude/skills/project-manager/` ships into every `init` with 20 reference docs (workflows, schemas, validation codes, anti-patterns) and 14 canonical example files. When the agent is confused it reads the example. When the example is wrong the validator catches it.
+**The PM skill.** 20 reference docs and 14 canonical examples. The agent reads the example; the validator catches bad examples.
 
 </details>
 
 <details>
-<summary><b>Worked example</b> — scoping from raw planning docs</summary>
+<summary><b>Worked example</b> — scoping from planning docs</summary>
 
-1. `tw init my-project` creates the project with templates, skill files, 23 slash commands, and enums. Auto-derives the key prefix from the name (`my-project` → `MP`).
-2. You open Claude Code in `my-project/` and type: `/pm-scope Build a knowledge base. Planning docs in ./plans/.`
-3. The PM skill auto-loads. It calls `tw brief` to read project state, then reads `plans/*.md`.
-4. The agent calls `tw next-key --type issue` 20 times, writes 20 issue YAML files into `issues/`, writes 15 concept nodes into `nodes/`, writes 3 session folders into `sessions/`.
-5. It runs `tw validate --strict --format=json`, parses the JSON, fixes any `ref/dangling`, `body/missing_heading`, or `status/unreachable` errors, re-runs.
-6. Clean. The agent commits the result. You `tw status` and see a connected dependency graph with a critical path.
+1. `tw init my-project` — derives `MP` from the name.
+2. `/pm-scope Build a knowledge base. Planning docs in ./plans/.`
+3. The PM skill calls `tw brief`, then reads `plans/*.md`.
+4. The agent writes 20 issues, 15 nodes, 3 sessions.
+5. `tw validate --strict` — fix errors, re-run, clean.
+6. Commit. `tw status` shows a connected graph with a critical path.
 
-Everything is in git. Every reference resolves. Every concept node's content hash is current. The next agent that picks up a ticket has the full picture from one clone.
+Everything resolves. One clone carries the whole project.
 
 </details>
 
 <details>
 <summary><b>What we learned building this</b></summary>
 
-Running a real PM agent against an 8,000-line planning corpus surfaced seven recurring failure modes — agents don't self-check unless forced; every workflow step must be load-bearing; agents anchor, rationalise, and reason as if they were human; output degrades over session length; structure and semantics are different problems; when in doubt create the node; the project must ship its own instruction set.
+Running a real PM agent against an 8,000-line planning corpus surfaced seven recurring failure modes.
 
-See [`docs/learnings.md`](docs/learnings.md) for the full write-up.
+See [`docs/learnings.md`](docs/learnings.md).
 
 </details>
 
