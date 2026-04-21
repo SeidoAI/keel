@@ -19,6 +19,7 @@ from tripwire.core import paths
 from tripwire.core.parser import ParseError, parse_frontmatter_body
 from tripwire.models.manifest import ArtifactManifest
 from tripwire.models.session import AgentSession
+from tripwire.models.session import RepoBinding as CoreRepoBinding
 
 logger = logging.getLogger("tripwire.ui.services.session_service")
 
@@ -221,16 +222,7 @@ def _artifact_status(
     return out
 
 
-def _flatten_engagement(engagement: Any) -> dict[str, Any]:
-    """Serialise an EngagementEntry (or dict) uniformly."""
-    if hasattr(engagement, "model_dump"):
-        return engagement.model_dump(mode="json")
-    if isinstance(engagement, dict):
-        return engagement
-    return {}
-
-
-def _flatten_repo(repo: Any) -> RepoBinding:
+def _flatten_repo(repo: CoreRepoBinding) -> RepoBinding:
     return RepoBinding(
         repo=repo.repo,
         base_branch=repo.base_branch,
@@ -340,15 +332,18 @@ def get_session(project_dir: Path, session_id: str) -> SessionDetail:
     summary = _build_summary(project_dir, session)
     manifest = _load_manifest(project_dir)
 
-    # TODO-v2: engagements[] is a placeholder for container runtime
-    # state; v1 passes through whatever is on disk (usually empty).
+    # TODO-v2: the engagements list is a v2-container-runtime placeholder.
+    # Per KUI-18 execution constraint: "v1 it's always empty. Do not guess
+    # at its shape — leave it as [] with a clear TODO-v2 comment." The
+    # `re_engagement_count` scalar is still derived from whatever the
+    # session.yaml has on disk (that's just a count).
     return SessionDetail(
         **summary.model_dump(),
         plan_md=_read_plan(project_dir, session_id),
         key_files=list(session.key_files),
         docs=list(session.docs or []),
         grouping_rationale=session.grouping_rationale,
-        engagements=[_flatten_engagement(e) for e in session.engagements],
+        engagements=[],
         artifact_status=_artifact_status(project_dir, session_id, manifest),
     )
 

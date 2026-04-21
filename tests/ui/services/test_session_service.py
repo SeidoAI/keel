@@ -179,6 +179,26 @@ class TestGetSession:
         detail = get_session(tmp_path_project, "s1")
         assert detail.engagements == []
 
+    def test_engagements_hardcoded_empty_even_when_session_has_entries(
+        self, tmp_path_project: Path, save_test_session
+    ):
+        # Per KUI-18 execution constraint, engagements[] is a v2-runtime
+        # placeholder — always empty on the DTO even if session.yaml has
+        # entries from legacy runs.
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            engagements=[
+                {"started_at": "2026-04-14T10:00:00", "trigger": "launch"},
+                {"started_at": "2026-04-14T11:00:00", "trigger": "ci_failure"},
+            ],
+        )
+        detail = get_session(tmp_path_project, "s1")
+        assert detail.engagements == []
+        # re_engagement_count is a scalar count — still derived from on-disk
+        # engagements so the UI can show the number without knowing shape.
+        assert detail.re_engagement_count == 1
+
     def test_re_engagement_count(
         self, tmp_path_project: Path, save_test_session
     ):
