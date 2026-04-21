@@ -5,7 +5,7 @@ v0 it reads directly from the graph cache (`graph/index.yaml`) for speed
 and falls back to scanning the project if the cache is missing.
 
 The UI's `/api/projects/:id/graph/concept` endpoint sits directly on top of
-this, and the CLI `keel graph --type concept` uses it too.
+this, and the CLI `tripwire graph --type concept` uses it too.
 """
 
 from __future__ import annotations
@@ -134,7 +134,7 @@ def _compute_orphans(all_ids: set[str], edges: list[GraphEdge]) -> list[str]:
     Orphans are typically a signal of a coherence gap — a concept node that
     no issue references, or an issue that has no dependencies and isn't
     referenced anywhere. The UI surfaces them as a warning; the CLI can
-    list them with `keel refs check`.
+    list them with `tripwire refs check`.
     """
     connected: set[str] = set()
     for edge in edges:

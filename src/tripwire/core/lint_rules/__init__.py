@@ -1,7 +1,7 @@
 """Lint rules registry — importing each submodule triggers @register_rule.
 
 Import this package before running the linter so every rule gets
-registered. ``src/keel/cli/lint.py`` does so at module load time.
+registered. ``src/tripwire/cli/lint.py`` does so at module load time.
 """
 
 from . import (

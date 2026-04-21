@@ -1,4 +1,4 @@
-"""Branch naming convention for keel sessions.
+"""Branch naming convention for tripwire sessions.
 
 Format: <type>/<session-slug> where:
 - <type> is one of ALLOWED_TYPES (feat, fix, refactor, docs, chore, test),
@@ -7,7 +7,7 @@ Format: <type>/<session-slug> where:
   lowercase, hyphen-separated, ≤ `MAX_BRANCH_LENGTH` chars.
 
 The convention is enforced at session launch (handoff.yaml.branch) and
-checked by `keel lint handoff`. Sessions spanning multiple repos use the
+checked by `tripwire lint handoff`. Sessions spanning multiple repos use the
 same branch name across all repos.
 """
 
@@ -58,7 +58,7 @@ def derive_branch_name(session_id: str, primary_issue_kind: str) -> str:
     Normalises the session id to a branch slug:
     - strips any "session-" prefix
     - lowercases (git accepts uppercase but convention is lowercase,
-      and session keys allocated via `keel next-key --type session`
+      and session keys allocated via `tripwire next-key --type session`
       look like "TST-S1" — uppercase with hyphens)
 
     The kind must be one of ALLOWED_TYPES; other kinds (e.g. "epic")

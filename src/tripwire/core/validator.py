@@ -1,6 +1,6 @@
 """The validation gate.
 
-`keel validate` is the single most important command in the system.
+`tripwire validate` is the single most important command in the system.
 This module implements the engine: load every entity, run every check in the
 catalogue, optionally apply auto-fixes, and emit a structured report.
 
@@ -274,7 +274,7 @@ def _try_load_project(ctx: ValidationContext) -> None:
                 severity="error",
                 file=PROJECT_CONFIG_FILENAME,
                 message=str(exc),
-                fix_hint="Run `keel init` to create project.yaml.",
+                fix_hint="Run `tripwire init` to create project.yaml.",
             )
         )
     except (ValueError, yaml.YAMLError) as exc:
@@ -1146,7 +1146,7 @@ def check_freshness(ctx: ValidationContext) -> list[CheckResult]:
                     file=rel,
                     field="source.content_hash",
                     message=fr.detail or f"Node {fr.node_id} content_hash is stale.",
-                    fix_hint="Run `keel node check --update` (deferred to a later release).",
+                    fix_hint="Run `tripwire node check --update` (deferred to a later release).",
                 )
             )
     return results
@@ -1597,7 +1597,7 @@ def apply_fixes(ctx: ValidationContext) -> list[CheckResult]:
     """Apply the auto-fix subset and return a list of fix CheckResults.
 
     Serialised across concurrent invocations by `project_lock`: two
-    `keel validate --fix` calls can't interleave their writes and lose
+    `tripwire validate --fix` calls can't interleave their writes and lose
     each other's changes. Bidirectional-ref fixes can write multiple
     files in one batch, so a single lock covers the whole transaction.
     """
@@ -1700,9 +1700,9 @@ def check_uuid_v4_version(ctx: ValidationContext) -> list[CheckResult]:
                         field="uuid",
                         message=(
                             f"UUID {uid} is not a valid RFC 4122 v4 UUID. "
-                            f"Use `keel uuid` to generate real UUIDs."
+                            f"Use `tripwire uuid` to generate real UUIDs."
                         ),
-                        fix_hint="Run `keel uuid` and replace the value.",
+                        fix_hint="Run `tripwire uuid` and replace the value.",
                     )
                 )
     return results
@@ -1955,7 +1955,7 @@ def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
                             "the <type>/<slug> convention."
                         ),
                         fix_hint=(
-                            "Run `keel session derive-branch <session-id>` "
+                            "Run `tripwire session derive-branch <session-id>` "
                             "and copy its output."
                         ),
                     )

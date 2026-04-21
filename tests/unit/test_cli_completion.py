@@ -2,7 +2,7 @@
 
 The subcommand prints install instructions for tab completion in
 bash/zsh/fish. Click handles the actual completion via its
-`_KEEL_COMPLETE` env var mechanism — we don't test that here.
+`_TRIPWIRE_COMPLETE` env var mechanism — we don't test that here.
 """
 
 from __future__ import annotations
@@ -21,22 +21,22 @@ def runner() -> CliRunner:
 def test_completion_bash_prints_install_snippet(runner: CliRunner) -> None:
     result = runner.invoke(cli, ["completion", "bash"])
     assert result.exit_code == 0, result.output
-    assert "_KEEL_COMPLETE=bash_source" in result.output
+    assert "_TRIPWIRE_COMPLETE=bash_source" in result.output
     assert "~/.bashrc" in result.output
 
 
 def test_completion_zsh_prints_install_snippet(runner: CliRunner) -> None:
     result = runner.invoke(cli, ["completion", "zsh"])
     assert result.exit_code == 0, result.output
-    assert "_KEEL_COMPLETE=zsh_source" in result.output
+    assert "_TRIPWIRE_COMPLETE=zsh_source" in result.output
     assert "~/.zshrc" in result.output
 
 
 def test_completion_fish_prints_install_snippet(runner: CliRunner) -> None:
     result = runner.invoke(cli, ["completion", "fish"])
     assert result.exit_code == 0, result.output
-    assert "_KEEL_COMPLETE=fish_source" in result.output
-    assert "~/.config/fish/completions/keel.fish" in result.output
+    assert "_TRIPWIRE_COMPLETE=fish_source" in result.output
+    assert "~/.config/fish/completions/tripwire.fish" in result.output
 
 
 def test_completion_unknown_shell_rejected(runner: CliRunner) -> None:

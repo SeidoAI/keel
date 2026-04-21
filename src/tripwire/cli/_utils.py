@@ -14,7 +14,7 @@ from tripwire.core.store import ProjectNotFoundError, load_project
 
 
 def require_project(project_dir: Path) -> None:
-    """Confirm the directory is a keel project, or raise a ClickException.
+    """Confirm the directory is a tripwire project, or raise a ClickException.
 
     Called at the top of read-only commands that need `project.yaml` to
     exist before they do anything.

@@ -1,4 +1,4 @@
-"""`keel uuid` — generate RFC 4122 UUID4 values.
+"""`tripwire uuid` — generate RFC 4122 UUID4 values.
 
 Outputs real uuid4 values with tracking annotations so agents can
 assign them to entities without hand-crafting fake UUIDs.

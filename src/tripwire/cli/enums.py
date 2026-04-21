@@ -1,4 +1,4 @@
-"""`keel enums list|show` — explore the active enums.
+"""`tripwire enums list|show` — explore the active enums.
 
 Read-only view over whatever `core.enum_loader.load_enums` returns for
 this project. If the project has its own `enums/*.yaml` files, those

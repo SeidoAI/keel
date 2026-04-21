@@ -1,6 +1,6 @@
 """Read/write workspace.yaml.
 
-Follows the same frontmatter-YAML pattern as other keel stores.
+Follows the same frontmatter-YAML pattern as other tripwire stores.
 Registry-mutation functions acquire a lock on the workspace's lock file
 and update atomically.
 """

@@ -197,7 +197,7 @@ def check_node_freshness(
 
     if stored_hash is None:
         # No baseline to compare against — treat as stale and let the agent
-        # rehash via `keel node update --rehash` (or auto-fix in a
+        # rehash via `tripwire node update --rehash` (or auto-fix in a
         # later release).
         return FreshnessResult(
             node_id=node.id,

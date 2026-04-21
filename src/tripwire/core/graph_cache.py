@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Backwards-compatible aliases — prefer importing from `keel.core.paths`.
+# Backwards-compatible aliases — prefer importing from `tripwire.core.paths`.
 INDEX_REL_PATH = paths.GRAPH_CACHE
 LOCK_REL_PATH = paths.GRAPH_LOCK
 CACHE_VERSION = 2

@@ -28,7 +28,7 @@ from tripwire.models.comment import Comment
 from tripwire.models.issue import Issue
 from tripwire.models.project import ProjectConfig
 
-# Backwards-compatible aliases — prefer importing from `keel.core.paths`.
+# Backwards-compatible aliases — prefer importing from `tripwire.core.paths`.
 ISSUES_DIRNAME = paths.ISSUES_DIR
 PROJECT_CONFIG_FILENAME = paths.PROJECT_CONFIG
 COMMENTS_DIRNAME = paths.COMMENTS_SUBDIR
@@ -53,7 +53,7 @@ def load_project(project_dir: Path) -> ProjectConfig:
     path = paths.project_config_path(project_dir)
     if not path.exists():
         raise ProjectNotFoundError(
-            f"project.yaml not found at {path}. Run `keel init` first."
+            f"project.yaml not found at {path}. Run `tripwire init` first."
         )
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(raw, dict):

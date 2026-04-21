@@ -1,4 +1,4 @@
-"""`keel validate` — run the validation gate against a project.
+"""`tripwire validate` — run the validation gate against a project.
 
 Thin CLI wrapper over `core.validator.validate_project`. Exits with the
 report's exit code so shell pipelines and orchestrators can branch on the

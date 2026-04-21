@@ -1,6 +1,6 @@
-"""`keel plan` — preview what init would produce without writing.
+"""`tripwire plan` — preview what init would produce without writing.
 
-Dry-run of ``keel init``: shows the directory tree, file list,
+Dry-run of ``tripwire init``: shows the directory tree, file list,
 sizes, and sources (jinja-rendered vs verbatim copy) that would be
 created. Useful for understanding project structure before committing
 to an init, or for the ``/pm-plan`` slash command to interpret.
@@ -37,12 +37,12 @@ from tripwire.core.planner import preview_init
     help="Output format.",
 )
 def plan_cmd(name: str, key_prefix: str | None, output_format: str) -> None:
-    """Preview what ``keel init`` would create.
+    """Preview what ``tripwire init`` would create.
 
     Shows directories, files, sizes, and sources without writing anything.
     """
     if key_prefix is None:
-        # Use the same extraction as `keel init` so plan and init agree on
+        # Use the same extraction as `tripwire init` so plan and init agree on
         # what prefix they would suggest (including camelCase handling).
         key_prefix = _extract_key_prefix(name) or "KP"
 

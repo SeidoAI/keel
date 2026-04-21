@@ -1,4 +1,4 @@
-"""`keel artifacts list|show` — read session artifacts.
+"""`tripwire artifacts list|show` — read session artifacts.
 
 Session artifacts live at `sessions/<session-id>/artifacts/<file>`. The
 set of required artifacts is declared in `templates/artifacts/manifest.yaml`

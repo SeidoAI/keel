@@ -2,7 +2,7 @@
 
 Enums are not hardcoded — they are YAML files in the project repo at
 `<project>/enums/<name>.yaml`, copied from packaged defaults at
-`templates/enums/` on `keel init`. After init, the project owns its
+`templates/enums/` on `tripwire init`. After init, the project owns its
 enums and can add states, rename labels, recolor for the UI, or remove states
 it doesn't use.
 

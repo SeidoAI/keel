@@ -1,6 +1,6 @@
 """Atomic next-key allocation under a file lock.
 
-Used by `keel next-key` to allocate sequential issue/session keys
+Used by `tripwire next-key` to allocate sequential issue/session keys
 without races between concurrent invocations.
 
 The lock file lives at `<project>/.tripwire.lock` and is acquired via
@@ -20,7 +20,7 @@ from tripwire.core import paths
 from tripwire.core.id_generator import format_key
 from tripwire.core.locks import DEFAULT_LOCK_TIMEOUT_S, LockTimeout, project_lock
 
-# Backwards-compatible alias — prefer `keel.core.paths.PROJECT_LOCK`.
+# Backwards-compatible alias — prefer `tripwire.core.paths.PROJECT_LOCK`.
 LOCK_FILENAME = paths.PROJECT_LOCK
 
 KeyType = Literal["issue", "session"]
@@ -61,7 +61,7 @@ def allocate_keys(
     project_yaml_path = paths.project_config_path(project_dir)
     if not project_yaml_path.exists():
         raise KeyAllocationError(
-            f"project.yaml not found at {project_yaml_path}. Run `keel init` first."
+            f"project.yaml not found at {project_yaml_path}. Run `tripwire init` first."
         )
 
     counter_field = COUNTER_FIELD[key_type]

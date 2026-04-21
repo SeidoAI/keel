@@ -1,6 +1,6 @@
-"""``keel lint`` — stage-aware heuristic checks.
+"""``tripwire lint`` — stage-aware heuristic checks.
 
-Distinct from ``keel validate``: validate is mechanical
+Distinct from ``tripwire validate``: validate is mechanical
 (schema/refs/graph consistency); lint is heuristic (did someone
 actually do the work at each stage).
 
@@ -30,7 +30,7 @@ from tripwire.core.linter import Linter, exit_code_for
 
 @click.group(name="lint")
 def lint_cmd() -> None:
-    """Heuristic checks (distinct from `keel validate`)."""
+    """Heuristic checks (distinct from `tripwire validate`)."""
 
 
 @lint_cmd.command("scoping")

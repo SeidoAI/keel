@@ -1,4 +1,4 @@
-"""`keel agenda` — aggregated view of everything in flight.
+"""`tripwire agenda` — aggregated view of everything in flight.
 
 Reads all issues from the project and renders a unified "what's in
 flight" feed, grouped by a chosen axis (status, executor, priority).

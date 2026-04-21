@@ -1,4 +1,4 @@
-"""`keel session` — read-only operations on agent sessions.
+"""`tripwire session` — read-only operations on agent sessions.
 
 Sessions live at `sessions/<id>/session.yaml`. In v0 agents write session
 files directly; the CLI provides only browsing.
@@ -6,7 +6,7 @@ files directly; the CLI provides only browsing.
 Subcommands:
 - `list` — enumerate all sessions with status and issue counts
 - `show <id>` — print one session's full YAML frontmatter + body
-- `artifacts <id>` — alias for `keel artifacts list <id>`
+- `artifacts <id>` — alias for `tripwire artifacts list <id>`
 """
 
 from __future__ import annotations
@@ -432,7 +432,7 @@ def session_derive_branch_cmd(session_id: str, project_dir: Path) -> None:
         raise click.ClickException(str(exc)) from exc
 
 
-# Alias `keel session artifacts <id>` to the existing `keel artifacts list <id>`.
+# Alias `tripwire session artifacts <id>` to the existing `tripwire artifacts list <id>`.
 # Exposes session-related commands in one place instead of making users
 # remember that artifact browsing sits under a separate top-level command.
 session_cmd.add_command(artifacts_list, name="artifacts")

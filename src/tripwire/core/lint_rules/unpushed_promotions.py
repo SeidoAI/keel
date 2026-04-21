@@ -35,11 +35,11 @@ def _check(ctx):
     has_ws = _has_linked_workspace(ctx)
     severity = "warning" if has_ws else "info"
     fix_hint = (
-        "Run /pm-project-sync or `keel workspace promote <id>` to push, "
+        "Run /pm-project-sync or `tripwire workspace promote <id>` to push, "
         "or mark scope=local to drop the candidacy."
         if has_ws
         else "Project isn't linked to a workspace. Link via "
-        "`keel workspace link <path>` or mark scope=local."
+        "`tripwire workspace link <path>` or mark scope=local."
     )
     for n in list_nodes(ctx.project_dir):
         origin = getattr(n, "origin", "local")

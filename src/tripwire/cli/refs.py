@@ -1,4 +1,4 @@
-"""`keel refs` — reference inspection.
+"""`tripwire refs` — reference inspection.
 
 Three subcommands, all read-only:
 - `refs list <issue-key>` — show every `[[reference]]` in this issue with

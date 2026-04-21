@@ -3,8 +3,8 @@
 `project_lock` is a context manager that acquires an exclusive `fcntl.flock`
 on a lock file inside the project directory. Used by:
 
-- `keel.core.key_allocator` to atomically increment issue/session counters
-- `keel.core.validator.apply_fixes` to serialise concurrent --fix calls
+- `tripwire.core.key_allocator` to atomically increment issue/session counters
+- `tripwire.core.validator.apply_fixes` to serialise concurrent --fix calls
 
 The polling loop with `LOCK_EX | LOCK_NB` exists because we need a timeout
 (blocking flock has none). Acquisition is short — read a number, increment,
@@ -74,7 +74,7 @@ def project_lock(
             age = 0.0
         if age > STALE_LOCK_AGE_S:
             logger.warning(
-                "Lock file %s is %.0fs old — previous keel process likely "
+                "Lock file %s is %.0fs old — previous tripwire process likely "
                 "exited without touching it (advisory lock is released on "
                 "process exit; proceeding).",
                 lock_path,
@@ -93,7 +93,7 @@ def project_lock(
                 if time.monotonic() >= deadline:
                     raise LockTimeout(
                         f"Could not acquire lock {lock_path} within "
-                        f"{timeout_s}s. Another keel process may be "
+                        f"{timeout_s}s. Another tripwire process may be "
                         f"holding it."
                     ) from None
                 time.sleep(LOCK_POLL_INTERVAL_S)

@@ -9,7 +9,7 @@ directory contains:
 - `comments/` — session-level messages
 
 This module handles only the YAML file. Artifacts, plans, and comments
-are accessed via their own path helpers in `keel.core.paths`.
+are accessed via their own path helpers in `tripwire.core.paths`.
 
 The directory layout is enforced here: `list_sessions` only finds
 sessions that have `session.yaml` in their directory. A flat

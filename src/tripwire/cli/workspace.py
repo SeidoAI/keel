@@ -1,4 +1,4 @@
-"""`keel workspace` command group (v0.6b).
+"""`tripwire workspace` command group (v0.6b).
 
 Subcommands:
 - init                         — bootstrap a new workspace
@@ -94,7 +94,7 @@ def workspace_init_cmd(
         subprocess.run(["git", "init", "-q"], cwd=resolved, check=True)
 
     click.echo(f"✓ Workspace '{name}' initialized at {resolved}")
-    click.echo("  Next: from a project, `keel workspace link <path-to-workspace>`")
+    click.echo("  Next: from a project, `tripwire workspace link <path-to-workspace>`")
 
 
 # ============================================================================
@@ -127,7 +127,7 @@ def workspace_link_cmd(workspace_path: Path, project_dir: Path, slug: str) -> No
     if cfg.workspace is not None:
         raise click.ClickException(
             f"project is already linked to workspace at "
-            f"{cfg.workspace.path}; run `keel workspace unlink` first"
+            f"{cfg.workspace.path}; run `tripwire workspace unlink` first"
         )
 
     # Write relative paths from each side.
@@ -276,7 +276,7 @@ def workspace_list_cmd(workspace_dir: Path, output_format: str) -> None:
         click.echo(f"  {mark} {r.slug:12s} {r.name:20s} {r.path}{status}")
     orphans = sum(1 for r in rows if not r.path_exists)
     if orphans:
-        click.echo(f"\n{orphans} orphan — run `keel workspace prune --force`")
+        click.echo(f"\n{orphans} orphan — run `tripwire workspace prune --force`")
 
 
 @workspace_cmd.command("status")
@@ -755,7 +755,7 @@ def workspace_pull_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> N
     for node_id, _ in conflicts:
         click.echo(f"  → .tripwire/merge-briefs/{node_id}.yaml")
     click.echo(
-        "\nRun /pm-project-sync (or `keel workspace merge-resolve <id>` per "
+        "\nRun /pm-project-sync (or `tripwire workspace merge-resolve <id>` per "
         "brief) to proceed."
     )
     raise click.exceptions.Exit(EXIT_PULL_MERGES_PENDING)
@@ -846,7 +846,7 @@ def workspace_push_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> N
         for n in diverged:
             click.echo(f"  - {n}")
         click.echo(
-            "\nRun `keel workspace pull` first to merge upstream changes, then push."
+            "\nRun `tripwire workspace pull` first to merge upstream changes, then push."
         )
         raise click.exceptions.Exit(EXIT_PUSH_UPSTREAM_DIVERGED)
 
@@ -929,9 +929,9 @@ def _apply_pushes(
         [
             "git",
             "-c",
-            "user.name=keel",
+            "user.name=tripwire",
             "-c",
-            "user.email=keel@seido.dev",
+            "user.email=tripwire@seido.dev",
             "commit",
             "-q",
             "-m",
@@ -1067,7 +1067,7 @@ def workspace_promote_cmd(ctx: click.Context, node_id: str, project_dir: Path) -
     if node.origin != "local":
         raise click.ClickException(
             f"node '{node_id}' is already origin=workspace; promote only "
-            "applies to local-origin nodes. Use `keel workspace push` to "
+            "applies to local-origin nodes. Use `tripwire workspace push` to "
             "send pending changes upstream."
         )
 

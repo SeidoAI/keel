@@ -18,7 +18,7 @@ from tripwire.core.parser import (
 )
 from tripwire.models.node import ConceptNode
 
-# Backwards-compatible alias — prefer importing from `keel.core.paths`.
+# Backwards-compatible alias — prefer importing from `tripwire.core.paths`.
 NODES_DIRNAME = paths.NODES_DIR
 
 

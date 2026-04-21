@@ -1,6 +1,6 @@
-"""Dry-run preview of what ``keel init`` would produce.
+"""Dry-run preview of what ``tripwire init`` would produce.
 
-Used by ``keel plan`` to show the directory tree, file list, and
+Used by ``tripwire plan`` to show the directory tree, file list, and
 template contents without writing anything to disk.
 """
 
@@ -62,7 +62,7 @@ def preview_init(
     base_branch: str = "main",
     description: str = "",
 ) -> PlanPreview:
-    """Compute what ``keel init`` would create without writing anything."""
+    """Compute what ``tripwire init`` would create without writing anything."""
     templates_dir = get_templates_dir()
     preview = PlanPreview(target_name=project_name)
 

@@ -31,8 +31,8 @@ class TestGracefulDegradation:
         ):
             result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 1
-        assert "full keel install" in result.output
-        assert "pip install keel" in result.output
+        assert "full tripwire install" in result.output
+        assert "pip install tripwire" in result.output
 
     def test_missing_uvicorn_prints_helpful_message(self):
         with patch(
@@ -41,7 +41,7 @@ class TestGracefulDegradation:
         ):
             result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 1
-        assert "full keel install" in result.output
+        assert "full tripwire install" in result.output
 
 
 class TestNoProjects:
@@ -53,7 +53,7 @@ class TestNoProjects:
             result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 1
         assert "No projects found" in result.output
-        assert "keel init" in result.output
+        assert "tripwire init" in result.output
 
 
 class TestStubBehaviour:

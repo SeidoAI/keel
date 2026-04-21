@@ -1,4 +1,4 @@
-"""`keel templates list|show` — explore the project's templates.
+"""`tripwire templates list|show` — explore the project's templates.
 
 Read-only helper for exploring the template tree the project owns. The
 source of truth is whatever files live under the template directories
@@ -100,7 +100,7 @@ def templates_show(name: str, project_dir: Path) -> None:
     if not matches:
         raise click.ClickException(
             f"No template matching {name!r} found in the project. "
-            f"Run `keel templates list` to see what's available."
+            f"Run `tripwire templates list` to see what's available."
         )
     if len(matches) > 1:
         options = ", ".join(p for p, _ in matches)

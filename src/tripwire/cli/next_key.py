@@ -1,4 +1,4 @@
-"""`keel next-key` — atomic sequential key allocation.
+"""`tripwire next-key` — atomic sequential key allocation.
 
 Thin CLI wrapper around `core.key_allocator.allocate_keys`. The atomicity
 guarantee (file lock on `project.yaml`) lives in the allocator; this
@@ -56,9 +56,9 @@ def next_key_cmd(project_dir: Path, key_type: str, count: int) -> None:
 
     \b
     Examples:
-        keel next-key              # → TST-42
-        keel next-key --count 3    # → TST-43\\nTST-44\\nTST-45
-        keel next-key --type session
+        tripwire next-key              # → TST-42
+        tripwire next-key --count 3    # → TST-43\\nTST-44\\nTST-45
+        tripwire next-key --type session
     """
     try:
         keys = allocate_keys(

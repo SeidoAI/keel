@@ -1,4 +1,4 @@
-"""`keel init` — create a new project from the packaged templates.
+"""`tripwire init` — create a new project from the packaged templates.
 
 The command is interactive by default: any required option that wasn't
 passed as a flag gets a prompt. Use `--non-interactive` to fail fast if any
@@ -551,7 +551,7 @@ def _git_head_short(repo_dir: Path) -> str:
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
     default=None,
     help=(
-        "Path to a keel workspace to link this project to (v0.6b). "
+        "Path to a tripwire workspace to link this project to (v0.6b). "
         "After init, the project.yaml gains a workspace pointer and the "
         "workspace.yaml gains a project entry."
     ),
@@ -577,7 +577,7 @@ def init_cmd(
     workspace_path: Path | None,
     copy_nodes: str | None,
 ) -> None:
-    """Initialise a new keel in TARGET (or the current directory).
+    """Initialise a new tripwire in TARGET (or the current directory).
 
     Interactive by default — any missing required option is prompted. Pass
     --non-interactive to fail fast when flags are missing (for scripts).
@@ -664,12 +664,12 @@ def init_cmd(
 
     console.print(
         Panel.fit(
-            f"[bold]Creating keel at[/bold] {target_dir}\n"
+            f"[bold]Creating tripwire at[/bold] {target_dir}\n"
             f"name: {name}\n"
             f"key prefix: {key_prefix}\n"
             f"base branch: {base_branch}\n"
             f"repos: {', '.join(repos_list) if repos_list else '(none)'}",
-            title="keel init",
+            title="tripwire init",
             border_style="cyan",
         )
     )

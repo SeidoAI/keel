@@ -1,4 +1,4 @@
-"""`keel node check` — concept node freshness check.
+"""`tripwire node check` — concept node freshness check.
 
 The only `node` subcommand in v0 is `check`, which compares each active
 node's stored `content_hash` against the live content on disk (local clone)

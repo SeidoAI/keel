@@ -3,7 +3,7 @@
 A merge brief is a structured YAML file written to
 ``<project>/.tripwire/merge-briefs/<node-id>.yaml`` when a 3-way merge
 surfaces non-trivial conflicts. The PM agent reads the brief, edits
-the node file to a resolved form, and runs ``keel workspace
+the node file to a resolved form, and runs ``tripwire workspace
 merge-resolve`` to finalize.
 
 Bookkeeping fields (uuid, created_at, updated_at, origin, scope,

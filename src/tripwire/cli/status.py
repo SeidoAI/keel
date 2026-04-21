@@ -1,4 +1,4 @@
-"""`keel status` — dashboard summary of a project.
+"""`tripwire status` — dashboard summary of a project.
 
 Prints issue counts by status/executor/priority, blocked issues, stale
 references (from the graph cache), and the critical path through the

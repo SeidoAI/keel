@@ -1,7 +1,7 @@
-"""`keel ui` — start the Keel dashboard.
+"""`tripwire ui` — start the Tripwire dashboard.
 
 Heavy imports (FastAPI, uvicorn) happen inside the command body so that
-``keel --help`` works even on a minimal ``keel[projects]`` install.
+``tripwire --help`` works even on a minimal ``tripwire[projects]`` install.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def ui_cmd(
     no_browser: bool,
     dev: bool,
 ) -> None:
-    """Start the Keel dashboard (localhost only)."""
+    """Start the Tripwire dashboard (localhost only)."""
     # 1. Import check — graceful degradation on minimal installs.
     try:
         from tripwire.ui.server import start_server  # noqa: F401
@@ -53,10 +53,10 @@ def ui_cmd(
         missing = getattr(exc, "name", "") or ""
         if any(mod in missing for mod in _UI_MODULES):
             click.echo(
-                "The UI requires the full keel install.\n"
+                "The UI requires the full tripwire install.\n"
                 "Run:\n"
-                "  pip install keel\n"
-                "(You appear to have keel[projects] "
+                "  pip install tripwire\n"
+                "(You appear to have tripwire[projects] "
                 "— a minimal install without web deps.)"
             )
             sys.exit(1)
@@ -77,7 +77,7 @@ def ui_cmd(
         if not projects:
             click.echo(
                 "No projects found.\n"
-                "Hint: run `keel init` in a project directory, or add paths\n"
+                "Hint: run `tripwire init` in a project directory, or add paths\n"
                 "to ~/.tripwire/config.yaml under `project_roots`."
             )
             sys.exit(1)
@@ -85,6 +85,6 @@ def ui_cmd(
 
     # 4. Server stub — not yet implemented (lands in KUI-9).
     click.echo(
-        f"keel ui: found {len(project_dirs)} project(s). "
+        f"tripwire ui: found {len(project_dirs)} project(s). "
         "Backend server not yet implemented."
     )

@@ -1,4 +1,4 @@
-"""`keel brief` — front-load the agent's context.
+"""`tripwire brief` — front-load the agent's context.
 
 This is the single command an agent runs FIRST when starting a session.
 It dumps everything the agent needs to know about the project — config,
@@ -287,7 +287,7 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
         phase=project.phase.value,
         node_ids=node_ids,
         validation_gate={
-            "command": "keel validate --strict",
+            "command": "tripwire validate --strict",
             "exit_codes": {
                 "0": "clean",
                 "1": "warnings only",
@@ -296,8 +296,8 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
             "side_effect": "rebuilds graph/index.yaml",
         },
         id_allocation={
-            "sequential_keys": "keel next-key --type issue --count N",
-            "uuids": "keel uuid --count N",
+            "sequential_keys": "tripwire next-key --type issue --count N",
+            "uuids": "tripwire uuid --count N",
             "rules": [
                 "Do NOT hand-write UUIDs — validator checks RFC 4122",
                 "Do NOT manually increment project.yaml.next_issue_number",
@@ -509,6 +509,6 @@ def brief_cmd(project_dir: Path, output_format: str) -> None:
 def scaffold_cmd(project_dir: Path, output_format: str) -> None:
     """Hidden alias for `brief` — kept for backward compatibility.
 
-    New code and documentation should use `keel brief`.
+    New code and documentation should use `tripwire brief`.
     """
     _scaffold_impl(project_dir, output_format)

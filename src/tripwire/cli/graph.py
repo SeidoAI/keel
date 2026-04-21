@@ -1,4 +1,4 @@
-"""`keel graph` — render the dependency or concept graph.
+"""`tripwire graph` — render the dependency or concept graph.
 
 Thin CLI wrapper over `core.dependency_graph` and `core.concept_graph`.
 Reads from the cache (`graph/index.yaml`) when available, falls back to

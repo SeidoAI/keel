@@ -46,7 +46,7 @@ def _check(ctx):
             ),
             file=f"sessions/{ctx.session_id}/handoff.yaml",
             fix_hint=(
-                "Run `keel session derive-branch <session-id>` and use "
+                "Run `tripwire session derive-branch <session-id>` and use "
                 "its output verbatim."
             ),
         )

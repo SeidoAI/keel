@@ -1,4 +1,4 @@
-"""`keel refresh` — rebuild the graph cache from the filesystem.
+"""`tripwire refresh` — rebuild the graph cache from the filesystem.
 
 Exposes `graph_cache.ensure_fresh` as a public command for debugging,
 manual invocation, and agent workflows that want an explicit cache
@@ -32,7 +32,7 @@ def refresh_cmd(ctx: click.Context, project_dir: Path) -> None:
 
     If you suspect the cache is wrong (e.g. after a hand-edit you didn't
     save through the CLI), delete `graph/index.yaml` and run
-    `keel validate` — that forces a full rebuild from scratch.
+    `tripwire validate` — that forces a full rebuild from scratch.
     """
     resolved = project_dir.expanduser().resolve()
     rebuilt = ensure_fresh(resolved)

@@ -1,4 +1,4 @@
-"""Click root group for `keel`.
+"""Click root group for `tripwire`.
 
 Registers every v0 subcommand. The root group does nothing on its own —
 all work happens inside the commands.
@@ -68,7 +68,7 @@ def _configure_logging(verbose: int) -> None:
     count=True,
     help="Increase logging verbosity. -v for INFO, -vv for DEBUG.",
 )
-@click.version_option(version=__version__, prog_name="keel")
+@click.version_option(version=__version__, prog_name="tripwire")
 @click.pass_context
 def cli(ctx: click.Context, verbose: int) -> None:
     """Root command group. Does nothing on its own — see subcommands."""
