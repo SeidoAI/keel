@@ -38,9 +38,7 @@ def issue_artifact_cmd() -> None:
 
 @issue_artifact_cmd.command("list")
 @click.argument("issue_key")
-@click.option(
-    "--project-dir", type=click.Path(path_type=Path), default="."
-)
+@click.option("--project-dir", type=click.Path(path_type=Path), default=".")
 @click.option(
     "--format",
     "output_format",
@@ -102,9 +100,7 @@ def issue_artifact_list_cmd(
 @issue_artifact_cmd.command("init")
 @click.argument("issue_key")
 @click.argument("artifact_name")
-@click.option(
-    "--project-dir", type=click.Path(path_type=Path), default="."
-)
+@click.option("--project-dir", type=click.Path(path_type=Path), default=".")
 @click.option(
     "--force",
     is_flag=True,
@@ -133,9 +129,7 @@ def issue_artifact_init_cmd(
         raise click.ClickException(str(exc)) from exc
 
     manifest = load_issue_artifact_manifest(resolved)
-    entry = next(
-        (e for e in manifest.artifacts if e.name == artifact_name), None
-    )
+    entry = next((e for e in manifest.artifacts if e.name == artifact_name), None)
     if entry is None:
         available = ", ".join(e.name for e in manifest.artifacts)
         raise click.ClickException(
@@ -150,9 +144,7 @@ def issue_artifact_init_cmd(
 
     import tripwire
 
-    template_root = (
-        Path(tripwire.__file__).parent / "templates" / "issue_artifacts"
-    )
+    template_root = Path(tripwire.__file__).parent / "templates" / "issue_artifacts"
     env = Environment(
         loader=FileSystemLoader(str(template_root)),
         keep_trailing_newline=True,
@@ -171,9 +163,7 @@ def issue_artifact_init_cmd(
 
 @issue_artifact_cmd.command("verify")
 @click.argument("issue_key")
-@click.option(
-    "--project-dir", type=click.Path(path_type=Path), default="."
-)
+@click.option("--project-dir", type=click.Path(path_type=Path), default=".")
 def issue_artifact_verify_cmd(issue_key: str, project_dir: Path) -> None:
     """Exit-1 if any required artifact for this issue is missing."""
     resolved = project_dir.expanduser().resolve()
@@ -190,9 +180,7 @@ def issue_artifact_verify_cmd(issue_key: str, project_dir: Path) -> None:
     for entry in manifest.artifacts:
         if not entry.required:
             continue
-        if not status_at_or_past(
-            issue.status, entry.required_at_status, resolved
-        ):
+        if not status_at_or_past(issue.status, entry.required_at_status, resolved):
             continue
         file_path = paths.issue_dir(resolved, issue_key) / entry.file
         if not file_path.is_file():

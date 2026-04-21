@@ -2195,9 +2195,7 @@ def check_issue_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
                 issue.status, entry.required_at_status, ctx.project_dir
             ):
                 continue
-            artifact_path = (
-                ctx.project_dir / "issues" / issue.id / entry.file
-            )
+            artifact_path = ctx.project_dir / "issues" / issue.id / entry.file
             if artifact_path.is_file():
                 continue
             results.append(
@@ -2211,8 +2209,7 @@ def check_issue_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
                         f"required artifact {entry.file!r}."
                     ),
                     fix_hint=(
-                        f"Write issues/{issue.id}/{entry.file} from "
-                        f"{entry.template}."
+                        f"Write issues/{issue.id}/{entry.file} from {entry.template}."
                     ),
                 )
             )

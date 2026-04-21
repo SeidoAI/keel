@@ -9,9 +9,7 @@ from tripwire.core.insights_store import load_insights, save_insights
 from tripwire.models.insights import InsightsFile, NodeProposal
 
 
-def test_insights_list_prints_proposals(
-    tmp_path_project: Path, save_test_session
-):
+def test_insights_list_prints_proposals(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1")
     save_insights(
         tmp_path_project,
@@ -49,9 +47,7 @@ def test_insights_list_empty(tmp_path_project: Path, save_test_session):
     assert "No insight proposals" in result.output
 
 
-def test_insights_apply_new_node_writes_file(
-    tmp_path_project: Path, save_test_session
-):
+def test_insights_apply_new_node_writes_file(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1")
     save_insights(
         tmp_path_project,
@@ -137,9 +133,7 @@ def test_insights_apply_update_node_appends_delta(
     assert "## Updated" in node_text
 
 
-def test_insights_reject_records_rejection(
-    tmp_path_project: Path, save_test_session
-):
+def test_insights_reject_records_rejection(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1")
     save_insights(
         tmp_path_project,
@@ -184,9 +178,7 @@ def test_insights_reject_records_rejection(
     assert "meh-node" in rej_path.read_text(encoding="utf-8")
 
 
-def test_insights_apply_unknown_proposal(
-    tmp_path_project: Path, save_test_session
-):
+def test_insights_apply_unknown_proposal(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1")
     runner = CliRunner()
     result = runner.invoke(

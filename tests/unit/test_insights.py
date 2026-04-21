@@ -80,9 +80,7 @@ def test_insights_file_roundtrip(tmp_path_project: Path, save_test_session):
     assert loaded.proposals[0].related == ["database"]
 
 
-def test_load_insights_missing_returns_empty(
-    tmp_path_project: Path, save_test_session
-):
+def test_load_insights_missing_returns_empty(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1")
     loaded = load_insights(tmp_path_project, "s1")
     assert loaded.proposals == []

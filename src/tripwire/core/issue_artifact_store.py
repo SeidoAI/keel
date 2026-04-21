@@ -19,7 +19,6 @@ import yaml
 from tripwire.core.enum_loader import load_enum
 from tripwire.models.issue_artifacts import IssueArtifactEntry, IssueArtifactManifest
 
-
 _DEFAULT_STATUS_ORDER: list[str] = [
     "backlog",
     "todo",
@@ -56,12 +55,8 @@ def _load_project_overrides(project_dir: Path) -> list[dict]:
 
 def load_issue_artifact_manifest(project_dir: Path) -> IssueArtifactManifest:
     """Load shipped manifest, merge project overrides, validate enum values."""
-    shipped = yaml.safe_load(
-        _shipped_manifest_path().read_text(encoding="utf-8")
-    ) or {}
-    by_name: dict[str, dict] = {
-        a["name"]: a for a in (shipped.get("artifacts") or [])
-    }
+    shipped = yaml.safe_load(_shipped_manifest_path().read_text(encoding="utf-8")) or {}
+    by_name: dict[str, dict] = {a["name"]: a for a in (shipped.get("artifacts") or [])}
     for override in _load_project_overrides(project_dir):
         if not isinstance(override, dict) or "name" not in override:
             continue

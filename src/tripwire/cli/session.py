@@ -929,9 +929,7 @@ def session_insights_cmd() -> None:
 
 @session_insights_cmd.command("list")
 @click.argument("session_id")
-@click.option(
-    "--project-dir", type=click.Path(path_type=Path), default="."
-)
+@click.option("--project-dir", type=click.Path(path_type=Path), default=".")
 @click.option(
     "--format",
     "output_format",
@@ -975,9 +973,7 @@ def session_insights_list_cmd(
     required=True,
     help="The proposal id to apply",
 )
-@click.option(
-    "--project-dir", type=click.Path(path_type=Path), default="."
-)
+@click.option("--project-dir", type=click.Path(path_type=Path), default=".")
 def session_insights_apply_cmd(
     session_id: str, proposal_id: str, project_dir: Path
 ) -> None:
@@ -993,9 +989,7 @@ def session_insights_apply_cmd(
     _require_project(resolved)
     insights = load_insights(resolved, session_id)
 
-    proposal = next(
-        (p for p in insights.proposals if p.id == proposal_id), None
-    )
+    proposal = next((p for p in insights.proposals if p.id == proposal_id), None)
     if proposal is None:
         raise click.ClickException(f"Unknown proposal id {proposal_id!r}")
 
@@ -1041,9 +1035,7 @@ def session_insights_apply_cmd(
 @click.argument("session_id")
 @click.option("--proposal", "proposal_id", required=True)
 @click.option("--reason", default="", help="Why rejected (for audit)")
-@click.option(
-    "--project-dir", type=click.Path(path_type=Path), default="."
-)
+@click.option("--project-dir", type=click.Path(path_type=Path), default=".")
 def session_insights_reject_cmd(
     session_id: str, proposal_id: str, reason: str, project_dir: Path
 ) -> None:
@@ -1058,9 +1050,7 @@ def session_insights_reject_cmd(
     _require_project(resolved)
     insights = load_insights(resolved, session_id)
 
-    proposal = next(
-        (p for p in insights.proposals if p.id == proposal_id), None
-    )
+    proposal = next((p for p in insights.proposals if p.id == proposal_id), None)
     if proposal is None:
         raise click.ClickException(f"Unknown proposal id {proposal_id!r}")
 

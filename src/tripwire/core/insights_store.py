@@ -33,9 +33,7 @@ def load_insights(project_dir: Path, session_id: str) -> InsightsFile:
     return InsightsFile.model_validate(data)
 
 
-def save_insights(
-    project_dir: Path, session_id: str, file: InsightsFile
-) -> None:
+def save_insights(project_dir: Path, session_id: str, file: InsightsFile) -> None:
     """Write `insights.yaml`. Parent directory is created if missing."""
     p = insights_path(project_dir, session_id)
     p.parent.mkdir(parents=True, exist_ok=True)

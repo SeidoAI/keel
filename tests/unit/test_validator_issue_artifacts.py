@@ -39,9 +39,7 @@ def test_issue_at_verified_missing_verified_errors(
     assert missing, "expected issue_artifact/missing for verified.md"
 
 
-def test_issue_at_todo_no_artifacts_required(
-    tmp_path_project: Path, save_test_issue
-):
+def test_issue_at_todo_no_artifacts_required(tmp_path_project: Path, save_test_issue):
     save_test_issue(tmp_path_project, "TMP-1", status="todo")
     report = validate_project(tmp_path_project)
     codes = [f.code for f in report.findings]
@@ -70,9 +68,7 @@ def test_issue_at_done_requires_both(tmp_path_project: Path, save_test_issue):
     save_test_issue(tmp_path_project, "TMP-1", status="done")
     report = validate_project(tmp_path_project)
     messages = [
-        f.message
-        for f in report.findings
-        if f.code == "issue_artifact/missing"
+        f.message for f in report.findings if f.code == "issue_artifact/missing"
     ]
     assert any("developer.md" in m for m in messages)
     assert any("verified.md" in m for m in messages)
