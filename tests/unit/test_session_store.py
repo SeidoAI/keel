@@ -136,65 +136,7 @@ class TestDelete:
         delete_session(project_dir, "never-existed")
 
 
-# -------- T2: merge_policy, commit_on_complete, pr_urls --------
-
-
-def test_session_merge_policy_defaults_await_review(
-    tmp_path_project, save_test_session
-):
-    save_test_session(tmp_path_project, "s1", status="planned")
-    session = load_session(tmp_path_project, "s1")
-    assert session.merge_policy == "await_review"
-    assert session.commit_on_complete == "auto"
-
-
-def test_session_merge_policy_rejects_unknown_value(
-    tmp_path_project, save_test_session
-):
-    from pydantic import ValidationError
-
-    with pytest.raises(ValidationError):
-        save_test_session(
-            tmp_path_project,
-            "s1",
-            status="planned",
-            merge_policy="force_merge",
-        )
-
-
-def test_session_commit_on_complete_manual(tmp_path_project, save_test_session):
-    save_test_session(
-        tmp_path_project,
-        "s1",
-        status="planned",
-        commit_on_complete="manual",
-    )
-    session = load_session(tmp_path_project, "s1")
-    assert session.commit_on_complete == "manual"
-
-
-def test_engagement_pr_urls_roundtrip(tmp_path_project, save_test_session):
-    """EngagementEntry gains a pr_urls list for PR persistence."""
-    from datetime import datetime, timezone
-
-    from tripwire.models.session import EngagementEntry
-
-    save_test_session(tmp_path_project, "s1", status="planned")
-    session = load_session(tmp_path_project, "s1")
-    session.engagements.append(
-        EngagementEntry(
-            started_at=datetime.now(tz=timezone.utc),
-            trigger="initial_launch",
-            pr_urls=["https://github.com/a/b/pull/1", "https://github.com/c/d/pull/2"],
-        )
-    )
-
-    save_session(tmp_path_project, session)
-    reloaded = load_session(tmp_path_project, "s1")
-    assert reloaded.engagements[0].pr_urls == [
-        "https://github.com/a/b/pull/1",
-        "https://github.com/c/d/pull/2",
-    ]
+# -------- runtime_state extensions --------
 
 
 def test_runtime_state_tmux_session_name(tmp_path_project, save_test_session):

@@ -12,7 +12,7 @@ re-engagements of the same container). It carries:
 
 import uuid as _uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -61,6 +61,7 @@ class RuntimeState(BaseModel):
     tmux_session_name: str | None = None
     started_at: datetime | str | None = None
     log_path: str | None = None
+    skills_hash: str | None = None        # sentinel for copy_skills idempotency
 
 
 class SessionOrchestration(BaseModel):
@@ -103,7 +104,6 @@ class EngagementEntry(BaseModel):
     context: str | None = None
     ended_at: datetime | None = None
     outcome: str | None = None
-    pr_urls: list[str] = Field(default_factory=list)
 
 
 class SpawnConfig(BaseModel):
@@ -168,13 +168,6 @@ class AgentSession(BaseModel):
     spawn_config: SpawnConfig | None = None
 
     runtime_state: RuntimeState = Field(default_factory=RuntimeState)
-
-    merge_policy: Literal[
-        "await_review",
-        "auto_merge_on_green",
-        "auto_merge_immediate",
-    ] = "await_review"
-    commit_on_complete: Literal["auto", "manual"] = "auto"
 
     engagements: list[EngagementEntry] = Field(default_factory=list)
 
