@@ -25,7 +25,7 @@ non-empty feedback string.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -153,7 +153,9 @@ def _resolve_artifact_file(project_dir: Path, session_id: str, file: str) -> Pat
     return artifacts_candidate
 
 
-def _load_sidecar(project_dir: Path, session_id: str, name: str) -> ApprovalSidecar | None:
+def _load_sidecar(
+    project_dir: Path, session_id: str, name: str
+) -> ApprovalSidecar | None:
     path = _sidecar_path(project_dir, session_id, name)
     if not path.is_file():
         return None
@@ -219,9 +221,7 @@ def get_manifest(project_dir: Path) -> ArtifactManifest:
     return ArtifactManifest(artifacts=[_spec_from_entry(e) for e in core.artifacts])
 
 
-def list_session_artifacts(
-    project_dir: Path, session_id: str
-) -> list[ArtifactStatus]:
+def list_session_artifacts(project_dir: Path, session_id: str) -> list[ArtifactStatus]:
     """Return one :class:`ArtifactStatus` per manifest entry.
 
     Present artifacts carry ``size_bytes`` + ``last_modified``; missing
@@ -245,7 +245,7 @@ def list_session_artifacts(
             stat = abs_path.stat()
             present = True
             size_bytes = stat.st_size
-            last_modified = datetime.fromtimestamp(stat.st_mtime)
+            last_modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
         else:
             present = False
             size_bytes = None
@@ -282,11 +282,9 @@ def get_session_artifact(
 
     abs_path = _resolve_artifact_file(project_dir, session_id, spec.file)
     if not abs_path.is_file():
-        raise FileNotFoundError(
-            f"Artifact file not found for {name!r}: {abs_path}"
-        )
+        raise FileNotFoundError(f"Artifact file not found for {name!r}: {abs_path}")
     body = abs_path.read_text(encoding="utf-8")
-    mtime = datetime.fromtimestamp(abs_path.stat().st_mtime)
+    mtime = datetime.fromtimestamp(abs_path.stat().st_mtime, tz=timezone.utc)
     try:
         rel = str(abs_path.relative_to(project_dir))
     except ValueError:
@@ -305,7 +303,7 @@ def _write_sidecar(
     sidecar = ApprovalSidecar(
         approved=approved,
         reviewer="user",
-        reviewed_at=datetime.now(),
+        reviewed_at=datetime.now(tz=timezone.utc),
         feedback=feedback,
     )
     path = _sidecar_path(project_dir, session_id, name)
@@ -388,9 +386,7 @@ def reject_artifact(
     return _fresh_status(project_dir, session_id, name)
 
 
-def _fresh_status(
-    project_dir: Path, session_id: str, name: str
-) -> ArtifactStatus:
+def _fresh_status(project_dir: Path, session_id: str, name: str) -> ArtifactStatus:
     """Rebuild a single ArtifactStatus after a sidecar write.
 
     We rerun the full :func:`list_session_artifacts` and pick out the

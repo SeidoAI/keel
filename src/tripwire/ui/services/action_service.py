@@ -25,17 +25,20 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from tripwire.core import graph_cache
+from tripwire.core import graph_cache, paths
 from tripwire.core.locks import project_lock
-from tripwire.core.session_store import load_session, save_session
-from tripwire.core.store import load_project, save_project
+from tripwire.core.parser import serialize_frontmatter_body
+from tripwire.core.session_store import load_session
+from tripwire.core.store import load_project
 from tripwire.core.validator import ValidationReport, validate_project
-from tripwire.models.project import ProjectPhase
+from tripwire.models.project import ProjectConfig, ProjectPhase
+from tripwire.models.session import AgentSession
+from tripwire.ui.services._atomic_write import atomic_write_text, atomic_write_yaml
 from tripwire.ui.services._audit import write_audit_entry
 
 logger = logging.getLogger("tripwire.ui.services.action_service")
@@ -97,8 +100,9 @@ def validate_all(project_dir: Path, *, strict: bool = True) -> ValidationReport:
     ``validate_project`` runs synchronously and is CPU/IO-bound; the
     route offloads to ``asyncio.to_thread`` so the event loop stays free.
     """
-    logger.info("action_service.validate_all: project_dir=%s strict=%s",
-                project_dir, strict)
+    logger.info(
+        "action_service.validate_all: project_dir=%s strict=%s", project_dir, strict
+    )
     return validate_project(project_dir, strict=strict)
 
 
@@ -123,13 +127,42 @@ def rebuild_index(project_dir: Path) -> RebuildResult:
     )
     logger.info(
         "action_service.rebuild_index: rebuilt=%s duration_ms=%d",
-        rebuilt, duration_ms,
+        rebuilt,
+        duration_ms,
     )
     return RebuildResult(cache_rebuilt=rebuilt, duration_ms=duration_ms)
 
 
 def _is_valid_phase(phase: str) -> bool:
     return phase in {p.value for p in ProjectPhase}
+
+
+def _atomic_save_project(project_dir: Path, config: ProjectConfig) -> None:
+    """Atomic replacement for :func:`tripwire.core.store.save_project`.
+
+    The core helper writes ``project.yaml`` via plain ``path.write_text``,
+    which the file watcher can observe mid-write as a torn read. Every
+    service-layer write of ``project.yaml`` routes through this helper
+    so the watcher sees either the old file or the complete new one.
+    """
+    path = paths.project_config_path(project_dir)
+    data = config.model_dump(mode="json", exclude_none=True)
+    atomic_write_yaml(path, data)
+
+
+def _atomic_save_session(project_dir: Path, session: AgentSession) -> None:
+    """Atomic replacement for :func:`tripwire.core.session_store.save_session`.
+
+    Same motivation as :func:`_atomic_save_project` — routes the existing
+    frontmatter+body serialisation through a tmp-file + ``os.replace``
+    so the watcher never observes a torn ``session.yaml``.
+    """
+    if session.updated_at is None:
+        session.updated_at = datetime.now(tz=timezone.utc)
+    path = paths.session_yaml_path(project_dir, session.id)
+    data = session.model_dump(mode="json", exclude={"body"}, exclude_none=True)
+    text = serialize_frontmatter_body(data, session.body)
+    atomic_write_text(path, text)
 
 
 def advance_phase(project_dir: Path, new_phase: str) -> PhaseResult:
@@ -174,22 +207,22 @@ def advance_phase(project_dir: Path, new_phase: str) -> PhaseResult:
             )
 
         config.phase = ProjectPhase(new_phase)
-        save_project(project_dir, config)
+        _atomic_save_project(project_dir, config)
 
         try:
             report = validate_project(project_dir, strict=True)
         except BaseException:
-            # Revert on any runtime failure so we never leave a
-            # half-advanced phase on disk.
-            reverted = load_project(project_dir)
-            reverted.phase = ProjectPhase(old_phase)
-            save_project(project_dir, reverted)
+            # Revert using the in-memory snapshot — never re-read the
+            # file we just wrote. If that write was partial we'd mask
+            # the original error with a garbled load.
+            config.phase = ProjectPhase(old_phase)
+            _atomic_save_project(project_dir, config)
             raise
 
         if report.errors:
-            reverted = load_project(project_dir)
-            reverted.phase = ProjectPhase(old_phase)
-            save_project(project_dir, reverted)
+            # Revert from the same in-memory snapshot.
+            config.phase = ProjectPhase(old_phase)
+            _atomic_save_project(project_dir, config)
             errors = [e.message for e in report.errors]
             write_audit_entry(
                 project_dir,
@@ -203,7 +236,9 @@ def advance_phase(project_dir: Path, new_phase: str) -> PhaseResult:
             )
             logger.info(
                 "advance_phase: %s → %s reverted (%d errors)",
-                old_phase, new_phase, len(errors),
+                old_phase,
+                new_phase,
+                len(errors),
             )
             return PhaseResult(
                 from_phase=old_phase,
@@ -212,22 +247,22 @@ def advance_phase(project_dir: Path, new_phase: str) -> PhaseResult:
                 validation_errors=errors,
             )
 
-    # Success path — the lock has been released by now; the audit write
-    # doesn't need to be inside the critical section.
-    write_audit_entry(
-        project_dir,
-        "actions.advance_phase",
-        before={"phase": old_phase},
-        after={"phase": new_phase},
-        result_summary=f"phase {old_phase} → {new_phase}",
-    )
-    logger.info("advance_phase: %s → %s OK", old_phase, new_phase)
-    return PhaseResult(
-        from_phase=old_phase,
-        to_phase=new_phase,
-        success=True,
-        validation_errors=[],
-    )
+        # Success path — audit inside the lock so a crash between save
+        # and audit can't leave phase-advanced-but-unaudited state.
+        write_audit_entry(
+            project_dir,
+            "actions.advance_phase",
+            before={"phase": old_phase},
+            after={"phase": new_phase},
+            result_summary=f"phase {old_phase} → {new_phase}",
+        )
+        logger.info("advance_phase: %s → %s OK", old_phase, new_phase)
+        return PhaseResult(
+            from_phase=old_phase,
+            to_phase=new_phase,
+            success=True,
+            validation_errors=[],
+        )
 
 
 def finalize_session(project_dir: Path, session_id: str) -> SessionResult:
@@ -238,36 +273,46 @@ def finalize_session(project_dir: Path, session_id: str) -> SessionResult:
     ("status + engagements[].ended_at"). No container operations are
     triggered — v1 finalisation is purely a bookkeeping write.
 
+    Timestamps are tz-aware UTC so downstream consumers such as
+    ``tripwire.core.lint_rules.session_stale`` don't have to defensively
+    coerce naive values.
+
     Raises:
         FileNotFoundError: if the session yaml is missing (propagated
             from :func:`tripwire.core.session_store.load_session`).
     """
-    session = load_session(project_dir, session_id)
-    now = datetime.now()
-    old_status = session.status
-    session.status = "completed"
-    session.updated_at = now
-    closed_engagements = 0
-    for engagement in session.engagements:
-        if engagement.ended_at is None:
-            engagement.ended_at = now
-            closed_engagements += 1
-    save_session(project_dir, session)
+    with project_lock(project_dir):
+        session = load_session(project_dir, session_id)
+        now = datetime.now(tz=timezone.utc)
+        old_status = session.status
+        session.status = "completed"
+        session.updated_at = now
+        closed_engagements = 0
+        for engagement in session.engagements:
+            if engagement.ended_at is None:
+                engagement.ended_at = now
+                closed_engagements += 1
+        _atomic_save_session(project_dir, session)
 
-    write_audit_entry(
-        project_dir,
-        "actions.finalize_session",
-        before={"status": old_status},
-        after={"status": "completed", "closed_engagements": closed_engagements},
-        result_summary=(
-            f"{session_id}: {old_status} → completed "
-            f"(closed {closed_engagements} open engagement(s))"
-        ),
-        extras={"session_id": session_id},
-    )
+        write_audit_entry(
+            project_dir,
+            "actions.finalize_session",
+            before={"status": old_status},
+            after={
+                "status": "completed",
+                "closed_engagements": closed_engagements,
+            },
+            result_summary=(
+                f"{session_id}: {old_status} → completed "
+                f"(closed {closed_engagements} open engagement(s))"
+            ),
+            extras={"session_id": session_id},
+        )
     logger.info(
         "finalize_session: %s %s → completed (%d engagement(s) closed)",
-        session_id, old_status, closed_engagements,
+        session_id,
+        old_status,
+        closed_engagements,
     )
     return SessionResult(
         session_id=session_id,

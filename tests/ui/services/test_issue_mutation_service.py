@@ -76,9 +76,7 @@ class TestUpdateIssueStatus:
         reloaded = load_issue(project_with_transitions, "TMP-1")
         assert reloaded.status == "in_progress"
 
-    def test_invalid_transition_raises(
-        self, project_with_transitions, save_test_issue
-    ):
+    def test_invalid_transition_raises(self, project_with_transitions, save_test_issue):
         save_test_issue(project_with_transitions, "TMP-1", status="todo")
         with pytest.raises(ValueError, match="Invalid transition"):
             update_issue_status(project_with_transitions, "TMP-1", "done")
@@ -108,18 +106,19 @@ class TestUpdateIssueStatus:
     def test_updates_updated_at_timestamp(
         self, project_with_transitions, save_test_issue
     ):
-        from datetime import datetime
+        from datetime import datetime, timedelta, timezone
 
         save_test_issue(project_with_transitions, "TMP-1", status="todo")
-        before = load_issue(project_with_transitions, "TMP-1").updated_at
 
         update_issue_status(project_with_transitions, "TMP-1", "in_progress")
 
         after = load_issue(project_with_transitions, "TMP-1").updated_at
         assert after is not None
         assert isinstance(after, datetime)
-        if before is not None:
-            assert after >= before
+        # Post-fix-#6: mutation writes tz-aware UTC timestamps.
+        assert after.tzinfo is not None
+        # And the stamp is recent (within the last minute of real time).
+        assert datetime.now(tz=timezone.utc) - after < timedelta(minutes=1)
 
     def test_preserves_body(self, project_with_transitions, save_test_issue):
         save_test_issue(project_with_transitions, "TMP-1", status="todo")
@@ -129,9 +128,7 @@ class TestUpdateIssueStatus:
 
         assert load_issue(project_with_transitions, "TMP-1").body == original_body
 
-    def test_missing_issue_raises_file_not_found(
-        self, project_with_transitions
-    ):
+    def test_missing_issue_raises_file_not_found(self, project_with_transitions):
         with pytest.raises(FileNotFoundError):
             update_issue_status(project_with_transitions, "TMP-404", "in_progress")
 
@@ -173,6 +170,76 @@ class TestUpdateIssueStatus:
         with pytest.raises(ValueError):
             update_issue_status(project_with_transitions, "TMP-1", "done")
         assert load_issue(project_with_transitions, "TMP-1").status == "todo"
+
+    def test_load_and_audit_happen_inside_project_lock(
+        self,
+        project_with_transitions,
+        save_test_issue,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """Post-fix #4+#5: load → validate → save → audit all run under the
+        project lock so concurrent callers can't race, and so a crash
+        between save and audit never leaves a mutated-but-unaudited state.
+
+        We prove this by tracing the order of lock-enter → save → audit →
+        lock-release. The audit write must happen before the lock
+        releases.
+        """
+        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+
+        events: list[str] = []
+
+        import contextlib
+
+        from tripwire.ui.services import issue_mutation_service as svc
+
+        original_lock = svc.project_lock
+        original_save = svc.save_issue
+        original_audit = svc.write_audit_entry
+
+        def _traced_lock(project_dir):
+            @contextlib.contextmanager
+            def _wrap():
+                events.append("lock_acquired")
+                with original_lock(project_dir):
+                    yield
+                events.append("lock_released")
+
+            return _wrap()
+
+        def _traced_save(*a, **kw):
+            events.append("save")
+            return original_save(*a, **kw)
+
+        def _traced_audit(*a, **kw):
+            events.append("audit")
+            return original_audit(*a, **kw)
+
+        monkeypatch.setattr(svc, "project_lock", _traced_lock)
+        monkeypatch.setattr(svc, "save_issue", _traced_save)
+        monkeypatch.setattr(svc, "write_audit_entry", _traced_audit)
+
+        update_issue_status(project_with_transitions, "TMP-1", "in_progress")
+
+        # Order: acquired < save < audit < released.
+        assert events[0] == "lock_acquired"
+        assert events[-1] == "lock_released"
+        save_idx = events.index("save")
+        audit_idx = events.index("audit")
+        release_idx = events.index("lock_released")
+        assert save_idx < audit_idx < release_idx
+
+    def test_updated_at_is_tz_aware_utc(
+        self, project_with_transitions, save_test_issue
+    ):
+        """Post-fix #6: updated_at is tz-aware UTC on every successful write."""
+        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+
+        update_issue_status(project_with_transitions, "TMP-1", "in_progress")
+
+        reloaded = load_issue(project_with_transitions, "TMP-1")
+        assert reloaded.updated_at is not None
+        assert reloaded.updated_at.tzinfo is not None
 
 
 # ---------------------------------------------------------------------------
@@ -232,17 +299,13 @@ class TestUpdateIssueFields:
         with pytest.raises(ValueError, match="priority"):
             update_issue_fields(project_with_transitions, "TMP-1", patch)
 
-    def test_invalid_label_raises(
-        self, project_with_transitions, save_test_issue
-    ):
+    def test_invalid_label_raises(self, project_with_transitions, save_test_issue):
         save_test_issue(project_with_transitions, "TMP-1")
         patch = IssuePatch(labels=["domain/nonexistent"])
         with pytest.raises(ValueError, match="label"):
             update_issue_fields(project_with_transitions, "TMP-1", patch)
 
-    def test_valid_label_succeeds(
-        self, project_with_transitions, save_test_issue
-    ):
+    def test_valid_label_succeeds(self, project_with_transitions, save_test_issue):
         save_test_issue(project_with_transitions, "TMP-1")
         patch = IssuePatch(labels=["domain/backend"])
         result = update_issue_fields(project_with_transitions, "TMP-1", patch)
@@ -251,17 +314,13 @@ class TestUpdateIssueFields:
     def test_immutable_field_rejected_at_dto_validation(self):
         """IssuePatch forbids extra fields, protecting uuid/id/created_at."""
         with pytest.raises(ValidationError):
-            IssuePatch.model_validate(
-                {"uuid": "00000000-0000-0000-0000-000000000000"}
-            )
+            IssuePatch.model_validate({"uuid": "00000000-0000-0000-0000-000000000000"})
         with pytest.raises(ValidationError):
             IssuePatch.model_validate({"id": "OTHER-1"})
         with pytest.raises(ValidationError):
             IssuePatch.model_validate({"created_at": "2020-01-01"})
 
-    def test_multi_field_patch(
-        self, project_with_transitions, save_test_issue
-    ):
+    def test_multi_field_patch(self, project_with_transitions, save_test_issue):
         save_test_issue(
             project_with_transitions, "TMP-1", status="todo", priority="medium"
         )
@@ -270,9 +329,7 @@ class TestUpdateIssueFields:
         assert result.status == "in_progress"
         assert result.priority == "high"
 
-    def test_audit_entry_on_success(
-        self, project_with_transitions, save_test_issue
-    ):
+    def test_audit_entry_on_success(self, project_with_transitions, save_test_issue):
         save_test_issue(project_with_transitions, "TMP-1", priority="medium")
         patch = IssuePatch(priority="high")
         update_issue_fields(project_with_transitions, "TMP-1", patch)
@@ -285,9 +342,7 @@ class TestUpdateIssueFields:
         assert record["before_state_snippet"] == {"priority": "medium"}
         assert record["after_state_snippet"] == {"priority": "high"}
 
-    def test_updates_updated_at(
-        self, project_with_transitions, save_test_issue
-    ):
+    def test_updates_updated_at(self, project_with_transitions, save_test_issue):
         save_test_issue(project_with_transitions, "TMP-1")
         patch = IssuePatch(priority="high")
         update_issue_fields(project_with_transitions, "TMP-1", patch)

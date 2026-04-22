@@ -1,7 +1,16 @@
 """Atomic file writes for mutation services.
 
-Every write path in ``tripwire.ui.services`` routes through one of these
-helpers so that the file watcher cannot observe a half-written file.
+All new-file writes in ``tripwire.ui.services`` (approval sidecars,
+audit log entries) route through these helpers so the file watcher
+cannot observe a half-written file. The two service-owned entity
+writes — ``project.yaml`` in :mod:`~tripwire.ui.services.action_service`
+and ``session.yaml`` in the same module — also use these helpers via
+local ``_atomic_save_*`` wrappers that mirror the core
+``save_project`` / ``save_session`` serialisation. Issue writes still
+go through :func:`tripwire.core.store.save_issue` per the KUI-24
+execution constraint; that helper does a direct ``path.write_text``
+and is not yet atomic.
+
 The mechanism is the classic ``write-to-temp → os.replace`` pattern:
 ``os.replace`` is guaranteed atomic on POSIX and on NTFS (since Python
 3.3), so a concurrent reader either sees the old file or the complete

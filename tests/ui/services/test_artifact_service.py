@@ -172,9 +172,7 @@ class TestListSessionArtifacts:
         plan = next(s for s in statuses if s.spec.name == "plan")
         assert plan.present is False
 
-    def test_reports_approval_sidecar_when_present(
-        self, project_with_manifest: Path
-    ):
+    def test_reports_approval_sidecar_when_present(self, project_with_manifest: Path):
         sdir = _session_dir(project_with_manifest, "s1")
         (sdir / "plan.md").write_text("# plan\n", encoding="utf-8")
         # Pre-write a sidecar and confirm the status picks it up.
@@ -235,9 +233,7 @@ class TestApproveArtifact:
         status = approve_artifact(
             project_with_manifest, "s1", "plan", feedback="looks good"
         )
-        sidecar = (
-            project_with_manifest / "sessions" / "s1" / "plan.approval.yaml"
-        )
+        sidecar = project_with_manifest / "sessions" / "s1" / "plan.approval.yaml"
         assert sidecar.is_file()
         raw = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
         assert raw["approved"] is True
@@ -278,9 +274,7 @@ class TestRejectArtifact:
         status = reject_artifact(
             project_with_manifest, "s1", "plan", feedback="needs rework"
         )
-        sidecar = (
-            project_with_manifest / "sessions" / "s1" / "plan.approval.yaml"
-        )
+        sidecar = project_with_manifest / "sessions" / "s1" / "plan.approval.yaml"
         raw = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
         assert raw["approved"] is False
         assert raw["feedback"] == "needs rework"
@@ -295,16 +289,12 @@ class TestRejectArtifact:
     def test_whitespace_feedback_raises(self, project_with_manifest: Path):
         _session_dir(project_with_manifest, "s1")
         with pytest.raises(ValueError, match="feedback"):
-            reject_artifact(
-                project_with_manifest, "s1", "plan", feedback="   \n\t  "
-            )
+            reject_artifact(project_with_manifest, "s1", "plan", feedback="   \n\t  ")
 
     def test_ungated_artifact_raises(self, project_with_manifest: Path):
         _session_dir(project_with_manifest, "s1")
         with pytest.raises(ValueError, match="no approval gate"):
-            reject_artifact(
-                project_with_manifest, "s1", "task-checklist", feedback="x"
-            )
+            reject_artifact(project_with_manifest, "s1", "task-checklist", feedback="x")
 
 
 # ---------------------------------------------------------------------------
@@ -313,18 +303,12 @@ class TestRejectArtifact:
 
 
 class TestAtomicSidecarWrite:
-    def test_existing_sidecar_is_overwritten_cleanly(
-        self, project_with_manifest: Path
-    ):
+    def test_existing_sidecar_is_overwritten_cleanly(self, project_with_manifest: Path):
         _session_dir(project_with_manifest, "s1")
         approve_artifact(project_with_manifest, "s1", "plan", feedback="first")
-        reject_artifact(
-            project_with_manifest, "s1", "plan", feedback="changed mind"
-        )
+        reject_artifact(project_with_manifest, "s1", "plan", feedback="changed mind")
 
-        sidecar = (
-            project_with_manifest / "sessions" / "s1" / "plan.approval.yaml"
-        )
+        sidecar = project_with_manifest / "sessions" / "s1" / "plan.approval.yaml"
         raw = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
         assert raw["approved"] is False
         assert raw["feedback"] == "changed mind"

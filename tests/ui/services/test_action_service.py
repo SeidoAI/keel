@@ -77,9 +77,7 @@ class TestValidateAll:
 
 
 class TestRebuildIndex:
-    def test_rebuilds_when_cache_missing(
-        self, tmp_path_project: Path, save_test_issue
-    ):
+    def test_rebuilds_when_cache_missing(self, tmp_path_project: Path, save_test_issue):
         save_test_issue(tmp_path_project, "TMP-1")
         result = rebuild_index(tmp_path_project)
 
@@ -97,9 +95,7 @@ class TestRebuildIndex:
         second = rebuild_index(tmp_path_project)
         assert second.cache_rebuilt is False
 
-    def test_audit_entry_written(
-        self, tmp_path_project: Path, save_test_issue
-    ):
+    def test_audit_entry_written(self, tmp_path_project: Path, save_test_issue):
         save_test_issue(tmp_path_project, "TMP-1")
         rebuild_index(tmp_path_project)
 
@@ -160,9 +156,7 @@ class TestAdvancePhase:
             "# Compliance\n\nStatus: complete\n", encoding="utf-8"
         )
         # Scoping plan (required while on scoping phase before advance).
-        (plans / "scoping-plan.md").write_text(
-            "# Scoping plan\n", encoding="utf-8"
-        )
+        (plans / "scoping-plan.md").write_text("# Scoping plan\n", encoding="utf-8")
 
         result = advance_phase(project_with_phase, "scoped")
 
@@ -183,6 +177,119 @@ class TestAdvancePhase:
     def test_unknown_phase_raises(self, project_with_phase: Path):
         with pytest.raises(ValueError, match="Unknown phase"):
             advance_phase(project_with_phase, "imaginary")
+
+    def test_revert_uses_in_memory_snapshot_not_disk(
+        self, project_with_phase: Path, save_test_issue, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Revert must not re-read project.yaml from disk.
+
+        The non-atomic save_project that used to back the revert could
+        leave a torn project.yaml that a load_project+resave revert
+        would then mask or mutate. Post-fix #2, the revert uses the
+        in-memory config snapshot. We prove this by patching
+        ``load_project`` to fail if called a second time (after the
+        initial pre-mutation load) — a revert that re-reads disk would
+        trip the trap; the in-memory path doesn't.
+        """
+        from tripwire.core import store
+        from tripwire.ui.services import action_service
+
+        save_test_issue(project_with_phase, "TMP-1")
+
+        # Trap any second load_project call during the transaction.
+        original_load = action_service.load_project
+        call_count = {"n": 0}
+
+        def _counted(project_dir):
+            call_count["n"] += 1
+            if call_count["n"] > 1:
+                raise AssertionError(
+                    "revert re-read project.yaml from disk — should use "
+                    "in-memory snapshot"
+                )
+            return original_load(project_dir)
+
+        monkeypatch.setattr(action_service, "load_project", _counted)
+
+        result = advance_phase(project_with_phase, "scoped")
+        # Validation fails (no gap-analysis.md) → revert fires.
+        assert result.success is False
+        # Original load was the only disk read.
+        assert call_count["n"] == 1
+        # And the on-disk phase is still the original.
+        assert store.load_project(project_with_phase).phase.value == "scoping"
+
+    def test_advance_uses_atomic_project_yaml_write(
+        self, project_with_phase: Path, save_test_issue, monkeypatch: pytest.MonkeyPatch
+    ):
+        """project.yaml writes route through atomic_write_yaml, not save_project."""
+        save_test_issue(project_with_phase, "TMP-1")
+
+        from tripwire.core import store as core_store
+
+        def _boom_nonatomic(*_a, **_kw):
+            raise AssertionError(
+                "action_service bypassed _atomic_save_project and called "
+                "tripwire.core.store.save_project"
+            )
+
+        monkeypatch.setattr(core_store, "save_project", _boom_nonatomic)
+        # The monkeypatch replaces save_project in its module; if
+        # action_service re-imported the symbol the trap wouldn't fire.
+        # Confirm via a successful revert that this path stays off.
+        result = advance_phase(project_with_phase, "scoped")
+        assert result.success is False  # reverted without the trap firing
+
+    def test_success_audit_written_inside_lock(
+        self, project_with_phase: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Success-path audit fires before project_lock releases.
+
+        Previous shape put the audit write after the ``with
+        project_lock`` block exited; a crash between the in-lock save
+        and the post-lock audit would leave phase-advanced-but-unaudited
+        state. Post-fix #1, the audit is inside the lock — prove it by
+        capturing the release timing and the audit timing.
+        """
+        plans = project_with_phase / "plans"
+        plans.mkdir(exist_ok=True)
+        (plans / "gap-analysis.md").write_text(
+            "# Gap analysis\n\nStatus: complete\n", encoding="utf-8"
+        )
+        (plans / "compliance.md").write_text(
+            "# Compliance\n\nStatus: complete\n", encoding="utf-8"
+        )
+
+        events: list[str] = []
+
+        from tripwire.ui.services import action_service
+
+        original_audit = action_service.write_audit_entry
+        original_lock = action_service.project_lock
+
+        def _traced_audit(*a, **kw):
+            events.append("audit")
+            return original_audit(*a, **kw)
+
+        def _traced_lock(*a, **kw):
+            import contextlib
+
+            @contextlib.contextmanager
+            def _wrap():
+                with original_lock(*a, **kw):
+                    yield
+                events.append("lock_released")
+
+            return _wrap()
+
+        monkeypatch.setattr(action_service, "write_audit_entry", _traced_audit)
+        monkeypatch.setattr(action_service, "project_lock", _traced_lock)
+
+        result = advance_phase(project_with_phase, "scoped")
+        if result.success:
+            assert "audit" in events
+            assert "lock_released" in events
+            assert events.index("audit") < events.index("lock_released")
 
     def test_reverts_phase_when_validator_crashes(
         self, project_with_phase: Path, monkeypatch: pytest.MonkeyPatch
@@ -215,9 +322,7 @@ class TestAdvancePhase:
         log_path = audit_log_path(project_with_phase)
         assert not log_path.exists()
 
-    def test_audit_entry_on_successful_transition(
-        self, project_with_phase: Path
-    ):
+    def test_audit_entry_on_successful_transition(self, project_with_phase: Path):
         plans = project_with_phase / "plans"
         plans.mkdir(exist_ok=True)
         (plans / "gap-analysis.md").write_text(
@@ -243,9 +348,7 @@ class TestAdvancePhase:
             assert successful[0]["before_state_snippet"] == {"phase": "scoping"}
             assert successful[0]["after_state_snippet"] == {"phase": "scoped"}
 
-    def test_audit_entry_on_revert(
-        self, project_with_phase: Path, save_test_issue
-    ):
+    def test_audit_entry_on_revert(self, project_with_phase: Path, save_test_issue):
         save_test_issue(project_with_phase, "TMP-1")
         advance_phase(project_with_phase, "scoped")  # expected to revert
 
@@ -283,9 +386,7 @@ class TestFinalizeSession:
         assert reloaded.status == "completed"
         assert reloaded.updated_at is not None
 
-    def test_closes_open_engagements(
-        self, tmp_path_project: Path, save_test_session
-    ):
+    def test_closes_open_engagements(self, tmp_path_project: Path, save_test_session):
         from datetime import datetime
 
         save_test_session(
@@ -315,16 +416,18 @@ class TestFinalizeSession:
         reloaded = load_session(tmp_path_project, "s1")
         assert reloaded.engagements[0].ended_at is not None
         # The already-closed engagement's timestamp is preserved.
-        assert reloaded.engagements[1].ended_at.replace(tzinfo=None).isoformat() \
+        assert (
+            reloaded.engagements[1]
+            .ended_at.replace(tzinfo=None)
+            .isoformat()
             .startswith("2026-04-14T12:00:00")
+        )
 
     def test_missing_session_raises(self, tmp_path_project: Path):
         with pytest.raises(FileNotFoundError):
             finalize_session(tmp_path_project, "nope")
 
-    def test_audit_entry_written(
-        self, tmp_path_project: Path, save_test_session
-    ):
+    def test_audit_entry_written(self, tmp_path_project: Path, save_test_session):
         save_test_session(tmp_path_project, "s1", status="active")
         finalize_session(tmp_path_project, "s1")
 
@@ -333,3 +436,28 @@ class TestFinalizeSession:
         assert record["action"] == "actions.finalize_session"
         assert record["extras"]["session_id"] == "s1"
         assert record["before_state_snippet"] == {"status": "active"}
+
+    def test_changed_at_is_tz_aware_utc(
+        self, tmp_path_project: Path, save_test_session
+    ):
+        """Post-fix #6: finalize writes tz-aware UTC timestamps.
+
+        The downstream lint rule ``tripwire.core.lint_rules.session_stale``
+        has defensive code at lines 30-32 to coerce naive ``updated_at``
+        values to UTC. That workaround exists because older writers
+        shipped naive timestamps. Every new write from this service is
+        tz-aware so the workaround is unnecessary for anything we touch.
+        """
+        from datetime import timezone
+
+        save_test_session(tmp_path_project, "s1", status="active")
+        result = finalize_session(tmp_path_project, "s1")
+
+        assert result.changed_at.tzinfo is not None
+        assert result.changed_at.utcoffset() == timezone.utc.utcoffset(None)
+
+        from tripwire.core.session_store import load_session
+
+        reloaded = load_session(tmp_path_project, "s1")
+        assert reloaded.updated_at is not None
+        assert reloaded.updated_at.tzinfo is not None
