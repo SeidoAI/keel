@@ -1,5 +1,6 @@
 """Shared pytest fixtures."""
 
+import json
 import os
 import shutil
 from pathlib import Path
@@ -47,6 +48,39 @@ def fake_tmux_on_path(tmp_path, monkeypatch):
         def mark_session_exists(self, name: str) -> None:
             has_dir.mkdir(parents=True, exist_ok=True)
             (has_dir / name).touch()
+
+    return Handle()
+
+
+@pytest.fixture
+def fake_gh_on_path(tmp_path, monkeypatch):
+    """Install a fake gh executable on PATH and return a handle to
+    inspect captured args."""
+    bin_dir = tmp_path / "ghbin"
+    bin_dir.mkdir()
+    src = Path(__file__).parent / "fixtures" / "fake_gh.py"
+    dst = bin_dir / "gh"
+    shutil.copy(src, dst)
+    dst.chmod(0o755)
+
+    log_path = tmp_path / "fake_gh.log"
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("FAKE_GH_LOG", str(log_path))
+    monkeypatch.setenv("FAKE_GH_EXISTING_PRS", "[]")
+
+    class Handle:
+        def calls(self) -> list[list[str]]:
+            if not log_path.exists():
+                return []
+            return [
+                line.split()
+                for line in log_path.read_text().splitlines()
+                if line
+            ]
+
+        def set_existing_prs(self, urls: list[str]) -> None:
+            items = [{"url": u} for u in urls]
+            monkeypatch.setenv("FAKE_GH_EXISTING_PRS", json.dumps(items))
 
     return Handle()
 
