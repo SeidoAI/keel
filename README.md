@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
 </p>
 
-> A git-native project-management framework for AI software teams. Tripwires catch workflow drift during a session; the concept graph prevents definition drift across the project.
+> A git-native project-management framework for AI software teams working on large projects. Tripwires catch workflow drift during a session; the concept graph prevents definition drift across the project.
 
 **[Quickstart](#quickstart)** · **[What you get](#what-you-get)** · **[Principles](#principles)** · **[Lifecycle](#v07-lifecycle-flow)** · **[Commands](#commands)** · **[Slash commands](#slash-commands)**
 
@@ -46,7 +46,7 @@ pip install "tripwire-pm[projects]"
 
 ## What you get
 
-- **Agents drift, skip stages, degrade over time, and sometimes lie about their work — worst on bigger projects.** Tripwires fire at workflow checkpoints and inject just-in-time instructions into the agent's *most recent* turn; **recency bias** makes them land. Sensors, not locks.
+- **Agents drift, skip stages, degrade over time, and sometimes lie about their work - worse on bigger projects.** Tripwires fire at workflow checkpoints and inject just-in-time instructions into the agent's *most recent* turn; **LLM recency bias** makes them pay attention. Think sensors, not locks.
 - **Descriptions go stale the moment code moves.** The concept graph anchors every reference: `[[node-id]]` points at a file region with a SHA-256 content hash. Move the code, the graph catches up. Stale refs are *validator errors*, not silent lies.
 - **Every session starts from zero.** Sessions propose graph updates in `insights.yaml`; the PM reviews them at close-out. Knowledge **compounds** instead of evaporating with the chat history.
 - **You can't tell if an agent's work is actually done.** 23-check validator runs in ~50 ms. JSON by default. Artifacts (`developer.md`, `verified.md`) gate status transitions — no handwaving through `in_review`.
@@ -71,7 +71,7 @@ Tripwire ships opinions on every question the agent shouldn't have to answer: wh
 
 ### 4. Sessions produce knowledge, not just code
 
-A session's deliverable is the PR *plus* updated concept nodes, developer notes, and verified notes. A session that ships code without updating what the project knows has made the project worse — the next agent inherits more confusion, not less. That's why status advancement gates on artifact production: the artifacts are where the knowledge lives.
+A session's deliverable is the PR *plus* updated concept nodes, developer notes, and verified notes. A session that ships code without updating what the project knows has made the project worse - the next agent inherits more confusion, not less. That's why status advancement gates on artifact production: the artifacts are where the knowledge lives.
 
 ### 5. Framing is where execution quality comes from
 
