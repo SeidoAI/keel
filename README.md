@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
 </p>
 
-> A git-native project-management framework for AI software teams. Tripwires catch agent drift from workflow requirements; a concept graph as ground truth aligns agents.
+> A git-native project-management framework for AI software teams. Tripwires catch workflow drift during a session; the concept graph prevents definition drift across the project.
 
 **[Quickstart](#quickstart)** · **[What you get](#what-you-get)** · **[Principles](#principles)** · **[Lifecycle](#v07-lifecycle-flow)** · **[Commands](#commands)** · **[Slash commands](#slash-commands)**
 
@@ -46,62 +46,36 @@ pip install "tripwire-pm[projects]"
 
 ## What you get
 
-- **One repo, everything inside.** Issues, nodes, sessions, skills, templates — all git. No DB, no SaaS.
-- **Dual IDs.** UUID + atomic human key (`MP-42`). Branch-merge safe.
-- **Content-hashed concept graph.** `[[node-id]]` references pin to file regions with SHA-256. Move the code, the graph catches up.
-- **23-check validator.** ~50 ms. JSON by default. Rebuilds the graph cache as it runs.
-- **Session lifecycle.** `queue → spawn → monitor → review → complete`. Each stage gates the next.
-- **Insights capture.** Sessions propose graph updates in `insights.yaml`. PM reviews at close-out; knowledge compounds.
-- **Canonical YAML spawn config.** One place decides model, effort, budget, prompt. Override what matters.
-- **PM skill.** 20 reference docs and 14 examples ship with every project. The agent reads the example, not the schema.
+- **Agents drift, skip stages, degrade over time, and sometimes lie about their work — worst on bigger projects.** Tripwires fire at workflow checkpoints and inject just-in-time instructions into the agent's *most recent* turn; **recency bias** makes them land. Sensors, not locks.
+- **Descriptions go stale the moment code moves.** The concept graph anchors every reference: `[[node-id]]` points at a file region with a SHA-256 content hash. Move the code, the graph catches up. Stale refs are *validator errors*, not silent lies.
+- **Every session starts from zero.** Sessions propose graph updates in `insights.yaml`; the PM reviews them at close-out. Knowledge **compounds** instead of evaporating with the chat history.
+- **You can't tell if an agent's work is actually done.** 23-check validator runs in ~50 ms. JSON by default. Artifacts (`developer.md`, `verified.md`) gate status transitions — no handwaving through `in_review`.
+- **You're babysitting `claude -p` in a terminal.** `queue → spawn → monitor → review → complete` turns each stage into a CLI verb *and* a `/pm-session-*` slash command. Each stage gates the next.
+- **Your methodology is trapped in someone else's cloud.** Issues, nodes, sessions, skills, templates, validation loop — all git. `tw init` ships the PM skill *into the repo*. Fork the project, fork the methodology.
+- **Parallel agents collide on keys.** Dual IDs — UUID + atomic human key (`MP-42`). `tw next-key` is branch-merge safe.
+- **Agents burn context reading schemas.** PM skill ships **20 reference docs + 14 canonical examples**. The agent reads the example, not the schema.
 
 ## Principles
 
-### 1. The graph is the synchronization layer that makes drift impossible
+### 1. The graph is where domain knowledge lives
 
-AI-driven work across issue trackers, docs, code comments, PR
-descriptions, and ADRs produces redundant descriptions of the same
-concept. Every copy drifts. Tripwire's concept graph is the single
-source of truth for every domain concept the project models — issues,
-PRs, code comments, READMEs, cross-repo workspace nodes reference
-nodes by pointer (`[[node-id]]`). There is one place to update and
-no alternative location for the same information to live.
+When the same concept gets described in five places — issue text, PR descriptions, code comments, docs — each copy ages independently. The graph keeps one canonical definition per concept; everything else references it by pointer (`[[node-id]]`). If there's only one place the information lives, there's nothing to go out of sync.
 
-### 2. Deviation is expected; tripwires catch what prevention can't
+### 2. Agents drift; tripwires catch it
 
-Agents drift during execution. Prevention cripples autonomy; tolerance
-produces wrong PRs. Tripwire designs for the failure: validators emit
-warnings into the agent's most recent context so they have a higher
-probability of being addressed before the agent proceeds. Tripwires
-are sensors, not locks — lightweight enough to preserve autonomy,
-explicit enough to redirect cleanly.
+Agents skip stages, fudge artifacts, degrade over long sessions, and occasionally claim work they haven't done. Blocking every step cripples autonomy; ignoring the problem ships bad PRs. Tripwires sit between those: validators drop warnings into the agent's *most recent* context, so **recency bias** makes them likely to land before the next action. Sensors, not locks.
 
-### 3. Config over convention, with opinions
+### 3. Defaults are strong; the mechanism doesn't bend
 
-Tripwire ships opinionated defaults in YAML — how sessions should
-spawn, what artifacts are required, what statuses mean, what the agent
-spawn prompt should say. Projects override where they legitimately
-differ. Tripwire is *not* configurable about validation-as-a-gate,
-artifacts-as-evidence, single-agent-sessions, or the graph-as-canon
-— softening those breaks the mechanism.
+YAML configures what projects legitimately differ on — how sessions spawn, what artifacts are required, what statuses mean, what prompts the agent gets. The validation gate, the required artifacts, the single-agent-session rule, the graph-as-canon: these aren't configurable. Softening them breaks the point.
 
-### 4. Work compounds; sessions are knowledge-producing events
+### 4. Sessions produce knowledge, not just code
 
-A session's deliverable is the PR **plus** the updated concept nodes,
-developer notes, and verified notes. A session that ships code without
-updating what the project knows about itself has made the project
-worse — the next agent inherits more confusion, not less. Status
-advancement is gated on artifact production because artifacts are
-where the knowledge lives.
+A session's deliverable is the PR *plus* updated concept nodes, developer notes, and verified notes. A session that ships code without updating what the project knows has made the project worse — the next agent inherits more confusion, not less. That's why status advancement gates on artifact production: the artifacts are where the knowledge lives.
 
-### 5. Decomposition is a first-class product
+### 5. Framing is where execution quality comes from
 
-Execution quality is bounded by framing quality. PM work — scoping,
-plan writing, session layout, acceptance criteria, dependency DAGs —
-is the highest-leverage work in the project, and the decomposition
-itself is a deliverable that deserves quality, review, and iteration.
-This is why tripwire has more PM-facing features than execution-facing
-ones.
+Scoping, plan writing, session layout, acceptance criteria, dependency DAGs — how well you frame the work bounds how well it can be executed. The decomposition itself deserves review and iteration. Tripwire has more PM-facing features than execution-facing ones on purpose.
 
 ## How it works
 
