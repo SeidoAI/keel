@@ -18,7 +18,8 @@ a Times-Roman wordmark where the `p` has tripped over the red wire.
 - `mark-dark.svg` — cream on ink
 - `mark-mono-ink.svg` — no accent, transparent bg
 - `mark-mono-cream.svg` — no accent, transparent, for dark backgrounds
-- `mark-accent.svg` — ink + red wire, transparent bg
+- `mark-accent.svg` — ink wordmark + red wire, transparent bg (light-mode hero)
+- `mark-accent-cream.svg` — cream wordmark + red wire, transparent bg (dark-mode hero)
 - `mark-print.svg` — pure black on white (print / grayscale)
 
 ### Icon (tripped p)
