@@ -303,3 +303,59 @@ class TestRenderKickoff:
         kickoff = code_wt / ".tripwire" / "kickoff.md"
         assert kickoff.is_file()
         assert kickoff.read_text() == "do the thing"
+
+
+class TestPrepRun:
+    def test_end_to_end(
+        self, tmp_path, tmp_path_project, save_test_session, write_handoff_yaml
+    ):
+        import yaml as _yaml
+
+        from tripwire.runtimes import RUNTIMES
+        from tripwire.runtimes.prep import run as prep_run
+
+        code_clone = tmp_path / "code-clone"
+        code_clone.mkdir()
+        _init_repo(code_clone)
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            plan=True,
+            status="queued",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+        )
+        write_handoff_yaml(tmp_path_project, "s1")
+
+        agents_dir = tmp_path_project / "agents"
+        agents_dir.mkdir(exist_ok=True)
+        (agents_dir / "backend-coder.yaml").write_text(
+            _yaml.safe_dump({
+                "id": "backend-coder",
+                "context": {"skills": ["backend-development"]},
+            })
+        )
+
+        from tripwire.core.session_store import load_session
+
+        session = load_session(tmp_path_project, "s1")
+
+        with patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=code_clone,
+        ):
+            prepped = prep_run(
+                session=session,
+                project_dir=tmp_path_project,
+                runtime=RUNTIMES["manual"],
+            )
+
+        assert prepped.session_id == "s1"
+        assert prepped.code_worktree.is_dir()
+        assert (prepped.code_worktree / "CLAUDE.md").is_file()
+        assert (
+            prepped.code_worktree / ".claude/skills/backend-development/SKILL.md"
+        ).is_file()
+        assert (prepped.code_worktree / ".tripwire/kickoff.md").is_file()
+        assert prepped.prompt
+        assert prepped.claude_session_id

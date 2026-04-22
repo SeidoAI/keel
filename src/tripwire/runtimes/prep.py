@@ -129,11 +129,42 @@ def _copy_traversable(src, dst: Path) -> None:
             target.write_bytes(entry.read_bytes())
 
 
+def _resolve_gitdir(worktree: Path) -> Path:
+    """Return the directory where per-worktree git metadata lives.
+
+    For a normal checkout this is ``<worktree>/.git``. For a ``git
+    worktree``-created worktree the ``.git`` entry is a file pointing
+    at ``<main-repo>/.git/worktrees/<name>``; we resolve it via
+    ``git rev-parse --git-dir``.
+    """
+    import subprocess
+
+    plain_gitdir = worktree / ".git"
+    if plain_gitdir.is_dir():
+        return plain_gitdir
+    try:
+        r = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=str(worktree),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        gitdir = Path(r.stdout.strip())
+        if not gitdir.is_absolute():
+            gitdir = (worktree / gitdir).resolve()
+        return gitdir
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return plain_gitdir
+
+
 def _append_to_git_info_exclude(worktree: Path) -> None:
     """Append .claude/ and .tripwire/ to the worktree's local gitignore
-    (.git/info/exclude). Idempotent — existing entries are detected by
-    line match."""
-    exclude_path = worktree / ".git" / "info" / "exclude"
+    (info/exclude). Idempotent — existing entries are detected by line
+    match. For ``git worktree``-created worktrees this writes to
+    ``<main-repo>/.git/worktrees/<name>/info/exclude``."""
+    gitdir = _resolve_gitdir(worktree)
+    exclude_path = gitdir / "info" / "exclude"
     exclude_path.parent.mkdir(parents=True, exist_ok=True)
     existing = (
         exclude_path.read_text(encoding="utf-8")
@@ -205,3 +236,139 @@ def render_kickoff(*, code_worktree: Path, prompt: str) -> None:
     kickoff = code_worktree / ".tripwire" / "kickoff.md"
     kickoff.parent.mkdir(parents=True, exist_ok=True)
     kickoff.write_text(prompt, encoding="utf-8")
+
+
+def _load_project_slug(project_dir: Path) -> str:
+    from tripwire.core.store import load_project
+
+    proj = load_project(project_dir)
+    return proj.name.lower().replace(" ", "-")
+
+
+def run(
+    *,
+    session: AgentSession,
+    project_dir: Path,
+    runtime,
+    max_turns_override: int | None = None,
+    claude_session_id: str | None = None,
+) -> "PreppedSession":
+    """Orchestrate all prep steps:
+
+      1. validate_environment on the selected runtime
+      2. resolve worktrees (one per session.repos)
+      3. copy skills into <code-worktree>/.claude/skills/
+      4. render CLAUDE.md
+      5. render prompt + kickoff.md
+
+    Returns a PreppedSession the runtime's ``start`` consumes.
+    """
+    import uuid as _uuid
+
+    import yaml as _yaml
+
+    from tripwire.core.handoff_store import load_handoff
+    from tripwire.core.paths import session_plan_path
+    from tripwire.core.spawn_config import (
+        load_resolved_spawn_config,
+        render_prompt,
+        render_system_append,
+    )
+    from tripwire.runtimes.base import PreppedSession
+
+    runtime.validate_environment()
+
+    handoff = load_handoff(project_dir, session.id)
+    if handoff is None:
+        raise RuntimeError(f"handoff.yaml not found for session '{session.id}'")
+    branch = handoff.branch
+
+    from tripwire.core.branch_naming import parse_branch_name
+
+    try:
+        branch_type, _ = parse_branch_name(branch)
+    except Exception:
+        branch_type = "feat"
+
+    worktrees = resolve_worktrees(
+        session=session,
+        project_dir=project_dir,
+        branch=branch,
+        base_ref="HEAD",
+    )
+    if not worktrees:
+        raise RuntimeError(
+            f"session '{session.id}' has no repos configured"
+        )
+
+    code_worktree = Path(worktrees[0].worktree_path)
+
+    # Look up the agent's declared skills
+    skill_names: list[str] = []
+    agent_yaml = project_dir / "agents" / f"{session.agent}.yaml"
+    if agent_yaml.is_file():
+        try:
+            agent_data = _yaml.safe_load(
+                agent_yaml.read_text(encoding="utf-8")
+            ) or {}
+            context = agent_data.get("context") or {}
+            skills = context.get("skills") or []
+            if isinstance(skills, list):
+                skill_names = [str(s) for s in skills]
+        except Exception:
+            skill_names = []
+
+    copy_skills(worktree=code_worktree, skill_names=skill_names)
+
+    render_claude_md(
+        code_worktree=code_worktree,
+        agent_id=session.agent,
+        skill_names=skill_names,
+        worktrees=worktrees,
+        session_id=session.id,
+    )
+
+    # Build the kickoff prompt
+    plan_path = session_plan_path(project_dir, session.id)
+    if not plan_path.is_file():
+        raise RuntimeError(f"plan.md not found at {plan_path}")
+    plan_content = plan_path.read_text(encoding="utf-8")
+
+    resolved = load_resolved_spawn_config(project_dir, session=session)
+    if max_turns_override is not None:
+        resolved.config.max_turns = max_turns_override
+
+    try:
+        proj_slug = _load_project_slug(project_dir)
+    except Exception:
+        proj_slug = "unknown"
+
+    prompt = render_prompt(
+        resolved,
+        plan=plan_content,
+        agent=session.agent,
+        session_id=session.id,
+        session_name=session.name,
+        branch_type=branch_type,
+    )
+    system_append = render_system_append(
+        resolved,
+        session_id=session.id,
+        project_slug=proj_slug,
+    )
+
+    render_kickoff(code_worktree=code_worktree, prompt=prompt)
+
+    csid = claude_session_id or str(_uuid.uuid4())
+
+    return PreppedSession(
+        session_id=session.id,
+        session=session,
+        project_dir=project_dir,
+        code_worktree=code_worktree,
+        worktrees=worktrees,
+        claude_session_id=csid,
+        prompt=prompt,
+        system_append=system_append,
+        spawn_defaults=resolved,
+    )
