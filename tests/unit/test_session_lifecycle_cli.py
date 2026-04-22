@@ -503,3 +503,60 @@ class TestSessionAbandonLegacyPidFallback:
         assert result.exit_code == 0, result.output
         s = load_session(tmp_path_project, "s1")
         assert s.status == "abandoned"
+
+
+class TestCleanupKillsRuntime:
+    def test_cleanup_abandons_tmux_runtime_before_removing_worktree(
+        self, fake_tmux_on_path, tmp_path, tmp_path_project, save_test_session
+    ):
+        """M7: cleanup must kill tmux (or any runtime) first, otherwise
+        the worktree gets yanked while claude still runs in it."""
+        import subprocess as _sp
+
+        clone = tmp_path / "clone"
+        clone.mkdir()
+        _sp.run(["git", "init", "-q"], cwd=clone, check=True)
+        _sp.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
+             "commit", "--allow-empty", "-q", "-m", "init"],
+            cwd=clone, check=True,
+        )
+        wt_path = tmp_path / "wt"
+        _sp.run(
+            ["git", "-C", str(clone), "worktree", "add",
+             str(wt_path), "-b", "feat/s1", "HEAD"],
+            check=True, capture_output=True,
+        )
+
+        fake_tmux_on_path.mark_session_exists("tw-s1")
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="completed",
+            spawn_config={"invocation": {"runtime": "tmux"}},
+            runtime_state={
+                "claude_session_id": "uuid-1",
+                "tmux_session_name": "tw-s1",
+                "worktrees": [
+                    {
+                        "repo": "X/Y",
+                        "clone_path": str(clone),
+                        "worktree_path": str(wt_path),
+                        "branch": "feat/s1",
+                    }
+                ],
+            },
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["cleanup", "s1", "--project-dir", str(tmp_path_project)],
+        )
+        assert result.exit_code == 0, result.output
+
+        # runtime.abandon was invoked → kill-session was called
+        calls = fake_tmux_on_path.calls()
+        assert any(c[0] == "kill-session" for c in calls), (
+            "cleanup must abandon the tmux session before removing the worktree"
+        )
