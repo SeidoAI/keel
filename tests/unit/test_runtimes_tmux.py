@@ -68,16 +68,22 @@ def test_start_creates_tmux_session_and_sends_keys(
     calls = fake_tmux_on_path.calls()
     commands = [c[0] for c in calls]
     assert "new-session" in commands
-    assert "send-keys" in commands
+    assert "load-buffer" in commands
+    assert "paste-buffer" in commands
 
     new_session = next(c for c in calls if c[0] == "new-session")
     assert "-s" in new_session
     session_name = new_session[new_session.index("-s") + 1]
     assert session_name.startswith("tw-s1")
 
-    send_keys = next(c for c in calls if c[0] == "send-keys")
-    assert "DO THE THING" in " ".join(send_keys)
-    assert "Enter" in send_keys
+    # Prompt is injected via the tmux buffer, not via send-keys.
+    assert fake_tmux_on_path.buffer_contents() == "DO THE THING"
+
+    # Final Enter submit after paste.
+    enter_call = next(
+        c for c in calls if c[0] == "send-keys" and "Enter" in c
+    )
+    assert enter_call == ["send-keys", "-t", session_name, "Enter"]
 
     assert result.tmux_session_name == session_name
     assert result.claude_session_id == "uuid-1"
@@ -187,3 +193,65 @@ def test_attach_command_with_no_tmux_session_returns_instruction(tmp_path):
         "no tmux session" in cmd.message.lower()
         or "not found" in cmd.message.lower()
     )
+
+
+def test_start_delivers_multiline_prompt_via_paste_buffer(
+    fake_tmux_on_path, tmp_path
+):
+    """Regression for B3: multi-line prompts (newlines in plan.md) must
+    not be typed with send-keys — embedded newlines would submit
+    partial prompts. Use load-buffer + paste-buffer + send-keys Enter."""
+    from tripwire.runtimes import TmuxRuntime
+
+    wt = WorktreeEntry(
+        repo="SeidoAI/code",
+        clone_path=str(tmp_path / "clone"),
+        worktree_path=str(tmp_path / "wt"),
+        branch="feat/s1",
+    )
+    (tmp_path / "wt").mkdir()
+    multiline = "Line 1 of the plan\n\nLine 3 after a blank\nLine 4"
+    prepped = PreppedSession(
+        session_id="s1",
+        session=AgentSession(id="s1", name="test", agent="a"),
+        project_dir=tmp_path,
+        code_worktree=tmp_path / "wt",
+        worktrees=[wt],
+        claude_session_id="uuid-1",
+        prompt=multiline,
+        system_append="",
+        spawn_defaults=SpawnDefaults.model_validate({
+            "prompt_template": "{plan}",
+            "system_prompt_append": "",
+        }),
+    )
+    fake_tmux_on_path.set_pane_text("> ")
+
+    TmuxRuntime().start(prepped)
+
+    calls = fake_tmux_on_path.calls()
+    commands = [c[0] for c in calls]
+    # load-buffer must be used, not a bare send-keys with the prompt.
+    assert "load-buffer" in commands
+    assert "paste-buffer" in commands
+
+    # The buffer must contain the full multi-line prompt verbatim.
+    assert fake_tmux_on_path.buffer_contents() == multiline
+
+    # send-keys Enter is fired AFTER paste-buffer to submit.
+    load_idx = commands.index("load-buffer")
+    paste_idx = commands.index("paste-buffer")
+    assert load_idx < paste_idx
+    # Find the send-keys Enter call
+    enter_calls = [
+        i for i, c in enumerate(calls)
+        if c[0] == "send-keys" and "Enter" in c
+    ]
+    assert enter_calls, "send-keys Enter must fire after paste-buffer"
+    assert enter_calls[-1] > paste_idx
+
+    # The prompt must NOT be passed to send-keys directly — that would
+    # reintroduce the multi-line submission bug.
+    for c in calls:
+        if c[0] == "send-keys":
+            assert "Line 3 after a blank" not in " ".join(c)

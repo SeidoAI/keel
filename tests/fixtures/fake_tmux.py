@@ -43,6 +43,22 @@ def main() -> int:
     if cmd == "send-keys":
         return 0
 
+    if cmd == "load-buffer":
+        # Last argument is the file; "-" means stdin.
+        target = args[-1]
+        buffer_path = Path(
+            os.environ.get("FAKE_TMUX_BUFFER", "/tmp/fake_tmux_buffer")
+        )
+        buffer_path.parent.mkdir(parents=True, exist_ok=True)
+        if target == "-":
+            buffer_path.write_bytes(sys.stdin.buffer.read())
+        else:
+            buffer_path.write_bytes(Path(target).read_bytes())
+        return 0
+
+    if cmd == "paste-buffer":
+        return 0
+
     if cmd == "has-session":
         if "-t" in args:
             name = args[args.index("-t") + 1]

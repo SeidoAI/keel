@@ -22,15 +22,18 @@ def fake_tmux_on_path(tmp_path, monkeypatch):
 
     log_path = tmp_path / "fake_tmux.log"
     has_dir = tmp_path / "fake_tmux_has"
+    buffer_path = tmp_path / "fake_tmux_buffer"
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("FAKE_TMUX_LOG", str(log_path))
     monkeypatch.setenv("FAKE_TMUX_HAS", str(has_dir))
+    monkeypatch.setenv("FAKE_TMUX_BUFFER", str(buffer_path))
     monkeypatch.setenv("FAKE_TMUX_PANE_TEXT", "")
 
     class Handle:
         def __init__(self):
             self.log_path = log_path
             self.has_dir = has_dir
+            self.buffer_path = buffer_path
 
         def calls(self) -> list[list[str]]:
             if not log_path.exists():
@@ -47,6 +50,11 @@ def fake_tmux_on_path(tmp_path, monkeypatch):
         def mark_session_exists(self, name: str) -> None:
             has_dir.mkdir(parents=True, exist_ok=True)
             (has_dir / name).touch()
+
+        def buffer_contents(self) -> str:
+            if not buffer_path.exists():
+                return ""
+            return buffer_path.read_text(encoding="utf-8")
 
     return Handle()
 

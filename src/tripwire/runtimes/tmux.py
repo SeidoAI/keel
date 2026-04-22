@@ -105,11 +105,22 @@ class TmuxRuntime:
 
         _wait_for_ready(session_name)
 
+        # Deliver the prompt via tmux paste-buffer, not send-keys. Embedded
+        # newlines in send-keys are interpreted as Enter keystrokes and
+        # would submit partial prompts to claude. load-buffer + paste-buffer
+        # injects the whole string into the pane verbatim; a separate
+        # send-keys Enter submits at the end.
         subprocess.run(
-            [
-                "tmux", "send-keys", "-t", session_name,
-                prepped.prompt, "Enter",
-            ],
+            ["tmux", "load-buffer", "-"],
+            input=prepped.prompt.encode("utf-8"),
+            check=True,
+        )
+        subprocess.run(
+            ["tmux", "paste-buffer", "-t", session_name],
+            check=True,
+        )
+        subprocess.run(
+            ["tmux", "send-keys", "-t", session_name, "Enter"],
             check=True,
         )
 
