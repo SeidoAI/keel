@@ -1,22 +1,71 @@
-"""Session listing and detail routes.
+"""Session listing and detail routes (KUI-30).
 
-Endpoints filled by their respective route issues.
+Two read-only endpoints under `/api/projects/{project_id}/sessions`:
+
+    GET  /                return list of `SessionSummary` (optional status filter)
+    GET  /{sid}           return full `SessionDetail` including plan_md,
+                           artifact_status, task_progress
+
+Finalising a session lives under the actions router (KUI-34); there is
+no mutation in this module in v1.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+import re
+
+from fastapi import APIRouter, Depends, Query
+
+from tripwire.ui.dependencies import ProjectContext, get_project
+from tripwire.ui.routes._common import envelope_exception
+from tripwire.ui.services.session_service import (
+    SessionDetail,
+    SessionSummary,
+)
+from tripwire.ui.services.session_service import (
+    get_session as svc_get_session,
+)
+from tripwire.ui.services.session_service import (
+    list_sessions as svc_list_sessions,
+)
 
 router = APIRouter(prefix="/api/projects/{project_id}/sessions", tags=["sessions"])
 
-# Replace these 501 stubs when implementing the real endpoints.
-# Next agent (KUI-31): wire via
-#   from tripwire.ui.services.session_service import get_session, list_sessions
-# `get_session` raises FileNotFoundError — translate to 404; ValueError
-# from broken session.yaml — translate to 500.
+_SLUG_PATTERN = r"^[a-z][a-z0-9-]*$"
+_SLUG_RE = re.compile(_SLUG_PATTERN)
 
 
-@router.get("")
-async def list_sessions(project_id: str) -> None:
-    """List sessions for a project."""
-    raise HTTPException(status_code=501, detail="Not yet implemented")
+def _ensure_sid(sid: str) -> None:
+    if not _SLUG_RE.match(sid):
+        raise envelope_exception(
+            400,
+            code="session/bad_slug",
+            detail=(
+                f"Session id {sid!r} does not match {_SLUG_PATTERN} "
+                "(lowercase letter first, then alphanumerics or hyphens)."
+            ),
+        )
+
+
+@router.get("", response_model=list[SessionSummary])
+async def list_sessions(
+    project: ProjectContext = Depends(get_project),  # noqa: B008
+    status: str | None = Query(None, description="Filter by session status"),
+) -> list[SessionSummary]:
+    return svc_list_sessions(project.project_dir, status=status)
+
+
+@router.get("/{sid}", response_model=SessionDetail)
+async def get_session(
+    sid: str,
+    project: ProjectContext = Depends(get_project),  # noqa: B008
+) -> SessionDetail:
+    _ensure_sid(sid)
+    try:
+        return svc_get_session(project.project_dir, sid)
+    except FileNotFoundError as exc:
+        raise envelope_exception(
+            404,
+            code="session/not_found",
+            detail=f"Session {sid!r} not found in this project.",
+        ) from exc

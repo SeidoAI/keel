@@ -15,8 +15,13 @@ def register_routes(app: FastAPI) -> None:
 
     Called by ``create_app`` before the static-file mount so that ``/api/*``
     routes take precedence over the catch-all ``StaticFiles`` mount.
+
+    Also installs the shared v1 error-envelope exception handler so
+    routes can raise via :func:`_common.envelope_exception` and have the
+    body serialised as ``{detail, code, hint?}`` at the top level.
     """
     from tripwire.ui.routes import (
+        _common,
         actions,
         artifacts,
         containers,
@@ -33,6 +38,8 @@ def register_routes(app: FastAPI) -> None:
         sessions,
         ws,
     )
+
+    _common.install_error_handlers(app)
 
     modules: list[ModuleType] = [
         health,

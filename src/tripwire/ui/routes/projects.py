@@ -1,27 +1,45 @@
-"""Project listing and detail routes.
+"""Project listing and detail routes (KUI-26).
 
-Endpoints filled by their respective route issues.
+Read-only endpoints. Both are thin wrappers over
+:mod:`tripwire.ui.services.project_service`; translation of service
+exceptions to HTTP status codes happens here, nothing else.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Path
+
+from tripwire.ui.routes._common import envelope_exception
+from tripwire.ui.services.project_service import (
+    ProjectDetail,
+    ProjectSummary,
+    get_project,
+    list_projects,
+)
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
-# Replace these 501 stubs when implementing the real endpoints.
-# Next agent (KUI-26): wire via
-#   from tripwire.ui.services.project_service import list_projects, get_project
-# `get_project` raises KeyError on unknown id — translate to 404.
+
+@router.get("", response_model=list[ProjectSummary])
+async def list_all_projects() -> list[ProjectSummary]:
+    """Return every discoverable project as a :class:`ProjectSummary`."""
+    return list_projects()
 
 
-@router.get("")
-async def list_projects() -> None:
-    """List discovered projects."""
-    raise HTTPException(status_code=501, detail="Not yet implemented")
+@router.get("/{project_id}", response_model=ProjectDetail)
+async def get_project_detail(
+    project_id: str = Path(..., pattern=r"^[a-f0-9]{12}$"),
+) -> ProjectDetail:
+    """Return full :class:`ProjectDetail` for *project_id*.
 
-
-@router.get("/{project_id}")
-async def get_project(project_id: str) -> None:
-    """Get project detail."""
-    raise HTTPException(status_code=501, detail="Not yet implemented")
+    Translates :class:`KeyError` from the service (unknown project id)
+    to a 404 envelope with code ``project/not_found``.
+    """
+    try:
+        return get_project(project_id)
+    except KeyError as exc:
+        raise envelope_exception(
+            404,
+            code="project/not_found",
+            detail=f"Project {project_id!r} not found",
+        ) from exc
