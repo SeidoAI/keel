@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/SeidoAI/tripwire/actions/workflows/ci.yml"><img src="https://github.com/SeidoAI/tripwire/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+"></a>
   <a href="https://pypi.org/project/tripwire-pm/"><img src="https://img.shields.io/pypi/v/tripwire-pm" alt="PyPI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
