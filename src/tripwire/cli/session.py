@@ -768,6 +768,44 @@ def session_cleanup_cmd(
             session.runtime_state.worktrees = remaining
             save_session(resolved, session)
 
+        # Orphan-worktree scan: filesystem worktrees matching the
+        # tripwire naming convention (`*-wt-<session-id>`) that weren't
+        # in runtime_state. Happens when a spawn is interrupted before
+        # runtime_state gets written, or when artefacts leaked from a
+        # pre-I5 dry-run.
+        recorded_paths = {
+            Path(w.worktree_path).resolve() for w in session.runtime_state.worktrees
+        }
+        try:
+            from tripwire.core.store import load_project
+
+            proj = load_project(resolved)
+        except Exception:
+            proj = None
+        if proj and proj.repos:
+            for _slug, repo_cfg in proj.repos.items():
+                if not repo_cfg.local:
+                    continue
+                clone = Path(repo_cfg.local).expanduser()
+                if not clone.exists():
+                    continue
+                suffix = f"-wt-{session.id}"
+                for sibling in clone.parent.iterdir():
+                    if not sibling.is_dir() or not sibling.name.endswith(suffix):
+                        continue
+                    if sibling.resolve() in recorded_paths:
+                        continue  # already handled above
+                    if not force and worktree_is_dirty(sibling):
+                        click.echo(
+                            f"  Skipping orphan {sibling} — "
+                            "uncommitted changes (use --force)"
+                        )
+                        continue
+                    worktree_remove(clone, sibling)
+                    clones_to_prune.add(str(clone))
+                    cleaned += 1
+                    click.echo(f"  Removed orphan: {sibling}")
+
         # Optionally drop the session's log files. Log files are named
         # <session_id>-<timestamp>.log under a shared {project_slug}
         # directory, so we glob-match rather than rm -rf the parent
