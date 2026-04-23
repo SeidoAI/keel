@@ -69,8 +69,7 @@ def resolve_worktrees(
         clone_path = _resolve_clone_path(project_dir, rb.repo)
         if clone_path is None:
             raise RuntimeError(
-                f"No local clone for {rb.repo}. "
-                f"Set local path in project.yaml repos."
+                f"No local clone for {rb.repo}. Set local path in project.yaml repos."
             )
         wt_path = worktree_path_for_session(clone_path, session.id)
         if wt_path.exists():
@@ -141,15 +140,11 @@ def copy_skills(*, worktree: Path, skill_names: list[str]) -> None:
         wanted = _skills_hash(skill_names)
 
         current = sentinel.read_text().strip() if sentinel.is_file() else ""
-        all_present = all(
-            (dest_root / n / "SKILL.md").is_file() for n in skill_names
-        )
+        all_present = all((dest_root / n / "SKILL.md").is_file() for n in skill_names)
 
         if current != wanted or not all_present:
             if dest_root.exists():
-                ts = datetime.now(tz=timezone.utc).strftime(
-                    "%Y%m%dT%H%M%S%f"
-                )
+                ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S%f")
                 backup = worktree / ".claude" / f"skills.bak.{ts}"
                 # Walk children and move to avoid "Directory not empty"
                 # from os.rename on non-empty dest dirs.
@@ -218,9 +213,7 @@ def _append_to_git_info_exclude(worktree: Path) -> None:
     exclude_path = gitdir / "info" / "exclude"
     exclude_path.parent.mkdir(parents=True, exist_ok=True)
     existing = (
-        exclude_path.read_text(encoding="utf-8")
-        if exclude_path.is_file()
-        else ""
+        exclude_path.read_text(encoding="utf-8") if exclude_path.is_file() else ""
     )
     lines = existing.splitlines()
     additions: list[str] = []
@@ -241,9 +234,7 @@ def _template_env():
 
     import tripwire
 
-    templates_root = (
-        Path(tripwire.__file__).parent / "templates" / "worktree"
-    )
+    templates_root = Path(tripwire.__file__).parent / "templates" / "worktree"
     return Environment(
         loader=FileSystemLoader(str(templates_root)),
         autoescape=select_autoescape(disabled_extensions=("j2", "md")),
@@ -266,9 +257,7 @@ def _claude_md_hash(
     """
     import hashlib
 
-    worktree_keys = [
-        f"{w.repo}:{w.worktree_path}" for w in worktrees
-    ]
+    worktree_keys = [f"{w.repo}:{w.worktree_path}" for w in worktrees]
     joined = "\n".join(
         [
             f"template-version={_CLAUDE_MD_TEMPLATE_VERSION}",
@@ -400,9 +389,7 @@ def run(
         resume=resume,
     )
     if not worktrees:
-        raise RuntimeError(
-            f"session '{session.id}' has no repos configured"
-        )
+        raise RuntimeError(f"session '{session.id}' has no repos configured")
 
     code_worktree = Path(worktrees[0].worktree_path)
 
@@ -411,9 +398,7 @@ def run(
     agent_yaml = project_dir / "agents" / f"{session.agent}.yaml"
     if agent_yaml.is_file():
         try:
-            agent_data = _yaml.safe_load(
-                agent_yaml.read_text(encoding="utf-8")
-            ) or {}
+            agent_data = _yaml.safe_load(agent_yaml.read_text(encoding="utf-8")) or {}
             context = agent_data.get("context") or {}
             skills = context.get("skills") or []
             if isinstance(skills, list):

@@ -169,9 +169,7 @@ def test_runtime_defaults_to_subprocess(tmp_path_project):
     assert resolved.invocation.runtime == "subprocess"
 
 
-def test_runtime_session_override_beats_default(
-    tmp_path_project, save_test_session
-):
+def test_runtime_session_override_beats_default(tmp_path_project, save_test_session):
     save_test_session(
         tmp_path_project,
         "s1",

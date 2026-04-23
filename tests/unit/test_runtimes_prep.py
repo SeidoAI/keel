@@ -13,10 +13,19 @@ def _init_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=path, check=True)
     subprocess.run(
         [
-            "git", "-c", "user.name=t", "-c", "user.email=t@t",
-            "commit", "--allow-empty", "-q", "-m", "init",
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-q",
+            "-m",
+            "init",
         ],
-        cwd=path, check=True,
+        cwd=path,
+        check=True,
     )
 
 
@@ -101,9 +110,7 @@ class TestResolveWorktrees:
 
         assert entries[0].repo == "SeidoAI/code"
 
-    def test_missing_clone_path_errors(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_missing_clone_path_errors(self, tmp_path_project, save_test_session):
         from tripwire.runtimes.prep import resolve_worktrees
 
         save_test_session(
@@ -196,9 +203,7 @@ class TestCopySkills:
         backups = list(worktree.glob(".claude/skills.bak.*"))
         assert len(backups) == 1
         assert (backups[0] / "marker.txt").read_text() == "old"
-        assert (
-            worktree / ".claude/skills/backend-development/SKILL.md"
-        ).is_file()
+        assert (worktree / ".claude/skills/backend-development/SKILL.md").is_file()
 
     def test_appends_to_git_info_exclude(self, tmp_path):
         from tripwire.runtimes.prep import copy_skills
@@ -361,9 +366,7 @@ class TestRenderClaudeMdIdempotency:
         render_claude_md(**kwargs)
         assert list(code_wt.glob("CLAUDE.md.bak.*")) == []
 
-        monkeypatch.setattr(
-            prep_mod, "_CLAUDE_MD_TEMPLATE_VERSION", "bumped"
-        )
+        monkeypatch.setattr(prep_mod, "_CLAUDE_MD_TEMPLATE_VERSION", "bumped")
         render_claude_md(**kwargs)
 
         backups = list(code_wt.glob("CLAUDE.md.bak.*"))
@@ -409,10 +412,12 @@ class TestPrepRun:
         agents_dir = tmp_path_project / "agents"
         agents_dir.mkdir(exist_ok=True)
         (agents_dir / "backend-coder.yaml").write_text(
-            _yaml.safe_dump({
-                "id": "backend-coder",
-                "context": {"skills": ["backend-development"]},
-            })
+            _yaml.safe_dump(
+                {
+                    "id": "backend-coder",
+                    "context": {"skills": ["backend-development"]},
+                }
+            )
         )
 
         from tripwire.core.session_store import load_session
@@ -555,14 +560,18 @@ class TestBuildClaudeArgsResumePropagation:
             prompt="RESUMING",
             system_append="",
             project_slug="test-proj",
-            spawn_defaults=SpawnDefaults.model_validate({
-                "prompt_template": "{plan}",
-                "resume_prompt_template": "resuming",
-                "system_prompt_append": "",
-                "invocation": {
-                    "log_path_template": str(tmp_path / "logs" / "{session_id}.log"),
-                },
-            }),
+            spawn_defaults=SpawnDefaults.model_validate(
+                {
+                    "prompt_template": "{plan}",
+                    "resume_prompt_template": "resuming",
+                    "system_prompt_append": "",
+                    "invocation": {
+                        "log_path_template": str(
+                            tmp_path / "logs" / "{session_id}.log"
+                        ),
+                    },
+                }
+            ),
             resume=True,
         )
 
@@ -689,6 +698,4 @@ class TestCopySkillsIdempotency:
         backups = list(worktree.glob(".claude/skills.bak.*"))
         assert len(backups) == 1
         # New set in place.
-        assert (
-            worktree / ".claude/skills/verification/SKILL.md"
-        ).is_file()
+        assert (worktree / ".claude/skills/verification/SKILL.md").is_file()

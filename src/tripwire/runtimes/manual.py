@@ -50,7 +50,8 @@ class ManualRuntime:
         click.echo("Prepared — manual runtime. To launch, run:")
         click.echo("")
         click.echo(
-            "  " + _start_command(
+            "  "
+            + _start_command(
                 str(prepped.code_worktree),
                 prepped.session_id,
                 prepped.claude_session_id,

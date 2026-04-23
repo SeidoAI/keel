@@ -422,13 +422,9 @@ class TestSessionAgenda:
 
 
 class TestSessionPauseDispatch:
-    def test_pause_uses_subprocess_runtime(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_pause_uses_subprocess_runtime(self, tmp_path_project, save_test_session):
         """pause must go through runtime.pause which SIGTERMs the pid."""
-        proc = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(60)"]
-        )
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         try:
             save_test_session(
                 tmp_path_project,
@@ -458,13 +454,9 @@ class TestSessionPauseDispatch:
 
 
 class TestSessionAbandonDispatch:
-    def test_abandon_uses_subprocess_runtime(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_abandon_uses_subprocess_runtime(self, tmp_path_project, save_test_session):
         """abandon must go through runtime.abandon which SIGTERMs the pid."""
-        proc = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(60)"]
-        )
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         try:
             save_test_session(
                 tmp_path_project,
@@ -491,9 +483,7 @@ class TestSessionAbandonDispatch:
             if proc.poll() is None:
                 proc.kill()
 
-    def test_abandon_already_dead_pid(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_abandon_already_dead_pid(self, tmp_path_project, save_test_session):
         """Abandon on a session whose pid is long-dead should still
         transition to abandoned without error."""
         save_test_session(
@@ -527,20 +517,39 @@ class TestCleanupKillsRuntime:
         clone.mkdir()
         _sp.run(["git", "init", "-q"], cwd=clone, check=True)
         _sp.run(
-            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-             "commit", "--allow-empty", "-q", "-m", "init"],
-            cwd=clone, check=True,
+            [
+                "git",
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "commit",
+                "--allow-empty",
+                "-q",
+                "-m",
+                "init",
+            ],
+            cwd=clone,
+            check=True,
         )
         wt_path = tmp_path / "wt"
         _sp.run(
-            ["git", "-C", str(clone), "worktree", "add",
-             str(wt_path), "-b", "feat/s1", "HEAD"],
-            check=True, capture_output=True,
+            [
+                "git",
+                "-C",
+                str(clone),
+                "worktree",
+                "add",
+                str(wt_path),
+                "-b",
+                "feat/s1",
+                "HEAD",
+            ],
+            check=True,
+            capture_output=True,
         )
 
-        proc = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(60)"]
-        )
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         try:
             save_test_session(
                 tmp_path_project,

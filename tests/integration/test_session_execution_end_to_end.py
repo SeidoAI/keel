@@ -21,15 +21,22 @@ from tripwire.core.session_store import load_session
 
 
 def _init_repo(path: Path) -> None:
-    subprocess.run(
-        ["git", "init", "-q", "-b", "main"], cwd=path, check=True
-    )
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=path, check=True)
     subprocess.run(
         [
-            "git", "-c", "user.name=t", "-c", "user.email=t@t",
-            "commit", "--allow-empty", "-q", "-m", "init",
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "--allow-empty",
+            "-q",
+            "-m",
+            "init",
         ],
-        cwd=path, check=True,
+        cwd=path,
+        check=True,
     )
 
 
@@ -39,15 +46,9 @@ def _install_fake_claude(tmp_path: Path, monkeypatch) -> Path:
     bin_dir = tmp_path / "claudebin"
     bin_dir.mkdir()
     fake = bin_dir / "claude"
-    fake.write_text(
-        "#!/bin/sh\n"
-        'echo "fake-claude ready"\n'
-        "exec sleep 30\n"
-    )
+    fake.write_text('#!/bin/sh\necho "fake-claude ready"\nexec sleep 30\n')
     fake.chmod(0o755)
-    monkeypatch.setenv(
-        "PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
-    )
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
     return fake
 
 
@@ -100,9 +101,7 @@ def test_subprocess_mode_end_to_end(
         # Prep artifacts in the code worktree.
         wt = Path(session.runtime_state.worktrees[0].worktree_path)
         assert (wt / "CLAUDE.md").is_file()
-        assert (
-            wt / ".claude/skills/backend-development/SKILL.md"
-        ).is_file()
+        assert (wt / ".claude/skills/backend-development/SKILL.md").is_file()
         assert (wt / ".tripwire/kickoff.md").is_file()
 
         # Log file created, fake-claude's "ready" line landed in it.
@@ -122,9 +121,7 @@ def test_subprocess_mode_end_to_end(
         from tripwire.runtimes import get_runtime
         from tripwire.runtimes.base import AttachExec
 
-        spawn_cfg = load_resolved_spawn_config(
-            tmp_path_project, session=session
-        )
+        spawn_cfg = load_resolved_spawn_config(tmp_path_project, session=session)
         runtime = get_runtime(spawn_cfg.invocation.runtime)
         cmd = runtime.attach_command(session)
         assert isinstance(cmd, AttachExec)

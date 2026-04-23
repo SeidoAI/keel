@@ -134,5 +134,3 @@ class TestDelete:
 
     def test_delete_missing_is_noop(self, project_dir: Path) -> None:
         delete_session(project_dir, "never-existed")
-
-

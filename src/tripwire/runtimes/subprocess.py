@@ -115,6 +115,7 @@ class SubprocessRuntime:
         # Still alive — SIGKILL.
         import os
         import signal
+
         try:
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:

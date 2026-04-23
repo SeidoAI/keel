@@ -5,10 +5,12 @@ from tripwire.models.spawn import SpawnDefaults
 
 
 def _defaults() -> SpawnDefaults:
-    return SpawnDefaults.model_validate({
-        "prompt_template": "hi",
-        "system_prompt_append": "sa",
-    })
+    return SpawnDefaults.model_validate(
+        {
+            "prompt_template": "hi",
+            "system_prompt_append": "sa",
+        }
+    )
 
 
 def test_interactive_true_omits_p_flag_and_prompt():

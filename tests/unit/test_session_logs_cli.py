@@ -50,9 +50,7 @@ class TestSessionLogs:
         assert "s1-20260423T100000.log" in result.output
         assert "s1-20260423T120000.log" in result.output
 
-    def test_logs_tail_default(
-        self, tmp_path, tmp_path_project, save_test_session
-    ):
+    def test_logs_tail_default(self, tmp_path, tmp_path_project, save_test_session):
         log_dir = tmp_path / "logs" / "tmp"
         lines = "\n".join(f"line-{i}" for i in range(1, 101))
         latest = _seed_log(log_dir, "s1", "20260423T120000", lines + "\n")
@@ -114,9 +112,7 @@ class TestSessionLogs:
         assert len(out_lines) == 10
         assert out_lines[0] == "line-1"
 
-    def test_logs_errors_when_never_spawned(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_logs_errors_when_never_spawned(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="queued")
         runner = CliRunner()
         result = runner.invoke(
@@ -194,18 +190,13 @@ class TestCleanupWithLogs:
 
 
 class TestSessionSummary:
-    def test_summary_text_format(
-        self, tmp_path, tmp_path_project, save_test_session
-    ):
+    def test_summary_text_format(self, tmp_path, tmp_path_project, save_test_session):
         """Smoke: the CLI wires session_log_parser and renders the
         expected shape for the happy-path fixture."""
         import shutil
 
         fixture = (
-            Path(__file__).parent.parent
-            / "fixtures"
-            / "stream-json"
-            / "happy_path.log"
+            Path(__file__).parent.parent / "fixtures" / "stream-json" / "happy_path.log"
         )
         log_dir = tmp_path / "logs" / "tmp"
         log_dir.mkdir(parents=True)
@@ -233,9 +224,7 @@ class TestSessionSummary:
         assert "success" in result.output
         assert "PR opened" in result.output
 
-    def test_summary_json_format(
-        self, tmp_path, tmp_path_project, save_test_session
-    ):
+    def test_summary_json_format(self, tmp_path, tmp_path_project, save_test_session):
         import json as _json
         import shutil
 

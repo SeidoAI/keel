@@ -421,9 +421,7 @@ def session_spawn_cmd(
     try:
         session = load_session(resolved, session_id)
     except FileNotFoundError as exc:
-        raise click.ClickException(
-            f"session '{session_id}' not found"
-        ) from exc
+        raise click.ClickException(f"session '{session_id}' not found") from exc
 
     # Status gate
     if resume_flag:
@@ -490,9 +488,7 @@ def session_spawn_cmd(
     )
     save_session(resolved, session)
 
-    click.echo(
-        f"Session '{session_id}' → executing  (runtime: {runtime.name})"
-    )
+    click.echo(f"Session '{session_id}' → executing  (runtime: {runtime.name})")
     click.echo(f"  Branch: {prepped.worktrees[0].branch}")
     click.echo(f"  Code worktree: {prepped.code_worktree}")
     if start_result.pid:
@@ -527,9 +523,7 @@ def session_attach_cmd(session_id: str, project_dir: Path) -> None:
     try:
         session = load_session(resolved, session_id)
     except FileNotFoundError as exc:
-        raise click.ClickException(
-            f"session '{session_id}' not found"
-        ) from exc
+        raise click.ClickException(f"session '{session_id}' not found") from exc
 
     spawn = load_resolved_spawn_config(resolved, session=session)
     try:
@@ -583,9 +577,7 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     pid = session.runtime_state.pid
     if pid and not is_alive(pid):
         session.status = "failed"
-        click.echo(
-            f"Warning: PID {pid} not alive — session '{session_id}' → failed"
-        )
+        click.echo(f"Warning: PID {pid} not alive — session '{session_id}' → failed")
         session.updated_at = datetime.now(tz=timezone.utc)
         save_session(resolved, session)
         return
@@ -747,9 +739,7 @@ def session_cleanup_cmd(
                     log_file.unlink()
                     removed += 1
                 if removed:
-                    click.echo(
-                        f"  Removed {removed} log file(s) for '{session.id}'"
-                    )
+                    click.echo(f"  Removed {removed} log file(s) for '{session.id}'")
 
     for clone_str in clones_to_prune:
         worktree_prune(Path(clone_str))
@@ -805,9 +795,7 @@ def session_logs_cmd(
     try:
         session = load_session(resolved, session_id)
     except FileNotFoundError as exc:
-        raise click.ClickException(
-            f"session '{session_id}' not found"
-        ) from exc
+        raise click.ClickException(f"session '{session_id}' not found") from exc
 
     log_path_str = session.runtime_state.log_path
     if not log_path_str:
@@ -818,24 +806,20 @@ def session_logs_cmd(
     latest_log = Path(log_path_str).expanduser()
     log_dir = latest_log.parent
     if not log_dir.is_dir():
-        raise click.ClickException(
-            f"log directory does not exist: {log_dir}"
-        )
+        raise click.ClickException(f"log directory does not exist: {log_dir}")
 
     matches = sorted(log_dir.glob(f"{session_id}-*.log"))
     if not matches and latest_log.is_file():
         matches = [latest_log]
     if not matches:
-        raise click.ClickException(
-            f"no log files found for session '{session_id}'"
-        )
+        raise click.ClickException(f"no log files found for session '{session_id}'")
 
     if list_only:
         for path in matches:
             st = path.stat()
-            ts = datetime.fromtimestamp(
-                st.st_mtime, tz=timezone.utc
-            ).strftime("%Y-%m-%d %H:%M:%S UTC")
+            ts = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
             click.echo(f"  {path.name}  {st.st_size:>10} bytes  {ts}")
         return
 
@@ -887,9 +871,7 @@ def session_summary_cmd(
     try:
         session = load_session(resolved, session_id)
     except FileNotFoundError as exc:
-        raise click.ClickException(
-            f"session '{session_id}' not found"
-        ) from exc
+        raise click.ClickException(f"session '{session_id}' not found") from exc
 
     log_path_str = session.runtime_state.log_path
     if not log_path_str:
@@ -899,17 +881,11 @@ def session_summary_cmd(
         )
     latest_log = Path(log_path_str).expanduser()
     log_dir = latest_log.parent
-    matches = (
-        sorted(log_dir.glob(f"{session_id}-*.log"))
-        if log_dir.is_dir()
-        else []
-    )
+    matches = sorted(log_dir.glob(f"{session_id}-*.log")) if log_dir.is_dir() else []
     if not matches and latest_log.is_file():
         matches = [latest_log]
     if not matches:
-        raise click.ClickException(
-            f"no log files found for session '{session_id}'"
-        )
+        raise click.ClickException(f"no log files found for session '{session_id}'")
 
     summary = parse(matches[-1])
     if output_format == "json":

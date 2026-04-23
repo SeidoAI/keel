@@ -64,12 +64,14 @@ class TestParseEdgeCases:
         still produces a valid summary."""
         log = tmp_path / "mixed.log"
         log.write_text(
-            '\n'.join([
-                'not json at all',
-                '{"type":"system","subtype":"init","session_id":"u1","timestamp":"2026-04-23T12:00:00Z"}',
-                '{malformed',
-                '{"type":"result","subtype":"success","result":"done"}',
-            ]),
+            "\n".join(
+                [
+                    "not json at all",
+                    '{"type":"system","subtype":"init","session_id":"u1","timestamp":"2026-04-23T12:00:00Z"}',
+                    "{malformed",
+                    '{"type":"result","subtype":"success","result":"done"}',
+                ]
+            ),
             encoding="utf-8",
         )
         summary = parse(log)

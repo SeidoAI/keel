@@ -195,5 +195,3 @@ def test_complete_force_bypasses_gates(tmp_path_project: Path, save_test_session
         skip_artifact_check=True,
     )
     assert result.session_id == "s1"
-
-

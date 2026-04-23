@@ -140,11 +140,13 @@ class TestSpawnRuntimeDispatch:
             "id: backend-coder\ncontext:\n  skills: []\n"
         )
 
-        with patch("shutil.which", return_value="/usr/bin/claude"), \
-             patch(
-                 "tripwire.cli.session._resolve_clone_path",
-                 return_value=clone,
-             ):
+        with (
+            patch("shutil.which", return_value="/usr/bin/claude"),
+            patch(
+                "tripwire.cli.session._resolve_clone_path",
+                return_value=clone,
+            ),
+        ):
             runner = CliRunner()
             result = runner.invoke(
                 session_cmd,
@@ -194,13 +196,17 @@ class TestSpawnRuntimeDispatch:
         (fake_claude / "claude").write_text("#!/bin/sh\necho ready\n")
         (fake_claude / "claude").chmod(0o755)
         import os as _os
+
         env_path_override = f"{fake_claude}{_os.pathsep}{_os.environ['PATH']}"
 
-        with patch("shutil.which", return_value=str(fake_claude / "claude")), \
-             patch(
-                 "tripwire.cli.session._resolve_clone_path",
-                 return_value=clone,
-             ), patch.dict(_os.environ, {"PATH": env_path_override}):
+        with (
+            patch("shutil.which", return_value=str(fake_claude / "claude")),
+            patch(
+                "tripwire.cli.session._resolve_clone_path",
+                return_value=clone,
+            ),
+            patch.dict(_os.environ, {"PATH": env_path_override}),
+        ):
             runner = CliRunner()
             result = runner.invoke(
                 session_cmd,

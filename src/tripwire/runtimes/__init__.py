@@ -29,9 +29,7 @@ def get_runtime(name: str) -> SessionRuntime:
     with the valid options in the message."""
     if name not in RUNTIMES:
         valid = ", ".join(sorted(RUNTIMES))
-        raise ValueError(
-            f"Unknown runtime '{name}'. Valid runtimes: {valid}"
-        )
+        raise ValueError(f"Unknown runtime '{name}'. Valid runtimes: {valid}")
     return RUNTIMES[name]
 
 
