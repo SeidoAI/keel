@@ -16,10 +16,10 @@ from tripwire.runtimes.base import (
     SessionRuntime,
 )
 from tripwire.runtimes.manual import ManualRuntime
-from tripwire.runtimes.tmux import TmuxRuntime
+from tripwire.runtimes.subprocess import SubprocessRuntime
 
 RUNTIMES: dict[str, SessionRuntime] = {
-    "tmux": TmuxRuntime(),
+    "subprocess": SubprocessRuntime(),
     "manual": ManualRuntime(),
 }
 
@@ -45,6 +45,6 @@ __all__ = [
     "RuntimeStartResult",
     "RuntimeStatus",
     "SessionRuntime",
-    "TmuxRuntime",
+    "SubprocessRuntime",
     "get_runtime",
 ]
