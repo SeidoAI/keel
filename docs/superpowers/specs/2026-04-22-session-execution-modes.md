@@ -78,6 +78,15 @@ updates the plan, spawns again with `--resume`.
 **Default runtime is now `subprocess`.** The `manual` runtime stays
 as a prep-only escape hatch. `tmux` is not a valid runtime value.
 
+**Known limitation — process-group handling.** `SubprocessRuntime`
+sends SIGTERM to the claude pid directly, not to its process group.
+If a future claude (or an MCP server claude spawns) installs its
+own SIGTERM handler or double-forks to detach, those children will
+outlive `pause`/`abandon`. Empirically non-issue for claude 2.1.x.
+Mitigation is one line: `start_new_session=True` is already passed
+to `Popen`, so we can switch to `os.killpg(pid, SIGTERM)` when this
+becomes a real problem.
+
 ---
 
 ## Correction (2026-04-22 afternoon)
@@ -115,12 +124,14 @@ opens PRs.
 - `EngagementEntry.pr_urls` field
 - `session complete` `--skip-pr-flow` / `--skip-pr-flow-push` flags
 
-**Retained from the design** (still correct):
+**Retained from the design** (still correct, post-2026-04-23 pivot):
 
-- Pluggable `SessionRuntime` registry (tmux + manual)
+- Pluggable `SessionRuntime` registry (subprocess + manual; tmux
+  is no longer a runtime — see the 2026-04-23 correction above)
 - Runtime-agnostic prep pipeline (worktrees + skill copy + CLAUDE.md + kickoff.md)
 - `tripwire session attach` subcommand
-- Schema additions: `SpawnInvocation.runtime`, `RuntimeState.tmux_session_name`, `RuntimeState.skills_hash`
+- Schema additions: `SpawnInvocation.runtime`, `RuntimeState.skills_hash`
+  (`RuntimeState.tmux_session_name` was removed in the 2026-04-23 pivot)
 
 The rest of this document describes the original (flawed) dual-PR
 design and its rationale. Keep for historical context; do not read as
