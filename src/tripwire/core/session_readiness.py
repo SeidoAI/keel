@@ -80,6 +80,10 @@ def check_readiness(
             )
             continue
         for blocker_key in issue.blocked_by or []:
+            # Skip blockers that are themselves in the same session —
+            # they'll be completed in this spawn, not a prerequisite.
+            if blocker_key in session.issues:
+                continue
             try:
                 blocker = load_issue(project_dir, blocker_key)
             except FileNotFoundError:
