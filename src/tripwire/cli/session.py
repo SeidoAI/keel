@@ -473,7 +473,28 @@ def session_spawn_cmd(
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    # Prep (runtime-agnostic): worktrees + skills + CLAUDE.md + kickoff
+    # Dry-run is pure: compute what prep WOULD produce (worktree paths,
+    # runtime, max-turns) without running prep. Prep mutates the
+    # filesystem (git worktree add + skill copy + CLAUDE.md render),
+    # and until v0.7.3 dry-run ran prep first — leaving a worktree on
+    # disk that blocked every subsequent real spawn with "worktree
+    # already exists". Now dry-run just resolves symbolic paths.
+    if dry_run:
+        from tripwire.core.git_helpers import worktree_path_for_session
+
+        click.echo(f"Dry run — would spawn session '{session_id}'")
+        click.echo(f"  Runtime: {runtime.name}")
+        for rb in session.repos:
+            clone = _resolve_clone_path(resolved, rb.repo)
+            if clone is None:
+                click.echo(f"  Worktree: [unresolved: no local clone for {rb.repo}]")
+                continue
+            wt_path = worktree_path_for_session(clone, session.id)
+            click.echo(f"  Worktree (would create): {wt_path}")
+        click.echo(f"  Max turns: {resolved_spawn.config.max_turns}")
+        return
+
+    # Real spawn: now we're committed to mutating the filesystem.
     try:
         prepped = prep_run(
             session=session,
@@ -487,14 +508,6 @@ def session_spawn_cmd(
         )
     except RuntimeError as exc:
         raise click.ClickException(str(exc)) from exc
-
-    if dry_run:
-        click.echo(f"Dry run — would spawn session '{session_id}'")
-        click.echo(f"  Runtime: {runtime.name}")
-        for wt in prepped.worktrees:
-            click.echo(f"  Worktree: {wt.worktree_path}")
-        click.echo(f"  Max turns: {prepped.spawn_defaults.config.max_turns}")
-        return
 
     # Launch via the runtime
     start_result = runtime.start(prepped)
