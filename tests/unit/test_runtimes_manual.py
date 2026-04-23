@@ -91,4 +91,42 @@ def test_attach_command_returns_instruction(tmp_path):
     cmd = ManualRuntime().attach_command(session)
     assert isinstance(cmd, AttachInstruction)
     assert "claude --name s1 --session-id uuid-1" in cmd.message
+    assert "--resume" not in cmd.message
     assert str(tmp_path / "wt") in cmd.message
+
+
+def test_attach_command_honours_resume_state(tmp_path):
+    """When the last spawn was --resume, the attach instruction must
+    include --resume (so the operator's paste matches what tripwire
+    actually ran). Regression test for bug #3."""
+    base_state = {
+        "claude_session_id": "uuid-1",
+        "worktrees": [
+            WorktreeEntry(
+                repo="SeidoAI/code",
+                clone_path=str(tmp_path / "clone"),
+                worktree_path=str(tmp_path / "wt"),
+                branch="feat/s1",
+            ),
+        ],
+    }
+    resumed = AgentSession(
+        id="s1",
+        name="t",
+        agent="a",
+        runtime_state=RuntimeState(**base_state, last_spawn_resumed=True),
+    )
+    fresh = AgentSession(
+        id="s1",
+        name="t",
+        agent="a",
+        runtime_state=RuntimeState(**base_state, last_spawn_resumed=False),
+    )
+
+    resumed_cmd = ManualRuntime().attach_command(resumed)
+    fresh_cmd = ManualRuntime().attach_command(fresh)
+
+    assert isinstance(resumed_cmd, AttachInstruction)
+    assert isinstance(fresh_cmd, AttachInstruction)
+    assert "--resume" in resumed_cmd.message
+    assert "--resume" not in fresh_cmd.message

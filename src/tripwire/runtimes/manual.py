@@ -95,6 +95,6 @@ class ManualRuntime:
         return AttachInstruction(
             message=(
                 "This session is on the manual runtime — launch it yourself:\n\n"
-                f"  {_start_command(wt, session.id, state.claude_session_id)}\n"
+                f"  {_start_command(wt, session.id, state.claude_session_id, resume=state.last_spawn_resumed)}\n"
             )
         )

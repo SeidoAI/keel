@@ -480,6 +480,7 @@ def session_spawn_cmd(
     session.runtime_state.pid = start_result.pid
     session.runtime_state.started_at = start_result.started_at
     session.runtime_state.log_path = start_result.log_path
+    session.runtime_state.last_spawn_resumed = resume_flag
     session.updated_at = now
     session.engagements.append(
         EngagementEntry(
