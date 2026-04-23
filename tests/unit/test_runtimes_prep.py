@@ -444,45 +444,129 @@ class TestResolveWorktreesResume:
 
 
 class TestBuildClaudeArgsResumePropagation:
-    def test_tmux_runtime_passes_resume_flag(
-        self, fake_tmux_on_path, tmp_path
-    ):
-        """TmuxRuntime.start must thread resume through build_claude_args."""
+    def test_subprocess_runtime_passes_resume_flag(self, tmp_path):
+        """SubprocessRuntime.start must thread resume through
+        build_claude_args so claude -p --resume <uuid> is invoked."""
+        from unittest.mock import MagicMock
+
         from tripwire.models.session import AgentSession, WorktreeEntry
         from tripwire.models.spawn import SpawnDefaults
-        from tripwire.runtimes import TmuxRuntime
+        from tripwire.runtimes import SubprocessRuntime
         from tripwire.runtimes.base import PreppedSession
 
+        wt_dir = tmp_path / "wt"
+        wt_dir.mkdir()
         wt = WorktreeEntry(
             repo="SeidoAI/code",
             clone_path=str(tmp_path / "clone"),
-            worktree_path=str(tmp_path / "wt"),
+            worktree_path=str(wt_dir),
             branch="feat/s1",
         )
-        (tmp_path / "wt").mkdir()
         prepped = PreppedSession(
             session_id="s1",
             session=AgentSession(id="s1", name="test", agent="a"),
             project_dir=tmp_path,
-            code_worktree=tmp_path / "wt",
+            code_worktree=wt_dir,
             worktrees=[wt],
             claude_session_id="uuid-1",
             prompt="RESUMING",
             system_append="",
             spawn_defaults=SpawnDefaults.model_validate({
                 "prompt_template": "{plan}",
+                "resume_prompt_template": "resuming",
                 "system_prompt_append": "",
+                "invocation": {
+                    "log_path_template": str(tmp_path / "logs" / "{session_id}.log"),
+                },
             }),
             resume=True,
         )
-        fake_tmux_on_path.set_pane_text("> ")
 
-        TmuxRuntime().start(prepped)
+        fake_proc = MagicMock()
+        fake_proc.pid = 12345
+        with patch(
+            "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
+        ) as mock_popen:
+            SubprocessRuntime().start(prepped)
 
-        calls = fake_tmux_on_path.calls()
-        new_session = next(c for c in calls if c[0] == "new-session")
-        # --resume must appear among the claude args tmux was asked to run
-        assert "--resume" in new_session
+        argv = mock_popen.call_args[0][0]
+        assert "--resume" in argv
+        assert argv[argv.index("--resume") + 1] == "uuid-1"
+        assert "--session-id" not in argv
+
+
+class TestPrepRunResume:
+    def test_resume_uses_resume_template_and_does_not_read_plan(
+        self, tmp_path, tmp_path_project, save_test_session, write_handoff_yaml
+    ):
+        """On resume, prep.run renders the short continuation template
+        instead of the full {plan} kickoff, and does NOT require plan.md
+        on disk — claude has the prior conversation history."""
+        from tripwire.runtimes import RUNTIMES
+        from tripwire.runtimes.prep import run as prep_run
+
+        code_clone = tmp_path / "code-clone"
+        code_clone.mkdir()
+        _init_repo(code_clone)
+
+        # Note: plan=False so plan.md is deliberately absent. Initial
+        # spawn would error; resume must not.
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            plan=False,
+            status="paused",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+        )
+        write_handoff_yaml(tmp_path_project, "s1")
+
+        (tmp_path_project / "agents").mkdir(exist_ok=True)
+        (tmp_path_project / "agents" / "backend-coder.yaml").write_text(
+            "id: backend-coder\ncontext:\n  skills: []\n"
+        )
+
+        # First create the worktree by running a non-resume prep
+        # attempt, then ... no, simpler: use resume=True directly. The
+        # worktree gets created here; real resume paths would have an
+        # existing one.
+        from tripwire.core.session_store import load_session
+
+        session = load_session(tmp_path_project, "s1")
+
+        with patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=code_clone,
+        ):
+            # Prime the worktree first (non-resume to create it).
+            # But plan.md is absent — so we have to write a stub.
+            from tripwire.core.paths import session_plan_path
+
+            plan_path = session_plan_path(tmp_path_project, "s1")
+            plan_path.parent.mkdir(parents=True, exist_ok=True)
+            plan_path.write_text("# Plan\n", encoding="utf-8")
+
+            prep_run(
+                session=session,
+                project_dir=tmp_path_project,
+                runtime=RUNTIMES["manual"],
+            )
+
+            # Now remove plan.md to prove resume doesn't read it.
+            plan_path.unlink()
+
+            prepped = prep_run(
+                session=session,
+                project_dir=tmp_path_project,
+                runtime=RUNTIMES["manual"],
+                resume=True,
+            )
+
+        # Resume prompt contains the distinctive marker, not a plan body.
+        assert "Resuming session" in prepped.prompt
+        assert prepped.resume is True
+        # kickoff.md reflects the resume prompt, not the initial one.
+        kickoff = (prepped.code_worktree / ".tripwire" / "kickoff.md").read_text()
+        assert "Resuming session" in kickoff
 
 
 class TestCopySkillsIdempotency:

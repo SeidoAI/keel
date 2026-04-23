@@ -318,6 +318,7 @@ def run(
     from tripwire.core.spawn_config import (
         load_resolved_spawn_config,
         render_prompt,
+        render_resume_prompt,
         render_system_append,
     )
 
@@ -374,11 +375,12 @@ def run(
         session_id=session.id,
     )
 
-    # Build the kickoff prompt
+    # Build the kickoff prompt. On resume we render the short
+    # continuation template — claude already has the full conversation
+    # history from its own jsonl; re-reading plan.md is the agent's
+    # decision. On initial spawn we render the full template with
+    # plan.md content inlined.
     plan_path = session_plan_path(project_dir, session.id)
-    if not plan_path.is_file():
-        raise RuntimeError(f"plan.md not found at {plan_path}")
-    plan_content = plan_path.read_text(encoding="utf-8")
 
     resolved = load_resolved_spawn_config(project_dir, session=session)
     if max_turns_override is not None:
@@ -389,14 +391,25 @@ def run(
     except Exception:
         proj_slug = "unknown"
 
-    prompt = render_prompt(
-        resolved,
-        plan=plan_content,
-        agent=session.agent,
-        session_id=session.id,
-        session_name=session.name,
-        branch_type=branch_type,
-    )
+    if resume:
+        prompt = render_resume_prompt(
+            resolved,
+            session_id=session.id,
+            plan_path=str(plan_path),
+        )
+    else:
+        if not plan_path.is_file():
+            raise RuntimeError(f"plan.md not found at {plan_path}")
+        plan_content = plan_path.read_text(encoding="utf-8")
+        prompt = render_prompt(
+            resolved,
+            plan=plan_content,
+            agent=session.agent,
+            session_id=session.id,
+            session_name=session.name,
+            branch_type=branch_type,
+        )
+
     system_append = render_system_append(
         resolved,
         session_id=session.id,
