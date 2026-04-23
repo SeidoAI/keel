@@ -59,7 +59,6 @@ class RuntimeStartResult:
     claude_session_id: str
     worktrees: list[WorktreeEntry]
     started_at: str
-    tmux_session_name: str | None = None
     pid: int | None = None
     log_path: str | None = None
 

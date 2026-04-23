@@ -163,9 +163,8 @@ class TestSpawnRuntimeDispatch:
         assert (wt / "CLAUDE.md").is_file()
         assert (wt / ".tripwire" / "kickoff.md").is_file()
 
-    def test_spawn_uses_tmux_runtime_by_default(
+    def test_spawn_uses_subprocess_runtime_by_default(
         self,
-        fake_tmux_on_path,
         tmp_path,
         tmp_path_project,
         save_test_session,
@@ -188,13 +187,20 @@ class TestSpawnRuntimeDispatch:
             "id: backend-coder\ncontext:\n  skills: []\n"
         )
 
-        fake_tmux_on_path.set_pane_text("> ")
+        # Fake claude shim: prints one line, exits. Keeps Popen happy
+        # without launching real claude.
+        fake_claude = tmp_path / "claudebin"
+        fake_claude.mkdir()
+        (fake_claude / "claude").write_text("#!/bin/sh\necho ready\n")
+        (fake_claude / "claude").chmod(0o755)
+        import os as _os
+        env_path_override = f"{fake_claude}{_os.pathsep}{_os.environ['PATH']}"
 
-        with patch("shutil.which", return_value="/usr/bin/claude"), \
+        with patch("shutil.which", return_value=str(fake_claude / "claude")), \
              patch(
                  "tripwire.cli.session._resolve_clone_path",
                  return_value=clone,
-             ):
+             ), patch.dict(_os.environ, {"PATH": env_path_override}):
             runner = CliRunner()
             result = runner.invoke(
                 session_cmd,
@@ -203,50 +209,6 @@ class TestSpawnRuntimeDispatch:
 
         assert result.exit_code == 0, result.output
         s = load_session(tmp_path_project, "s1")
-        assert s.runtime_state.tmux_session_name == "tw-s1"
-        assert s.runtime_state.pid is None
-
-    def test_spawn_errors_when_tmux_missing_and_runtime_is_tmux(
-        self,
-        tmp_path,
-        tmp_path_project,
-        save_test_session,
-        write_handoff_yaml,
-        monkeypatch,
-    ):
-        clone = tmp_path / "clone"
-        clone.mkdir()
-        _init_repo(clone)
-
-        save_test_session(
-            tmp_path_project,
-            "s1",
-            plan=True,
-            status="queued",
-            repos=[{"repo": "SeidoAI/tripwire", "base_branch": "main"}],
-        )
-        write_handoff_yaml(tmp_path_project, "s1")
-        (tmp_path_project / "agents").mkdir(exist_ok=True)
-        (tmp_path_project / "agents" / "backend-coder.yaml").write_text(
-            "id: backend-coder\ncontext:\n  skills: []\n"
-        )
-
-        monkeypatch.setenv("PATH", "/nonexistent-dir")
-
-        with patch(
-            "shutil.which",
-            lambda x: "/usr/bin/claude" if x == "claude" else None,
-        ), patch(
-            "tripwire.cli.session._resolve_clone_path",
-            return_value=clone,
-        ):
-            runner = CliRunner()
-            result = runner.invoke(
-                session_cmd,
-                ["spawn", "s1", "--project-dir", str(tmp_path_project)],
-            )
-
-        assert result.exit_code != 0
-        assert "tmux" in result.output.lower()
-        s = load_session(tmp_path_project, "s1")
-        assert s.status == "queued"
+        # Default runtime is subprocess — pid populated, no tmux field.
+        assert s.runtime_state.pid is not None
+        assert s.runtime_state.log_path is not None

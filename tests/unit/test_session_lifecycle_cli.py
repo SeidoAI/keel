@@ -422,71 +422,80 @@ class TestSessionAgenda:
 
 
 class TestSessionPauseDispatch:
-    def test_pause_uses_runtime_abandon_for_tmux(
-        self, fake_tmux_on_path, tmp_path_project, save_test_session
+    def test_pause_uses_subprocess_runtime(
+        self, tmp_path_project, save_test_session
     ):
-        fake_tmux_on_path.mark_session_exists("tw-s1")
-        save_test_session(
-            tmp_path_project,
-            "s1",
-            status="executing",
-            spawn_config={"invocation": {"runtime": "tmux"}},
-            runtime_state={
-                "claude_session_id": "uuid-1",
-                "tmux_session_name": "tw-s1",
-            },
+        """pause must go through runtime.pause which SIGTERMs the pid."""
+        proc = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(60)"]
         )
+        try:
+            save_test_session(
+                tmp_path_project,
+                "s1",
+                status="executing",
+                spawn_config={"invocation": {"runtime": "subprocess"}},
+                runtime_state={
+                    "claude_session_id": "uuid-1",
+                    "pid": proc.pid,
+                },
+            )
 
-        runner = CliRunner()
-        result = runner.invoke(
-            session_cmd,
-            ["pause", "s1", "--project-dir", str(tmp_path_project)],
-        )
+            runner = CliRunner()
+            result = runner.invoke(
+                session_cmd,
+                ["pause", "s1", "--project-dir", str(tmp_path_project)],
+            )
 
-        assert result.exit_code == 0, result.output
-        calls = fake_tmux_on_path.calls()
-        assert any(c[0] == "send-keys" and "C-c" in c for c in calls)
-
-        s = load_session(tmp_path_project, "s1")
-        assert s.status == "paused"
+            assert result.exit_code == 0, result.output
+            s = load_session(tmp_path_project, "s1")
+            assert s.status == "paused"
+            # The subprocess should have been SIGTERM'd
+            proc.wait(timeout=3)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
 
 
 class TestSessionAbandonDispatch:
-    def test_abandon_uses_runtime_for_tmux(
-        self, fake_tmux_on_path, tmp_path_project, save_test_session
-    ):
-        fake_tmux_on_path.mark_session_exists("tw-s1")
-        save_test_session(
-            tmp_path_project,
-            "s1",
-            status="executing",
-            spawn_config={"invocation": {"runtime": "tmux"}},
-            runtime_state={
-                "claude_session_id": "uuid-1",
-                "tmux_session_name": "tw-s1",
-            },
-        )
-
-        runner = CliRunner()
-        result = runner.invoke(
-            session_cmd,
-            ["abandon", "s1", "--project-dir", str(tmp_path_project)],
-        )
-
-        assert result.exit_code == 0, result.output
-        calls = fake_tmux_on_path.calls()
-        assert any(c[0] == "kill-session" for c in calls)
-
-        s = load_session(tmp_path_project, "s1")
-        assert s.status == "abandoned"
-
-
-class TestSessionAbandonLegacyPidFallback:
-    def test_abandon_v07_session_with_pid_only(
+    def test_abandon_uses_subprocess_runtime(
         self, tmp_path_project, save_test_session
     ):
-        """v0.7 sessions have only pid — no tmux_session_name.
-        Abandon should still fall through to SIGTERM path."""
+        """abandon must go through runtime.abandon which SIGTERMs the pid."""
+        proc = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(60)"]
+        )
+        try:
+            save_test_session(
+                tmp_path_project,
+                "s1",
+                status="executing",
+                spawn_config={"invocation": {"runtime": "subprocess"}},
+                runtime_state={
+                    "claude_session_id": "uuid-1",
+                    "pid": proc.pid,
+                },
+            )
+
+            runner = CliRunner()
+            result = runner.invoke(
+                session_cmd,
+                ["abandon", "s1", "--project-dir", str(tmp_path_project)],
+            )
+
+            assert result.exit_code == 0, result.output
+            s = load_session(tmp_path_project, "s1")
+            assert s.status == "abandoned"
+            proc.wait(timeout=3)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+
+    def test_abandon_already_dead_pid(
+        self, tmp_path_project, save_test_session
+    ):
+        """Abandon on a session whose pid is long-dead should still
+        transition to abandoned without error."""
         save_test_session(
             tmp_path_project,
             "s1",
@@ -506,11 +515,12 @@ class TestSessionAbandonLegacyPidFallback:
 
 
 class TestCleanupKillsRuntime:
-    def test_cleanup_abandons_tmux_runtime_before_removing_worktree(
-        self, fake_tmux_on_path, tmp_path, tmp_path_project, save_test_session
+    def test_cleanup_abandons_runtime_before_removing_worktree(
+        self, tmp_path, tmp_path_project, save_test_session
     ):
-        """M7: cleanup must kill tmux (or any runtime) first, otherwise
-        the worktree gets yanked while claude still runs in it."""
+        """M7: cleanup must kill the runtime (SIGTERM the pid for
+        subprocess) before removing the worktree, otherwise claude
+        is left running with its cwd yanked."""
         import subprocess as _sp
 
         clone = tmp_path / "clone"
@@ -528,35 +538,42 @@ class TestCleanupKillsRuntime:
             check=True, capture_output=True,
         )
 
-        fake_tmux_on_path.mark_session_exists("tw-s1")
-        save_test_session(
-            tmp_path_project,
-            "s1",
-            status="completed",
-            spawn_config={"invocation": {"runtime": "tmux"}},
-            runtime_state={
-                "claude_session_id": "uuid-1",
-                "tmux_session_name": "tw-s1",
-                "worktrees": [
-                    {
-                        "repo": "X/Y",
-                        "clone_path": str(clone),
-                        "worktree_path": str(wt_path),
-                        "branch": "feat/s1",
-                    }
-                ],
-            },
+        proc = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(60)"]
         )
+        try:
+            save_test_session(
+                tmp_path_project,
+                "s1",
+                status="completed",
+                spawn_config={"invocation": {"runtime": "subprocess"}},
+                runtime_state={
+                    "claude_session_id": "uuid-1",
+                    "pid": proc.pid,
+                    "worktrees": [
+                        {
+                            "repo": "X/Y",
+                            "clone_path": str(clone),
+                            "worktree_path": str(wt_path),
+                            "branch": "feat/s1",
+                        }
+                    ],
+                },
+            )
 
-        runner = CliRunner()
-        result = runner.invoke(
-            session_cmd,
-            ["cleanup", "s1", "--project-dir", str(tmp_path_project)],
-        )
-        assert result.exit_code == 0, result.output
+            runner = CliRunner()
+            result = runner.invoke(
+                session_cmd,
+                ["cleanup", "s1", "--project-dir", str(tmp_path_project)],
+            )
+            assert result.exit_code == 0, result.output
 
-        # runtime.abandon was invoked → kill-session was called
-        calls = fake_tmux_on_path.calls()
-        assert any(c[0] == "kill-session" for c in calls), (
-            "cleanup must abandon the tmux session before removing the worktree"
-        )
+            # runtime.abandon SIGTERM'd our test process
+            proc.wait(timeout=3)
+            assert proc.poll() is not None, (
+                "cleanup must abandon the runtime (kill the pid) before "
+                "removing the worktree"
+            )
+        finally:
+            if proc.poll() is None:
+                proc.kill()

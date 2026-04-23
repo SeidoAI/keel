@@ -49,7 +49,6 @@ def test_start_prints_command_and_returns_state(tmp_path, capsys):
 
     assert result.claude_session_id == "uuid-1"
     assert result.pid is None
-    assert result.tmux_session_name is None
 
 
 def test_pause_is_noop_but_warns(capsys):

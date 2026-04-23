@@ -477,7 +477,6 @@ def session_spawn_cmd(
     session.status = "executing"
     session.runtime_state.worktrees = start_result.worktrees
     session.runtime_state.claude_session_id = start_result.claude_session_id
-    session.runtime_state.tmux_session_name = start_result.tmux_session_name
     session.runtime_state.pid = start_result.pid
     session.runtime_state.started_at = start_result.started_at
     session.runtime_state.log_path = start_result.log_path
@@ -495,13 +494,11 @@ def session_spawn_cmd(
     )
     click.echo(f"  Branch: {prepped.worktrees[0].branch}")
     click.echo(f"  Code worktree: {prepped.code_worktree}")
-    if start_result.tmux_session_name:
-        click.echo(
-            f"  Tmux session: {start_result.tmux_session_name}"
-        )
-        click.echo(f"\n  tripwire session attach {session_id}")
     if start_result.pid:
         click.echo(f"  PID: {start_result.pid}")
+    if start_result.log_path:
+        click.echo(f"  Log: {start_result.log_path}")
+        click.echo(f"\n  tripwire session attach {session_id}")
     click.echo(f"  Claude session: {start_result.claude_session_id}")
 
 
@@ -577,34 +574,23 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
         )
 
     spawn = load_resolved_spawn_config(resolved, session=session)
-    runtime_name = spawn.invocation.runtime
-    now = datetime.now(tz=timezone.utc)
+    runtime = get_runtime(spawn.invocation.runtime)
 
-    # v0.7 legacy fallback: session has pid but no tmux_session_name.
-    if (
-        runtime_name == "tmux"
-        and not session.runtime_state.tmux_session_name
-        and session.runtime_state.pid
-    ):
-        pid = session.runtime_state.pid
-        if pid and is_alive(pid):
-            send_sigterm(pid)
-            session.status = "paused"
-            click.echo(
-                f"Session '{session_id}' → paused (legacy SIGTERM to PID {pid})"
-            )
-        else:
-            session.status = "failed"
-            click.echo(
-                f"Warning: PID {pid} not found — session '{session_id}' → failed"
-            )
+    # For subprocess runtime, a dead pid means the agent already exited
+    # (cleanly or otherwise). Surface that as 'failed' — pause doesn't
+    # make sense once the process is gone.
+    pid = session.runtime_state.pid
+    if pid and not is_alive(pid):
+        session.status = "failed"
+        click.echo(
+            f"Warning: PID {pid} not alive — session '{session_id}' → failed"
+        )
     else:
-        runtime = get_runtime(runtime_name)
         runtime.pause(session)
         session.status = "paused"
         click.echo(f"Session '{session_id}' → paused")
 
-    session.updated_at = now
+    session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
 
 
@@ -635,22 +621,10 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
         )
 
     spawn = load_resolved_spawn_config(resolved, session=session)
-    runtime_name = spawn.invocation.runtime
+    runtime = get_runtime(spawn.invocation.runtime)
 
-    # v0.7 legacy fallback: session has pid but no tmux_session_name.
-    if (
-        runtime_name == "tmux"
-        and not session.runtime_state.tmux_session_name
-        and session.runtime_state.pid
-    ):
-        pid = session.runtime_state.pid
-        if pid and session.status == "executing" and is_alive(pid):
-            send_sigterm(pid)
-            click.echo(f"Sent SIGTERM to PID {pid}")
-    else:
-        runtime = get_runtime(runtime_name)
-        if session.status == "executing":
-            runtime.abandon(session)
+    if session.status == "executing":
+        runtime.abandon(session)
 
     session.status = "abandoned"
     session.updated_at = datetime.now(tz=timezone.utc)

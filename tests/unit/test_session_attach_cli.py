@@ -38,17 +38,17 @@ class TestSessionAttach:
         assert result.exit_code == 0, result.output
         assert "claude --name s1 --session-id uuid-1" in result.output
 
-    def test_attach_tmux_runtime_execs_tmux(
+    def test_attach_subprocess_runtime_execs_tail(
         self, tmp_path_project, save_test_session
     ):
         save_test_session(
             tmp_path_project,
             "s1",
             status="executing",
-            spawn_config={"invocation": {"runtime": "tmux"}},
+            spawn_config={"invocation": {"runtime": "subprocess"}},
             runtime_state={
                 "claude_session_id": "uuid-1",
-                "tmux_session_name": "tw-s1",
+                "log_path": "/tmp/tripwire/s1-xyz.log",
                 "worktrees": [
                     {
                         "repo": "SeidoAI/code",
@@ -70,8 +70,9 @@ class TestSessionAttach:
         assert result.exit_code == 0, result.output
         mock_execvp.assert_called_once()
         prog, argv = mock_execvp.call_args[0]
-        assert prog == "tmux"
-        assert "tw-s1" in argv
+        assert prog == "tail"
+        assert "/tmp/tripwire/s1-xyz.log" in argv
+        assert "-f" in argv
 
     def test_attach_session_not_found(self, tmp_path_project):
         runner = CliRunner()
@@ -82,14 +83,14 @@ class TestSessionAttach:
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
-    def test_attach_returns_instruction_when_tmux_name_missing(
+    def test_attach_returns_instruction_when_log_path_missing(
         self, tmp_path_project, save_test_session
     ):
         save_test_session(
             tmp_path_project,
             "s1",
             status="executing",
-            spawn_config={"invocation": {"runtime": "tmux"}},
+            spawn_config={"invocation": {"runtime": "subprocess"}},
             runtime_state={"claude_session_id": "uuid-1"},
         )
 
@@ -101,6 +102,6 @@ class TestSessionAttach:
 
         assert result.exit_code == 0, result.output
         assert (
-            "no tmux session" in result.output.lower()
-            or "not found" in result.output.lower()
+            "never spawned" in result.output.lower()
+            or "no log_path" in result.output.lower()
         )

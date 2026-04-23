@@ -85,7 +85,6 @@ def test_start_invokes_popen_with_expected_argv(tmp_path):
 
     assert result.pid == 12345
     assert result.claude_session_id == "uuid-1"
-    assert result.tmux_session_name is None
 
 
 def test_start_with_resume_uses_resume_flag_not_session_id(tmp_path):
