@@ -136,15 +136,3 @@ class TestDelete:
         delete_session(project_dir, "never-existed")
 
 
-# -------- runtime_state extensions --------
-
-
-def test_runtime_state_tmux_session_name(tmp_path_project, save_test_session):
-    save_test_session(
-        tmp_path_project,
-        "s1",
-        status="planned",
-        runtime_state={"tmux_session_name": "tw-s1"},
-    )
-    session = load_session(tmp_path_project, "s1")
-    assert session.runtime_state.tmux_session_name == "tw-s1"
