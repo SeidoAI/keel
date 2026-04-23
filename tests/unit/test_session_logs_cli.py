@@ -191,3 +191,90 @@ class TestCleanupWithLogs:
         assert result.exit_code == 0, result.output
         assert s1_log.exists()
         assert s1_log.read_text() == "keep me"
+
+
+class TestSessionSummary:
+    def test_summary_text_format(
+        self, tmp_path, tmp_path_project, save_test_session
+    ):
+        """Smoke: the CLI wires session_log_parser and renders the
+        expected shape for the happy-path fixture."""
+        import shutil
+
+        fixture = (
+            Path(__file__).parent.parent
+            / "fixtures"
+            / "stream-json"
+            / "happy_path.log"
+        )
+        log_dir = tmp_path / "logs" / "tmp"
+        log_dir.mkdir(parents=True)
+        log_file = log_dir / "s1-20260423T120000.log"
+        shutil.copy(fixture, log_file)
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            runtime_state={
+                "claude_session_id": "uuid-happy",
+                "log_path": str(log_file),
+            },
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["summary", "s1", "--project-dir", str(tmp_path_project)],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "uuid-happy" in result.output
+        assert "success" in result.output
+        assert "PR opened" in result.output
+
+    def test_summary_json_format(
+        self, tmp_path, tmp_path_project, save_test_session
+    ):
+        import json as _json
+        import shutil
+
+        fixture = (
+            Path(__file__).parent.parent
+            / "fixtures"
+            / "stream-json"
+            / "stop_and_ask.log"
+        )
+        log_dir = tmp_path / "logs" / "tmp"
+        log_dir.mkdir(parents=True)
+        log_file = log_dir / "s1-20260423T120000.log"
+        shutil.copy(fixture, log_file)
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            runtime_state={
+                "claude_session_id": "uuid-ask",
+                "log_path": str(log_file),
+            },
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "summary",
+                "s1",
+                "--project-dir",
+                str(tmp_path_project),
+                "--format",
+                "json",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        payload = _json.loads(result.output)
+        assert payload["claude_session_id"] == "uuid-ask"
+        assert payload["stopped_to_ask"] is True
+        assert payload["exit_subtype"] == "success"
