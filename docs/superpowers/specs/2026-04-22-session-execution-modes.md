@@ -1,8 +1,84 @@
-# Session execution modes + agent-driven PRs
+# Session execution modes (subprocess + manual)
 
-**Status:** implemented on `feat/v0.7.2-tmux` (PR #16) with mid-stream correction — see below
+**Status:** implemented on `feat/v0.7.2-tmux` (PR #16) after two mid-stream corrections — see below
 **Authors:** sean@seido.dev + Claude Opus 4.7
-**Date:** 2026-04-22
+**Date:** 2026-04-22, 2026-04-23
+
+## Correction (2026-04-23) — tmux reverted to subprocess
+
+After landing the tmux runtime and running a real-claude probe, we hit
+four structural issues that together made tmux unfit for production:
+
+1. **Workspace-trust gate.** Claude's interactive mode blocks on an
+   Enter-to-accept dialog in every fresh cwd (= every tripwire
+   worktree). Neither `--dangerously-skip-permissions`, `--bare`, nor
+   `--add-dir` bypasses it. Only `-p` mode skips the dialog (claude's
+   own CLI help documents this).
+2. **`tmux send-keys` interprets newlines as Enter.** Multi-line
+   prompts got split into many user turns. Required `load-buffer` /
+   `paste-buffer`; fragile to verify.
+3. **`tmux capture-pane` strips trailing whitespace per line.** The
+   default `_READY_MARKER = "> "` cannot match what real claude
+   emits. The real claude ready marker is UI-version-sensitive and
+   needs re-probing every release.
+4. **Hard tmux dependency** plus a two-phase ready-probe state
+   machine (detect trust → send Enter → wait for ready).
+
+Weighed against the actual architecture — the executor agent is
+autonomous, opens a PR when done, and exits; the PM reviews on
+GitHub — none of these costs bought us anything. The "live mid-run
+attach + input" feature that motivated tmux wasn't a real
+requirement.
+
+**Pivot: `SubprocessRuntime` using `claude -p` + log file.** `-p`
+auto-skips the trust dialog, takes the prompt as an argv string
+(no newline quirks), emits `stream-json` to a log file we `tail -f`
+for live observation. No tmux, no ready-probe, no send-keys.
+
+The jsonl-corruption and resume-broken claude bugs that originally
+ruled out `-p` in the earlier spec fire only when a second `claude
+--resume` process runs against a live session. Since `tripwire
+session attach` is now `tail -f <log>` (a pure reader), no second
+process ever touches the jsonl. **Additionally:** an empirical probe
+against claude 2.1.117 found that `claude -p <prompt> --resume
+<uuid>` (with no `--session-id`) works correctly — issue #2354 is
+fixed. We had a latent bug in `build_claude_args` that sent both
+`--session-id` and `--resume` (which claude rejects); that's now
+fixed too.
+
+**Stop-and-ask semantics** hardened empirically: `AskUserQuestion`
+and `SendUserMessage` both fail in `-p` mode (no TTY to answer),
+and the agent retry-loops on the `is_error` sentinel until
+`--max-turns` exhausts. Fix: those tools go on the default
+`disallowed_tools` list, so the agent falls back to plain-text
+"here's what I can't figure out" and exits 0. The PM reads the log,
+updates the plan, spawns again with `--resume`.
+
+**Removed in this correction:**
+
+- `src/tripwire/runtimes/tmux.py` (entire file, deleted)
+- `tests/unit/test_runtimes_tmux.py`
+- `tests/fixtures/fake_tmux.py`
+- `fake_tmux_on_path` fixture
+- `RuntimeState.tmux_session_name` field
+- `RuntimeStartResult.tmux_session_name` field
+- V0.7 pid-fallback branches in `session_pause_cmd` / `session_abandon_cmd`
+
+**Added in this correction:**
+
+- `src/tripwire/runtimes/subprocess.py` — `SubprocessRuntime`
+- `SpawnDefaults.resume_prompt_template` + `render_resume_prompt`
+- Resume kickoff template (short continuation cue, not full plan.md
+  re-render) — claude's own jsonl carries the prior conversation
+- `AskUserQuestion` + `SendUserMessage` in default `disallowed_tools`
+- "headless mode" clause in the prompt template exit protocol
+- Resume-argv fix in `build_claude_args`: drop `--session-id` when
+  `resume=True`
+
+**Default runtime is now `subprocess`.** The `manual` runtime stays
+as a prep-only escape hatch. `tmux` is not a valid runtime value.
+
+---
 
 ## Correction (2026-04-22 afternoon)
 

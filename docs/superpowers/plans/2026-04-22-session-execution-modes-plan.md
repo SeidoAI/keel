@@ -1,5 +1,14 @@
 # Session Execution Modes + Dual-PR Completion Implementation Plan
 
+> **⚠️ Superseded.** This plan is kept for historical context. Its
+> dual-PR-at-session-complete architecture was reverted in the first
+> correction (2026-04-22 afternoon), and the tmux runtime was
+> reverted to subprocess in the second correction (2026-04-23). Read
+> the spec's correction preambles at
+> `docs/superpowers/specs/2026-04-22-session-execution-modes.md` for
+> the shipped design. The final implementation is a `SubprocessRuntime`
+> using `claude -p` + log file, with agent-driven PR creation at exit.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace `tripwire session spawn`'s `claude -p` subprocess launcher with a pluggable runtime model (tmux for live-attach, manual for prep-only), add a `tripwire session attach` subcommand, and extend `tripwire session complete` to open one PR per worktree with cross-linking.
