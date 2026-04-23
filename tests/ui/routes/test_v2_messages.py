@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import sys
+import inspect
 
 from tests.ui.routes.conftest import assert_v2_envelope
 
@@ -62,9 +62,16 @@ class TestMessagesOpenAPI:
 
 class TestNoSqliteImport:
     def test_sqlite_not_imported(self):
-        from tripwire.ui.routes import messages  # noqa: F401
-        from tripwire.ui.services import message_service  # noqa: F401
+        # sys.modules is global and pollutable by coverage and other test
+        # modules, so inspect the stub source directly instead.
+        from tripwire.ui.routes import messages
+        from tripwire.ui.services import message_service
 
-        assert "sqlite3" not in sys.modules, (
-            f"stub imported sqlite3: {sys.modules.get('sqlite3')!r}"
-        )
+        for mod in (messages, message_service):
+            src = inspect.getsource(mod)
+            assert "import sqlite3" not in src, (
+                f"{mod.__name__} imports sqlite3 — v2 stub should not"
+            )
+            assert "from sqlite3" not in src, (
+                f"{mod.__name__} imports from sqlite3 — v2 stub should not"
+            )
