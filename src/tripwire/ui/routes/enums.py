@@ -32,14 +32,8 @@ _NAME_RE = re.compile(_NAME_PATTERN)
 
 
 def _ensure_name(name: str) -> None:
-    """Validate the enum name manually so we can raise `400 + envelope`
-    instead of FastAPI's default `422` for path-regex mismatches.
-
-    v0.7.4: unifies the error shape across the `/api/` surface — every
-    v1 route now returns `{detail, code, hint}` with a consistent 400
-    for malformed slugs/names, so the frontend's `ApiError` helper
-    doesn't need two code paths.
-    """
+    """Raise ``400 + envelope`` on a malformed name so the error shape
+    matches every other ``/api/`` route."""
     if not _NAME_RE.match(name):
         raise envelope_exception(
             400,

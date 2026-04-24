@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 const V2_MESSAGE = "Agent monitoring ships in v2 — requires session-runtime telemetry";
 
-// v2: fetch from the session-runtime telemetry API and render one card per running session.
+// v2: render one card per running session.
 export function AgentStatusBar() {
   return (
     <Tooltip>

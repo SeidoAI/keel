@@ -198,47 +198,51 @@ def test_complete_force_bypasses_gates(tmp_path_project: Path, save_test_session
 
 
 class TestVerifyPrMerged:
-    """v0.7.4: `_verify_pr_merged` must require every worktree branch
-    to have a merged PR, not just the first one it finds. Pre-v0.7.4
-    single-worktree sessions keep the same single-branch behaviour."""
+    """`_verify_pr_merged` must require every worktree branch to have a
+    merged PR (not just the first one found), and must invoke ``gh``
+    from inside each worktree so gh picks up the correct remote when
+    the two worktrees have different origins (v0.7.4 dual-PR case)."""
 
     def _make_session(self, worktrees):
-        """Minimal session-shaped object with a runtime_state.worktrees
-        list. Avoids full pydantic construction for these direct-call
-        unit tests."""
-        from tripwire.models.session import RuntimeState, WorktreeEntry
+        from tripwire.models.session import AgentSession, RuntimeState, WorktreeEntry
 
-        entries = [
-            WorktreeEntry(
-                repo=w["repo"],
-                clone_path=w["clone_path"],
-                worktree_path=w["worktree_path"],
-                branch=w["branch"],
-            )
-            for w in worktrees
-        ]
+        entries = [WorktreeEntry(**w) for w in worktrees]
+        return AgentSession.model_validate(
+            {
+                "id": "s1",
+                "name": "t",
+                "agent": "a",
+                "runtime_state": RuntimeState(worktrees=entries).model_dump(),
+            }
+        )
 
-        class _S:
-            pass
-
-        s = _S()
-        s.runtime_state = RuntimeState(worktrees=entries)
-        return s
-
-    def test_single_worktree_merged_passes(self, monkeypatch, tmp_path):
-        """Pre-v0.7.4 regression guard: one worktree with a merged PR
-        succeeds."""
+    def _install_fake_run(self, monkeypatch, verdicts_by_branch):
+        """Stub subprocess.run so each gh call returns merged/unmerged
+        per ``verdicts_by_branch[<branch>]``. Captures every call's
+        cwd + cmd for later assertion — this is what enforces that
+        ``_verify_pr_merged`` runs gh from inside each worktree."""
         from tripwire.core import session_complete as mod
 
+        calls: list[dict] = []
+
         def fake_run(cmd, **kwargs):
+            branch = cmd[cmd.index("--head") + 1]
+            calls.append({"cmd": cmd, "cwd": kwargs.get("cwd"), "branch": branch})
+
             class _R:
                 returncode = 0
-                stdout = '[{"number": 1}]'
+                stdout = '[{"number": 1}]' if verdicts_by_branch.get(branch) else "[]"
 
             return _R()
 
         monkeypatch.setattr(mod.subprocess, "run", fake_run)
+        return calls
 
+    def test_single_worktree_merged_passes(self, monkeypatch, tmp_path):
+        """Pre-v0.7.4 regression guard."""
+        from tripwire.core import session_complete as mod
+
+        calls = self._install_fake_run(monkeypatch, {"feat/s1": True})
         session = self._make_session(
             [
                 {
@@ -249,23 +253,16 @@ class TestVerifyPrMerged:
                 }
             ]
         )
-        # No exception means pass.
         mod._verify_pr_merged(session)
+        # gh was invoked from inside the worktree.
+        assert calls[0]["cwd"] == str(tmp_path / "code-wt-s1")
 
     def test_single_worktree_unmerged_fails_with_branch_name(
         self, monkeypatch, tmp_path
     ):
         from tripwire.core import session_complete as mod
 
-        def fake_run(cmd, **kwargs):
-            class _R:
-                returncode = 0
-                stdout = "[]"
-
-            return _R()
-
-        monkeypatch.setattr(mod.subprocess, "run", fake_run)
-
+        self._install_fake_run(monkeypatch, {"feat/s1": False})
         session = self._make_session(
             [
                 {
@@ -281,20 +278,17 @@ class TestVerifyPrMerged:
         assert exc.value.code == "complete/pr_not_merged"
         assert "feat/s1" in str(exc.value)
 
-    def test_all_branches_merged_passes_dual_worktree(self, monkeypatch, tmp_path):
-        """v0.7.4: dual worktree (code + project-tracking) — both PRs
-        merged → complete proceeds."""
+    def test_all_branches_merged_passes_dual_worktree_with_per_worktree_cwd(
+        self, monkeypatch, tmp_path
+    ):
+        """v0.7.4: both PRs merged → complete proceeds. Key content
+        assertion: gh was invoked twice, each call's cwd matching the
+        corresponding worktree path — proves the ``cwd=wt.worktree_path``
+        behaviour that lets gh pick the right remote when the two
+        worktrees have different origins."""
         from tripwire.core import session_complete as mod
 
-        def fake_run(cmd, **kwargs):
-            class _R:
-                returncode = 0
-                stdout = '[{"number": 1}]'
-
-            return _R()
-
-        monkeypatch.setattr(mod.subprocess, "run", fake_run)
-
+        calls = self._install_fake_run(monkeypatch, {"feat/s1": True, "proj/s1": True})
         session = self._make_session(
             [
                 {
@@ -312,30 +306,22 @@ class TestVerifyPrMerged:
             ]
         )
         mod._verify_pr_merged(session)
+        # Each gh call ran from inside its own worktree.
+        cwds_by_branch = {c["branch"]: c["cwd"] for c in calls}
+        assert cwds_by_branch == {
+            "feat/s1": str(tmp_path / "code-wt-s1"),
+            "proj/s1": str(tmp_path / "proj-wt-s1"),
+        }
 
     def test_one_branch_unmerged_fails_with_that_branch_name(
         self, monkeypatch, tmp_path
     ):
-        """The critical v0.7.4 change: first branch merged, second not
-        → complete refuses and names the unmerged branch. Pre-v0.7.4
-        semantics would have returned on the first merged PR and
-        missed the second."""
+        """First branch merged, second not → complete refuses and names
+        the unmerged branch. Pre-v0.7.4 semantics would have early-
+        exited on the first merged PR and missed the second."""
         from tripwire.core import session_complete as mod
 
-        calls = []
-
-        def fake_run(cmd, **kwargs):
-            calls.append(cmd)
-            # First call merged, second empty.
-
-            class _R:
-                returncode = 0
-                stdout = '[{"number": 1}]' if len(calls) == 1 else "[]"
-
-            return _R()
-
-        monkeypatch.setattr(mod.subprocess, "run", fake_run)
-
+        calls = self._install_fake_run(monkeypatch, {"feat/s1": True, "proj/s1": False})
         session = self._make_session(
             [
                 {
@@ -358,7 +344,7 @@ class TestVerifyPrMerged:
         assert "proj/s1" in str(exc.value)
         # feat/s1 merged, so should NOT be in the error message.
         assert "feat/s1" not in str(exc.value)
-        # Content check: iterated all branches, didn't early-exit.
+        # Content check: iterated all branches (didn't early-exit).
         assert len(calls) == 2
 
     def test_empty_worktrees_raises(self):

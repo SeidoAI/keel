@@ -125,18 +125,10 @@ def complete_session(
 
 
 def _verify_pr_merged(session) -> None:
-    """Require every worktree branch to have a merged PR.
-
-    v0.7.4: a session may own >1 worktree (code repo + per-session
-    project-tracking repo), and ``complete`` must wait for BOTH PRs to
-    merge before transitioning the session to ``done``. The previous
-    behaviour — return on the first merged PR found — was correct for
-    single-worktree sessions but would let a half-merged dual-PR
-    session slip through.
-
-    Queries ``gh`` from inside each worktree so ``gh`` picks up the
-    correct remote (the two worktrees may have different origins, e.g.
-    SeidoAI/tripwire + project-tripwire-ui-init).
+    """Require every worktree branch to have a merged PR; raise
+    :class:`CompleteError` naming the unmerged branch(es) otherwise.
+    ``gh`` is invoked from inside each worktree so it picks up the
+    correct remote when worktrees have different origins.
     """
     worktrees = list(session.runtime_state.worktrees)
     if not worktrees:
