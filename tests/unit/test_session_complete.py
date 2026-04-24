@@ -195,3 +195,177 @@ def test_complete_force_bypasses_gates(tmp_path_project: Path, save_test_session
         skip_artifact_check=True,
     )
     assert result.session_id == "s1"
+
+
+class TestVerifyPrMerged:
+    """v0.7.4: `_verify_pr_merged` must require every worktree branch
+    to have a merged PR, not just the first one it finds. Pre-v0.7.4
+    single-worktree sessions keep the same single-branch behaviour."""
+
+    def _make_session(self, worktrees):
+        """Minimal session-shaped object with a runtime_state.worktrees
+        list. Avoids full pydantic construction for these direct-call
+        unit tests."""
+        from tripwire.models.session import RuntimeState, WorktreeEntry
+
+        entries = [
+            WorktreeEntry(
+                repo=w["repo"],
+                clone_path=w["clone_path"],
+                worktree_path=w["worktree_path"],
+                branch=w["branch"],
+            )
+            for w in worktrees
+        ]
+
+        class _S:
+            pass
+
+        s = _S()
+        s.runtime_state = RuntimeState(worktrees=entries)
+        return s
+
+    def test_single_worktree_merged_passes(self, monkeypatch, tmp_path):
+        """Pre-v0.7.4 regression guard: one worktree with a merged PR
+        succeeds."""
+        from tripwire.core import session_complete as mod
+
+        def fake_run(cmd, **kwargs):
+            class _R:
+                returncode = 0
+                stdout = '[{"number": 1}]'
+
+            return _R()
+
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+        session = self._make_session(
+            [
+                {
+                    "repo": "SeidoAI/code",
+                    "clone_path": str(tmp_path / "code"),
+                    "worktree_path": str(tmp_path / "code-wt-s1"),
+                    "branch": "feat/s1",
+                }
+            ]
+        )
+        # No exception means pass.
+        mod._verify_pr_merged(session)
+
+    def test_single_worktree_unmerged_fails_with_branch_name(
+        self, monkeypatch, tmp_path
+    ):
+        from tripwire.core import session_complete as mod
+
+        def fake_run(cmd, **kwargs):
+            class _R:
+                returncode = 0
+                stdout = "[]"
+
+            return _R()
+
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+        session = self._make_session(
+            [
+                {
+                    "repo": "SeidoAI/code",
+                    "clone_path": str(tmp_path / "code"),
+                    "worktree_path": str(tmp_path / "code-wt-s1"),
+                    "branch": "feat/s1",
+                }
+            ]
+        )
+        with pytest.raises(CompleteError) as exc:
+            mod._verify_pr_merged(session)
+        assert exc.value.code == "complete/pr_not_merged"
+        assert "feat/s1" in str(exc.value)
+
+    def test_all_branches_merged_passes_dual_worktree(self, monkeypatch, tmp_path):
+        """v0.7.4: dual worktree (code + project-tracking) — both PRs
+        merged → complete proceeds."""
+        from tripwire.core import session_complete as mod
+
+        def fake_run(cmd, **kwargs):
+            class _R:
+                returncode = 0
+                stdout = '[{"number": 1}]'
+
+            return _R()
+
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+        session = self._make_session(
+            [
+                {
+                    "repo": "SeidoAI/code",
+                    "clone_path": str(tmp_path / "code"),
+                    "worktree_path": str(tmp_path / "code-wt-s1"),
+                    "branch": "feat/s1",
+                },
+                {
+                    "repo": "proj-tracking",
+                    "clone_path": str(tmp_path / "proj"),
+                    "worktree_path": str(tmp_path / "proj-wt-s1"),
+                    "branch": "proj/s1",
+                },
+            ]
+        )
+        mod._verify_pr_merged(session)
+
+    def test_one_branch_unmerged_fails_with_that_branch_name(
+        self, monkeypatch, tmp_path
+    ):
+        """The critical v0.7.4 change: first branch merged, second not
+        → complete refuses and names the unmerged branch. Pre-v0.7.4
+        semantics would have returned on the first merged PR and
+        missed the second."""
+        from tripwire.core import session_complete as mod
+
+        calls = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append(cmd)
+            # First call merged, second empty.
+
+            class _R:
+                returncode = 0
+                stdout = '[{"number": 1}]' if len(calls) == 1 else "[]"
+
+            return _R()
+
+        monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+        session = self._make_session(
+            [
+                {
+                    "repo": "SeidoAI/code",
+                    "clone_path": str(tmp_path / "code"),
+                    "worktree_path": str(tmp_path / "code-wt-s1"),
+                    "branch": "feat/s1",
+                },
+                {
+                    "repo": "proj-tracking",
+                    "clone_path": str(tmp_path / "proj"),
+                    "worktree_path": str(tmp_path / "proj-wt-s1"),
+                    "branch": "proj/s1",
+                },
+            ]
+        )
+        with pytest.raises(CompleteError) as exc:
+            mod._verify_pr_merged(session)
+        assert exc.value.code == "complete/pr_not_merged"
+        assert "proj/s1" in str(exc.value)
+        # feat/s1 merged, so should NOT be in the error message.
+        assert "feat/s1" not in str(exc.value)
+        # Content check: iterated all branches, didn't early-exit.
+        assert len(calls) == 2
+
+    def test_empty_worktrees_raises(self):
+        from tripwire.core import session_complete as mod
+
+        session = self._make_session([])
+        with pytest.raises(CompleteError) as exc:
+            mod._verify_pr_merged(session)
+        assert exc.value.code == "complete/pr_not_merged"
+        assert "no recorded worktrees" in str(exc.value)
