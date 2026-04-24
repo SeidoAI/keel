@@ -4,7 +4,7 @@ import type { Reference as MarkdownReference } from "@/components/markdown/remar
 import { apiGet, apiPatch, apiPost } from "../client";
 import { queryKeys, staleTime } from "../queryKeys";
 
-export type IssueReferenceKind = "node" | "issue" | "dangling";
+export type IssueReferenceKind = "node" | "issue" | "session" | "dangling";
 
 export interface IssueReference {
   ref: string;
@@ -12,6 +12,11 @@ export interface IssueReference {
   is_stale: boolean;
 }
 
+// Aliases for code paths using the shorter names from PR #21 (`Reference`, `ReferenceKind`).
+export type ReferenceKind = IssueReferenceKind;
+export type Reference = IssueReference;
+
+/** Mirrors `IssueSummary` from `tripwire.ui.services.issue_service`. */
 export interface IssueSummary {
   id: string;
   title: string;
@@ -40,7 +45,28 @@ export interface IssuePatchBody {
   status?: string;
   priority?: string;
   labels?: string[];
-  agent?: string;
+  agent?: string | null;
+}
+
+// Alias for code paths using PR #21's shorter name.
+export type IssuePatch = IssuePatchBody;
+
+export interface IssueFilterParams {
+  status?: string;
+  executor?: string;
+  label?: string;
+  parent?: string;
+}
+
+function buildQuery(filters?: IssueFilterParams): string {
+  if (!filters) return "";
+  const params = new URLSearchParams();
+  if (filters.status) params.set("status", filters.status);
+  if (filters.executor) params.set("executor", filters.executor);
+  if (filters.label) params.set("label", filters.label);
+  if (filters.parent) params.set("parent", filters.parent);
+  const s = params.toString();
+  return s ? `?${s}` : "";
 }
 
 export interface ValidationFinding {
@@ -77,6 +103,10 @@ export interface IssueValidationReport {
 }
 
 export const issuesApi = {
+  list: (pid: string, filters?: IssueFilterParams) =>
+    apiGet<IssueSummary[]>(
+      `/api/projects/${encodeURIComponent(pid)}/issues${buildQuery(filters)}`,
+    ),
   get: (pid: string, key: string) =>
     apiGet<IssueDetail>(
       `/api/projects/${encodeURIComponent(pid)}/issues/${encodeURIComponent(key)}`,

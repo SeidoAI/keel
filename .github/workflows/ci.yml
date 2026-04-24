@@ -20,4 +20,4 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check
       - name: Pytest
-        run: uv run pytest tests/ -q
+        run: uv run pytest tests/ -q --cov=src/tripwire --cov-report=term-missing

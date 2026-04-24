@@ -15,6 +15,7 @@ export interface RepoBinding {
   pr_number: number | null;
 }
 
+/** Mirrors `SessionSummary` from `tripwire.ui.services.session_service`. */
 export interface SessionSummary {
   id: string;
   name: string;
@@ -41,7 +42,9 @@ export interface SessionDetail extends SessionSummary {
 export const sessionsApi = {
   list: (pid: string, status?: string) => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-    return apiGet<SessionSummary[]>(`/api/projects/${encodeURIComponent(pid)}/sessions${qs}`);
+    return apiGet<SessionSummary[]>(
+      `/api/projects/${encodeURIComponent(pid)}/sessions${qs}`,
+    );
   },
   get: (pid: string, sid: string) =>
     apiGet<SessionDetail>(
