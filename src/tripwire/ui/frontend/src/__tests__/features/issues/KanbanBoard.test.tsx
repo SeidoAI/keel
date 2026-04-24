@@ -1,68 +1,30 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { type ReactNode, useEffect } from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type UpdateStatusVariables,
   useUpdateIssueStatus,
 } from "@/features/issues/hooks/useIssues";
 import { KanbanBoard } from "@/features/issues/KanbanBoard";
-import type { EnumDescriptor } from "@/lib/api/endpoints/enums";
 import type { IssueFilterParams, IssueSummary } from "@/lib/api/endpoints/issues";
 import { queryKeys } from "@/lib/api/queryKeys";
+import {
+  makeIssueStatusEnum,
+  makeIssueSummary,
+} from "../../mocks/fixtures";
 import { server } from "../../mocks/server";
+import { makeTestQueryClient, renderWithProviders } from "../../test-utils";
 
 vi.mock("@/app/ProjectShell", () => ({
   useProjectShell: () => ({ projectId: "p1", wsStatus: "open" }),
 }));
 
-const ENUM: EnumDescriptor = {
-  name: "issue_status",
-  values: [
-    { value: "todo", label: "To do", color: "#888", description: null },
-    { value: "doing", label: "Doing", color: "#0af", description: null },
-    { value: "done", label: "Done", color: "#0f0", description: null },
-  ],
-};
+const ENUM = makeIssueStatusEnum();
 
-function issue(id: string, status: string, overrides: Partial<IssueSummary> = {}): IssueSummary {
-  return {
-    id,
-    title: `title ${id}`,
-    status,
-    priority: "medium",
-    executor: "ai",
-    verifier: "required",
-    kind: null,
-    agent: null,
-    labels: [],
-    parent: null,
-    repo: null,
-    blocked_by: [],
-    is_blocked: false,
-    is_epic: false,
-    ...overrides,
-  };
-}
-
-function makeClient() {
-  return new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
-  });
-}
-
-function withClient(qc: QueryClient) {
-  return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/p/p1/board"]}>
-        <Routes>
-          <Route path="/p/:projectId/board" element={children} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
+function issue(id: string, status: string): IssueSummary {
+  return makeIssueSummary({ id, title: `title ${id}`, status });
 }
 
 /**
@@ -92,24 +54,32 @@ describe("KanbanBoard", () => {
   });
 
   it("renders one column per enum value in order", () => {
-    const qc = makeClient();
+    const qc = makeTestQueryClient();
     qc.setQueryData(queryKeys.issues("p1"), [issue("X-1", "todo")]);
     qc.setQueryData(queryKeys.enum("p1", "issue_status"), ENUM);
-    render(<KanbanBoard />, { wrapper: withClient(qc) });
+    renderWithProviders(<KanbanBoard />, {
+      queryClient: qc,
+      initialPath: "/p/p1/board",
+      routePath: "/p/:projectId/board",
+    });
     expect(screen.getByLabelText("To do column")).toBeInTheDocument();
     expect(screen.getByLabelText("Doing column")).toBeInTheDocument();
     expect(screen.getByLabelText("Done column")).toBeInTheDocument();
   });
 
   it("puts each issue in the column matching its status", () => {
-    const qc = makeClient();
+    const qc = makeTestQueryClient();
     qc.setQueryData(queryKeys.issues("p1"), [
       issue("X-1", "todo"),
       issue("X-2", "doing"),
       issue("X-3", "done"),
     ]);
     qc.setQueryData(queryKeys.enum("p1", "issue_status"), ENUM);
-    render(<KanbanBoard />, { wrapper: withClient(qc) });
+    renderWithProviders(<KanbanBoard />, {
+      queryClient: qc,
+      initialPath: "/p/p1/board",
+      routePath: "/p/:projectId/board",
+    });
 
     expect(
       within(screen.getByTestId("kanban-column-todo")).getByTestId("issue-card-X-1"),
@@ -138,12 +108,12 @@ describe("KanbanBoard", () => {
       ),
     );
 
-    const qc = makeClient();
+    const qc = makeTestQueryClient();
     qc.setQueryData(queryKeys.issues("p1"), persisted);
     qc.setQueryData(queryKeys.enum("p1", "issue_status"), ENUM);
 
     let mutate: ((v: UpdateStatusVariables) => Promise<IssueSummary>) | null = null;
-    render(
+    renderWithProviders(
       <>
         <KanbanBoard />
         <MutationHarness
@@ -152,7 +122,11 @@ describe("KanbanBoard", () => {
           }}
         />
       </>,
-      { wrapper: withClient(qc) },
+      {
+        queryClient: qc,
+        initialPath: "/p/p1/board",
+        routePath: "/p/:projectId/board",
+      },
     );
 
     // Before the move, X-1 is in "todo".
@@ -208,10 +182,12 @@ describe("KanbanBoard", () => {
       ),
     );
 
-    const qc = makeClient();
+    const qc = makeTestQueryClient();
     qc.setQueryData(queryKeys.issues("p1"), originalList);
     qc.setQueryData(queryKeys.issuesFiltered("p1", filters), originalFiltered);
 
+    // This test only needs the mutation harness — no Router because
+    // we're asserting on the cache, not on rendered output.
     let mutate: ((v: UpdateStatusVariables) => Promise<IssueSummary>) | null = null;
     render(
       <QueryClientProvider client={qc}>

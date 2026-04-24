@@ -1,11 +1,11 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { http } from "msw";
-import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { makeProject } from "../../mocks/fixtures";
 import { server } from "../../mocks/server";
+import { makeTestQueryClient, renderWithProviders } from "../../test-utils";
 
 vi.mock("@/app/ProjectShell", () => ({
   useProjectShell: () => ({ projectId: "p1", wsStatus: "open" }),
@@ -16,37 +16,22 @@ async function loadBadge() {
   return mod.PhaseBadge;
 }
 
-function withProject(project: ProjectDetail | undefined): {
-  wrapper: ({ children }: { children: ReactNode }) => ReactElement;
-} {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
-  });
-  if (project) {
-    queryClient.setQueryData(queryKeys.project("p1"), project);
-  }
-  return {
-    wrapper: ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    ),
-  };
+function renderBadge(project: ProjectDetail | undefined) {
+  const qc = makeTestQueryClient();
+  if (project) qc.setQueryData(queryKeys.project("p1"), project);
+  return qc;
 }
 
-describe("PhaseBadge", () => {
-  afterEach(() => {
-    cleanup();
-  });
+afterEach(() => {
+  cleanup();
+});
 
+describe("PhaseBadge", () => {
   it("renders the phase label and applies the phase-specific style", async () => {
     const PhaseBadge = await loadBadge();
-    const { wrapper } = withProject({
-      id: "p1",
-      name: "Demo",
-      key_prefix: "DEMO",
-      phase: "executing",
+    renderWithProviders(<PhaseBadge />, {
+      queryClient: renderBadge(makeProject({ phase: "executing" })),
     });
-
-    render(<PhaseBadge />, { wrapper });
 
     const button = screen.getByRole("button", { name: /project phase: executing/i });
     expect(button).toHaveAttribute("data-phase", "executing");
@@ -60,13 +45,9 @@ describe("PhaseBadge", () => {
       ["scoped", "violet"],
       ["reviewing", "amber"],
     ] as const) {
-      const { wrapper } = withProject({
-        id: "p1",
-        name: "Demo",
-        key_prefix: "DEMO",
-        phase,
+      const { unmount } = renderWithProviders(<PhaseBadge />, {
+        queryClient: renderBadge(makeProject({ phase })),
       });
-      const { unmount } = render(<PhaseBadge />, { wrapper });
       const button = screen.getByRole("button", { name: new RegExp(phase, "i") });
       expect(button.className).toMatch(new RegExp(token));
       unmount();
@@ -75,14 +56,9 @@ describe("PhaseBadge", () => {
 
   it("falls back to neutral styling for an unknown phase", async () => {
     const PhaseBadge = await loadBadge();
-    const { wrapper } = withProject({
-      id: "p1",
-      name: "Demo",
-      key_prefix: "DEMO",
-      phase: "archived",
+    renderWithProviders(<PhaseBadge />, {
+      queryClient: renderBadge(makeProject({ phase: "archived" })),
     });
-
-    render(<PhaseBadge />, { wrapper });
     const button = screen.getByRole("button", { name: /archived/i });
     expect(button.className).toMatch(/muted/);
   });
@@ -92,40 +68,27 @@ describe("PhaseBadge", () => {
     // `isLoading: true`. We hold the request open with an
     // unresolved promise so the assertion runs before any
     // reconciliation flips the skeleton off.
-    server.use(
-      http.get("/api/projects/p1", () => new Promise<Response>(() => {})),
-    );
+    server.use(http.get("/api/projects/p1", () => new Promise<Response>(() => {})));
     const PhaseBadge = await loadBadge();
-    const { wrapper } = withProject(undefined);
 
-    render(<PhaseBadge />, { wrapper });
+    renderWithProviders(<PhaseBadge />, { queryClient: renderBadge(undefined) });
     expect(screen.getByLabelText("Project phase loading")).toBeInTheDocument();
   });
 
   it("lists phase transitions when phase_log is present", async () => {
     const PhaseBadge = await loadBadge();
-    const { wrapper } = withProject({
-      id: "p1",
-      name: "Demo",
-      key_prefix: "DEMO",
-      phase: "executing",
-      phase_log: [
-        {
-          from: "scoping",
-          to: "scoped",
-          at: "2026-04-10T12:00:00Z",
-          by: "pm-agent",
-        },
-        {
-          from: "scoped",
-          to: "executing",
-          at: "2026-04-15T09:30:00Z",
-          by: "sean",
-        },
-      ],
+    renderWithProviders(<PhaseBadge />, {
+      queryClient: renderBadge(
+        makeProject({
+          phase: "executing",
+          phase_log: [
+            { from: "scoping", to: "scoped", at: "2026-04-10T12:00:00Z", by: "pm-agent" },
+            { from: "scoped", to: "executing", at: "2026-04-15T09:30:00Z", by: "sean" },
+          ],
+        }),
+      ),
     });
 
-    render(<PhaseBadge />, { wrapper });
     fireEvent.click(screen.getByRole("button", { name: /executing/i }));
 
     expect(screen.getByText("Phase transitions")).toBeInTheDocument();
@@ -136,14 +99,10 @@ describe("PhaseBadge", () => {
 
   it("shows the empty-state message when phase_log is missing", async () => {
     const PhaseBadge = await loadBadge();
-    const { wrapper } = withProject({
-      id: "p1",
-      name: "Demo",
-      key_prefix: "DEMO",
-      phase: "scoping",
+    renderWithProviders(<PhaseBadge />, {
+      queryClient: renderBadge(makeProject({ phase: "scoping" })),
     });
 
-    render(<PhaseBadge />, { wrapper });
     fireEvent.click(screen.getByRole("button", { name: /scoping/i }));
 
     expect(screen.getByText("No transitions recorded yet.")).toBeInTheDocument();

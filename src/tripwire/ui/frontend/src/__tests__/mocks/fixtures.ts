@@ -8,13 +8,26 @@
  * cache priming — they are the single source of truth for fixture
  * shape across the test suite.
  */
-import type { ArtifactManifest, ArtifactStatus } from "@/lib/api/endpoints/artifacts";
+import type {
+  ArtifactManifest,
+  ArtifactSpec,
+  ArtifactStatus,
+} from "@/lib/api/endpoints/artifacts";
 import type { EnumDescriptor } from "@/lib/api/endpoints/enums";
 import type { ReactFlowGraph } from "@/lib/api/endpoints/graph";
 import type { IssueDetail, IssueSummary } from "@/lib/api/endpoints/issues";
-import type { NodeDetail, NodeSummary, ReverseRefsResult } from "@/lib/api/endpoints/nodes";
+import type {
+  NodeDetail,
+  NodeSummary,
+  Referrer,
+  ReverseRefsResult,
+} from "@/lib/api/endpoints/nodes";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
-import type { SessionDetail, SessionSummary } from "@/lib/api/endpoints/sessions";
+import type {
+  RepoBinding,
+  SessionDetail,
+  SessionSummary,
+} from "@/lib/api/endpoints/sessions";
 
 export const FIXTURE_PROJECT_ID = "p1";
 
@@ -26,6 +39,13 @@ export function makeProject(overrides: Partial<ProjectDetail> = {}): ProjectDeta
     phase: "executing",
     dir: "/tmp/demo",
     repos: { "SeidoAI/tripwire": { local: null, github: null } },
+    status_transitions: {
+      todo: ["in_progress"],
+      in_progress: ["in_review", "blocked"],
+      in_review: ["done", "in_progress"],
+      blocked: ["in_progress"],
+      done: [],
+    },
     ...overrides,
   };
 }
@@ -130,6 +150,56 @@ export function makeReverseRefs(overrides: Partial<ReverseRefsResult> = {}): Rev
   return {
     node_id: "demo-node",
     referrers: [],
+    ...overrides,
+  };
+}
+
+/** Build N referrers — handy for paginator tests. */
+export function makeReferrers(count: number, prefix = "DEMO"): Referrer[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `${prefix}-${i + 1}`,
+    kind: "issue" as const,
+  }));
+}
+
+export function makeRepoBinding(overrides: Partial<RepoBinding> = {}): RepoBinding {
+  return {
+    repo: "SeidoAI/tripwire",
+    base_branch: "main",
+    branch: null,
+    pr_number: null,
+    ...overrides,
+  };
+}
+
+export function makeArtifactSpec(overrides: Partial<ArtifactSpec> = {}): ArtifactSpec {
+  return {
+    name: "plan",
+    file: "plan.md",
+    template: "plan",
+    produced_at: "planning",
+    produced_by: "pm",
+    owned_by: null,
+    required: true,
+    approval_gate: false,
+    ...overrides,
+  };
+}
+
+/** Wrap an `ArtifactSpec` in an `ArtifactStatus` with sensible
+ *  present-or-not defaults (size + mtime when present, both null
+ *  otherwise). */
+export function makeArtifactStatus(
+  spec: ArtifactSpec,
+  present: boolean,
+  overrides: Partial<ArtifactStatus> = {},
+): ArtifactStatus {
+  return {
+    spec,
+    present,
+    size_bytes: present ? 120 : null,
+    last_modified: present ? "2026-04-24T00:00:00Z" : null,
+    approval: null,
     ...overrides,
   };
 }

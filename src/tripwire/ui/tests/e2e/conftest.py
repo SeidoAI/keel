@@ -13,6 +13,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Iterator
 from pathlib import Path
@@ -37,10 +38,7 @@ def _make_minimal_project(root: Path) -> Path:
     """Write the smallest valid tripwire project directory at *root*."""
     root.mkdir(parents=True, exist_ok=True)
     (root / "project.yaml").write_text(
-        "name: e2e\n"
-        "key_prefix: E2E\n"
-        "next_issue_number: 1\n"
-        "next_session_number: 1\n",
+        "name: e2e\nkey_prefix: E2E\nnext_issue_number: 1\nnext_session_number: 1\n",
         encoding="utf-8",
     )
     for sub in ("issues", "nodes", "sessions", "docs"):
@@ -52,6 +50,15 @@ def _make_minimal_project(root: Path) -> Path:
 def tripwire_ui_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict]:
     project_dir = _make_minimal_project(tmp_path_factory.mktemp("e2e_proj"))
     port = _free_port()
+
+    # Subprocess output goes to a tempfile (not subprocess.PIPE) so
+    # uvicorn's startup chatter can't fill the ~64KB OS pipe buffer
+    # and block the child on write — that failure would surface as a
+    # 30s readiness timeout instead of the actual cause. The file is
+    # only read on the unhappy path (early exit or readiness timeout).
+    log_file = tempfile.NamedTemporaryFile(
+        prefix="tripwire-ui-e2e-", suffix=".log", delete=False
+    )
 
     # Invoke via the current interpreter's `-m` so the test always uses
     # the in-tree code, not whatever `tripwire` may resolve to on PATH.
@@ -73,31 +80,44 @@ def tripwire_ui_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dic
             str(port),
             "--no-browser",
         ],
-        stdout=subprocess.PIPE,
+        stdout=log_file,
         stderr=subprocess.STDOUT,
         cwd=str(project_dir),
         env={**os.environ, "PYTHONUNBUFFERED": "1"},
     )
 
+    def _read_log() -> str:
+        log_file.flush()
+        try:
+            return Path(log_file.name).read_text(errors="replace")
+        except OSError:
+            return "<log file unreadable>"
+
     base_url = f"http://127.0.0.1:{port}"
     deadline = time.time() + 30.0
     last_err: Exception | None = None
+    ready = False
     while time.time() < deadline:
         if proc.poll() is not None:
-            output = (proc.stdout.read() if proc.stdout else b"").decode(errors="replace")
             raise RuntimeError(
-                f"tripwire ui exited early with code {proc.returncode}\n--- output ---\n{output}"
+                f"tripwire ui exited early with code {proc.returncode}\n"
+                f"--- subprocess log ---\n{_read_log()}"
             )
         try:
             r = httpx.get(f"{base_url}/api/health", timeout=1.0)
             if r.status_code == 200:
+                ready = True
                 break
         except httpx.HTTPError as exc:
             last_err = exc
         time.sleep(0.2)
-    else:
+
+    if not ready:
         proc.terminate()
-        raise RuntimeError(f"tripwire ui did not become ready in 30s (last err: {last_err!r})")
+        raise RuntimeError(
+            f"tripwire ui did not become ready in 30s (last err: {last_err!r})\n"
+            f"--- subprocess log ---\n{_read_log()}"
+        )
 
     try:
         yield {
@@ -114,3 +134,8 @@ def tripwire_ui_server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dic
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()
+        log_file.close()
+        try:
+            os.unlink(log_file.name)
+        except OSError:
+            pass

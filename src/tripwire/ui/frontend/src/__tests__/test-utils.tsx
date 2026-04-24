@@ -23,8 +23,16 @@ export interface RenderWithProvidersOptions extends Omit<RenderOptions, "wrapper
   queryClient?: QueryClient;
   /** Single entry path to seed `MemoryRouter`; default `"/"`. */
   initialPath?: string;
-  /** Optional route pattern — defaults to wrapping `ui` in a wildcard. */
+  /** Optional route pattern — when supplied, `ui` mounts under it so
+   *  `useParams()` resolves the placeholders from `initialPath`. */
   routePath?: string;
+  /** Extra `<Route>` siblings (back-nav stubs etc.). Ignored unless
+   *  `routePath` is also supplied. */
+  extraRoutes?: ReactNode;
+  /** Wrap the rendered target in extra context providers
+   *  (e.g., `TooltipProvider`). The wrapper sits between the route
+   *  element and the test target. */
+  wrap?: (target: ReactNode) => ReactElement;
 }
 
 export interface RenderWithProvidersResult extends RenderResult {
@@ -37,11 +45,17 @@ export interface RenderWithProvidersResult extends RenderResult {
  *
  * If `routePath` is supplied, `ui` is mounted under that route so
  * components calling `useParams()` see the path params from
- * `initialPath`. If omitted, `ui` is rendered at the root and the
- * caller is responsible for any nested Routes.
+ * `initialPath`. `extraRoutes` lets the test add sibling `<Route>`
+ * stubs (a back-nav target, an "issue not found" landing page).
  *
- * Returns the standard RTL result PLUS the `queryClient` so the
- * test can `setQueryData(...)` after mount or assert cache writes.
+ * `wrap(target)` lets the test layer extra providers (typically
+ * `TooltipProvider` or `ErrorBoundary`) between the route element
+ * and the test target without forcing every caller to construct a
+ * full Wrapper component.
+ *
+ * Returns the standard RTL result PLUS the `queryClient` handle so
+ * the test can `setQueryData(...)` after mount or assert cache
+ * writes.
  */
 export function renderWithProviders(
   ui: ReactElement,
@@ -51,19 +65,23 @@ export function renderWithProviders(
     queryClient = makeTestQueryClient(),
     initialPath = "/",
     routePath,
+    extraRoutes,
+    wrap,
     ...rtlOptions
   } = options;
 
   function Wrapper({ children }: { children: ReactNode }) {
+    const target = wrap ? wrap(children) : children;
     return (
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[initialPath]}>
           {routePath ? (
             <Routes>
-              <Route path={routePath} element={children} />
+              <Route path={routePath} element={target} />
+              {extraRoutes}
             </Routes>
           ) : (
-            children
+            target
           )}
         </MemoryRouter>
       </QueryClientProvider>

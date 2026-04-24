@@ -1,15 +1,15 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import type { ReactElement, ReactNode } from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Route } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { IssueDetail as IssueDetailView } from "@/features/issues/IssueDetail";
 import type { IssueDetail, IssueValidationReport } from "@/lib/api/endpoints/issues";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { makeIssueDetail, makeProject } from "../../mocks/fixtures";
 import { server } from "../../mocks/server";
+import { makeTestQueryClient, renderWithProviders } from "../../test-utils";
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -31,22 +31,17 @@ vi.mock("sonner", () => ({
   },
 }));
 
-function baseIssue(overrides: Partial<IssueDetail> = {}): IssueDetail {
-  return {
-    id: "KUI-42",
+const ISSUE_ID = "KUI-42";
+
+function fixtureIssue(overrides: Partial<IssueDetail> = {}): IssueDetail {
+  return makeIssueDetail({
+    id: ISSUE_ID,
     title: "Implement auth endpoint",
     status: "in_progress",
     priority: "high",
-    executor: "ai",
-    verifier: "required",
-    kind: null,
-    agent: null,
     labels: ["domain/backend"],
     parent: "KUI-8",
     repo: "SeidoAI/tripwire",
-    blocked_by: [],
-    is_blocked: false,
-    is_epic: false,
     body: "See [[user-model]] and [[old-node]] and [[missing]].",
     refs: [
       { ref: "user-model", resolves_as: "node", is_stale: false },
@@ -56,48 +51,38 @@ function baseIssue(overrides: Partial<IssueDetail> = {}): IssueDetail {
     created_at: "2026-04-14T11:30:00",
     updated_at: "2026-04-15T09:00:00",
     ...overrides,
-  };
+  });
 }
 
-function baseProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
-  return {
-    id: "p1",
+function fixtureProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
+  return makeProject({
     name: "Demo",
     key_prefix: "KUI",
-    phase: "executing",
     status_transitions: {
       in_progress: ["in_review", "blocked"],
       todo: ["in_progress"],
     },
-    dir: "/tmp/demo",
     ...overrides,
-  };
+  });
 }
 
-function prime(
-  issue: IssueDetail | undefined,
-  project: ProjectDetail | undefined,
-): { wrapper: ({ children }: { children: ReactNode }) => ReactElement; qc: QueryClient } {
-  const qc = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+/** Seed cache with the issue + project, and render via the
+ *  helper. The `extraRoutes` stub handles in-tree navigation to
+ *  the board (the "Back to board" link from the not-found state). */
+function renderIssueDetail(opts: {
+  issue?: IssueDetail;
+  project?: ProjectDetail;
+  initialPath?: string;
+}) {
+  const qc = makeTestQueryClient();
+  if (opts.issue) qc.setQueryData(queryKeys.issue("p1", opts.issue.id), opts.issue);
+  if (opts.project) qc.setQueryData(queryKeys.project("p1"), opts.project);
+  return renderWithProviders(<IssueDetailView />, {
+    queryClient: qc,
+    initialPath: opts.initialPath ?? `/p/p1/issues/${ISSUE_ID}`,
+    routePath: "/p/:projectId/issues/:key",
+    extraRoutes: <Route path="/p/:projectId/board" element={<div>Board stub</div>} />,
   });
-  if (issue) {
-    qc.setQueryData(queryKeys.issue("p1", issue.id), issue);
-  }
-  if (project) {
-    qc.setQueryData(queryKeys.project("p1"), project);
-  }
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/p/p1/issues/KUI-42"]}>
-        <Routes>
-          <Route path="/p/:projectId/issues/:key" element={children} />
-          <Route path="/p/:projectId/board" element={<div>Board stub</div>} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
-  return { wrapper, qc };
 }
 
 afterEach(() => {
@@ -108,10 +93,9 @@ afterEach(() => {
 
 describe("IssueDetail", () => {
   it("renders header, badges, body, refs, and timeline", () => {
-    const { wrapper } = prime(baseIssue(), baseProject());
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
 
-    expect(screen.getByText("KUI-42")).toBeInTheDocument();
+    expect(screen.getByText(ISSUE_ID)).toBeInTheDocument();
     expect(screen.getByText("Implement auth endpoint")).toBeInTheDocument();
     expect(screen.getByText(/Epic:/)).toBeInTheDocument();
     expect(screen.getByText("in_progress")).toBeInTheDocument();
@@ -124,8 +108,10 @@ describe("IssueDetail", () => {
   });
 
   it("renders each ref type with the correct status icon", () => {
-    const { wrapper } = prime(baseIssue(), baseProject());
-    const { container } = render(<IssueDetailView />, { wrapper });
+    const { container } = renderIssueDetail({
+      issue: fixtureIssue(),
+      project: fixtureProject(),
+    });
 
     const userModelRow = container.querySelector('li[data-ref-token="user-model"]');
     expect(userModelRow?.querySelector('[data-status="resolved"]')).not.toBeNull();
@@ -148,19 +134,7 @@ describe("IssueDetail", () => {
         ),
       ),
     );
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    qc.setQueryData(queryKeys.project("p1"), baseProject());
-    const wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={["/p/p1/issues/KUI-99"]}>
-          <Routes>
-            <Route path="/p/:projectId/issues/:key" element={children} />
-            <Route path="/p/:projectId/board" element={<div>Board stub</div>} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({ project: fixtureProject(), initialPath: "/p/p1/issues/KUI-99" });
 
     expect(await screen.findByText("Issue not found")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Back to board/ })).toHaveAttribute(
@@ -172,23 +146,20 @@ describe("IssueDetail", () => {
   it("fires the PATCH mutation when a status transition is chosen", async () => {
     const patchSpy = vi.fn();
     server.use(
-      http.patch("/api/projects/p1/issues/KUI-42", async ({ request }) => {
+      http.patch(`/api/projects/p1/issues/${ISSUE_ID}`, async ({ request }) => {
         patchSpy(request.url, request.method);
-        return HttpResponse.json({ ...baseIssue(), status: "in_review" });
+        return HttpResponse.json(fixtureIssue({ status: "in_review" }));
       }),
     );
 
-    const { wrapper } = prime(baseIssue(), baseProject());
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
 
     await openDropdown(screen.getByRole("button", { name: /Change status/ }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "in_review" }));
 
-    await waitFor(() => {
-      expect(patchSpy).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(patchSpy).toHaveBeenCalled());
     expect(patchSpy.mock.calls[0]).toEqual([
-      expect.stringContaining("/api/projects/p1/issues/KUI-42"),
+      expect.stringContaining(`/api/projects/p1/issues/${ISSUE_ID}`),
       "PATCH",
     ]);
     expect(toastMocks.success).toHaveBeenCalledWith("Status → in_review");
@@ -196,7 +167,7 @@ describe("IssueDetail", () => {
 
   it("shows an error toast when the PATCH returns 409 invalid_transition", async () => {
     server.use(
-      http.patch("/api/projects/p1/issues/KUI-42", () =>
+      http.patch(`/api/projects/p1/issues/${ISSUE_ID}`, () =>
         HttpResponse.json(
           {
             detail: "Cannot move from in_progress to done.",
@@ -207,16 +178,17 @@ describe("IssueDetail", () => {
       ),
     );
 
-    const project = baseProject({ status_transitions: { in_progress: ["done"] } });
-    const { wrapper } = prime(baseIssue(), project);
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({
+      issue: fixtureIssue(),
+      project: fixtureProject({ status_transitions: { in_progress: ["done"] } }),
+    });
 
     await openDropdown(screen.getByRole("button", { name: /Change status/ }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "done" }));
 
-    await waitFor(() => {
-      expect(toastMocks.error).toHaveBeenCalledWith(expect.stringContaining("Cannot move"));
-    });
+    await waitFor(() =>
+      expect(toastMocks.error).toHaveBeenCalledWith(expect.stringContaining("Cannot move")),
+    );
   });
 
   it("fires validate and shows a success toast when the report has 0 errors", async () => {
@@ -233,20 +205,19 @@ describe("IssueDetail", () => {
     };
     const validateSpy = vi.fn();
     server.use(
-      http.post("/api/projects/p1/issues/KUI-42/validate", ({ request }) => {
+      http.post(`/api/projects/p1/issues/${ISSUE_ID}/validate`, ({ request }) => {
         validateSpy(request.url, request.method);
         return HttpResponse.json(report);
       }),
     );
 
-    const { wrapper } = prime(baseIssue(), baseProject());
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
 
     fireEvent.click(screen.getByRole("button", { name: /Validate/ }));
 
     await waitFor(() => expect(validateSpy).toHaveBeenCalled());
     expect(validateSpy.mock.calls[0]).toEqual([
-      expect.stringContaining("/api/projects/p1/issues/KUI-42/validate"),
+      expect.stringContaining(`/api/projects/p1/issues/${ISSUE_ID}/validate`),
       "POST",
     ]);
     expect(toastMocks.success).toHaveBeenCalledWith("Validation passed.");
@@ -269,11 +240,12 @@ describe("IssueDetail", () => {
       fixed: [],
     };
     server.use(
-      http.post("/api/projects/p1/issues/KUI-42/validate", () => HttpResponse.json(report)),
+      http.post(`/api/projects/p1/issues/${ISSUE_ID}/validate`, () =>
+        HttpResponse.json(report),
+      ),
     );
 
-    const { wrapper } = prime(baseIssue(), baseProject());
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
     fireEvent.click(screen.getByRole("button", { name: /Validate/ }));
 
     await waitFor(() =>
@@ -299,11 +271,12 @@ describe("IssueDetail", () => {
       fixed: [],
     };
     server.use(
-      http.post("/api/projects/p1/issues/KUI-42/validate", () => HttpResponse.json(report)),
+      http.post(`/api/projects/p1/issues/${ISSUE_ID}/validate`, () =>
+        HttpResponse.json(report),
+      ),
     );
 
-    const { wrapper } = prime(baseIssue(), baseProject());
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
     fireEvent.click(screen.getByRole("button", { name: /Validate/ }));
 
     await waitFor(() => expect(toastMocks.error).toHaveBeenCalled());
@@ -316,34 +289,50 @@ describe("IssueDetail", () => {
   });
 
   it("renders the 'Open in editor' link using the project dir", () => {
-    const { wrapper } = prime(baseIssue(), baseProject());
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
 
     const link = screen.getByRole("link", { name: /Open issue YAML in editor/ });
-    expect(link).toHaveAttribute("href", "file:///tmp/demo/issues/KUI-42/issue.yaml");
+    expect(link).toHaveAttribute("href", `file:///tmp/demo/issues/${ISSUE_ID}/issue.yaml`);
   });
 
   it("disables the 'Change status' button when no transitions exist", () => {
-    const project = baseProject();
-    project.status_transitions = {};
-    const { wrapper } = prime(baseIssue(), project);
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({
+      issue: fixtureIssue(),
+      project: fixtureProject({ status_transitions: {} }),
+    });
 
-    const btn = screen.getByRole("button", { name: /Change status/ });
-    expect(btn).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Change status/ })).toBeDisabled();
+  });
+
+  it("shows the ApiError message in the error toast when validate returns 500", async () => {
+    server.use(
+      http.post(`/api/projects/p1/issues/${ISSUE_ID}/validate`, () =>
+        HttpResponse.json(
+          { detail: "Validator crashed.", code: "validate/internal" },
+          { status: 500 },
+        ),
+      ),
+    );
+
+    renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
+    fireEvent.click(screen.getByRole("button", { name: /Validate/ }));
+
+    await waitFor(() =>
+      expect(toastMocks.error).toHaveBeenCalledWith("Validator crashed."),
+    );
+    expect(toastMocks.success).not.toHaveBeenCalled();
   });
 
   it("does not call validate on mount", () => {
     const validateSpy = vi.fn();
     server.use(
-      http.post("/api/projects/p1/issues/KUI-42/validate", () => {
+      http.post(`/api/projects/p1/issues/${ISSUE_ID}/validate`, () => {
         validateSpy();
         return HttpResponse.json({});
       }),
     );
 
-    const { wrapper } = prime(baseIssue(), baseProject());
-    render(<IssueDetailView />, { wrapper });
+    renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
 
     expect(validateSpy).not.toHaveBeenCalled();
   });
