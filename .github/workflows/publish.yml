@@ -10,10 +10,25 @@ jobs:
     environment: pypi
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - uses: astral-sh/setup-uv@v3
         with:
           python-version: "3.13"
+      # Build frontend up-front so the wheel ships with a populated
+      # src/tripwire/ui/static/. The hatch build hook in hatch_build.py
+      # would also do this during `uv build`, but running it here keeps
+      # the npm output in CI logs and fails fast on a bad frontend build.
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: src/tripwire/ui/frontend
+      - name: Build frontend
+        run: npm run build
+        working-directory: src/tripwire/ui/frontend
       - name: Build
+        env:
+          TRIPWIRE_SKIP_FRONTEND_BUILD: "1"
         run: uv build
       - name: Publish
         env:

@@ -4,7 +4,7 @@ import { SKIP, visit } from "unist-util-visit";
 
 export interface Reference {
   token: string;
-  resolves_as?: "node" | "issue" | "dangling";
+  resolves_as?: "node" | "issue" | "session" | "dangling";
   is_stale?: boolean;
 }
 
