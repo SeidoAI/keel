@@ -10,10 +10,12 @@ Runs once per spawn before the runtime's ``start``:
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
 
+from tripwire.core.branch_naming import SESSION_ID_PREFIX
 from tripwire.core.git_helpers import (
     branch_exists,
     worktree_add,
@@ -21,6 +23,8 @@ from tripwire.core.git_helpers import (
 )
 from tripwire.models.session import AgentSession, WorktreeEntry
 from tripwire.runtimes.base import PreppedSession
+
+log = logging.getLogger("tripwire.runtimes.prep")
 
 _MANAGED_EXCLUDES = (".claude/", ".tripwire/")
 
@@ -103,6 +107,92 @@ def resolve_worktrees(
             )
         )
     return entries
+
+
+def maybe_add_project_tracking_worktree(
+    *,
+    project_dir: Path,
+    session: AgentSession,
+    resume: bool = False,
+) -> WorktreeEntry | None:
+    """Cut a per-session project-tracking worktree when the project dir
+    is a git repo with at least one remote.
+
+    Convention (v0.7.4):
+    - branch: ``proj/<session-slug-lower>`` — matches
+      ``derive_branch_name``'s slug rule so ``session complete`` can
+      push + PR it like any code-repo branch.
+    - path: ``worktree_path_for_session(project_dir, session.id)`` —
+      same sibling-dir convention used for code worktrees, so
+      orphan-scan cleanup logic (PR #19 I6) handles both with one
+      matcher.
+
+    Returns the new ``WorktreeEntry`` for the caller to append to the
+    session's worktree list. Returns ``None`` when ``project_dir``
+    isn't a git repo or has no remote configured — this is a
+    deliberate graceful skip (the feature is opt-in via remote
+    presence), logged at INFO so operators can see why no worktree
+    landed.
+    """
+    import subprocess
+
+    if not (project_dir / ".git").exists():
+        log.info(
+            "project_dir %s is not a git repo; skipping project-tracking "
+            "worktree for session %s",
+            project_dir,
+            session.id,
+        )
+        return None
+
+    remote_check = subprocess.run(
+        ["git", "-C", str(project_dir), "remote"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if remote_check.returncode != 0 or not remote_check.stdout.strip():
+        log.info(
+            "project_dir %s has no git remote; skipping project-tracking "
+            "worktree for session %s",
+            project_dir,
+            session.id,
+        )
+        return None
+
+    slug = session.id.removeprefix(SESSION_ID_PREFIX).lower()
+    proj_branch = f"proj/{slug}"
+    proj_wt_path = worktree_path_for_session(project_dir, session.id)
+
+    if proj_wt_path.exists():
+        if not resume:
+            raise RuntimeError(
+                f"Project-tracking worktree {proj_wt_path} already exists. "
+                f"Use 'tripwire session cleanup {session.id}' "
+                f"or re-spawn with --resume."
+            )
+        # resume: reuse existing worktree
+    else:
+        if resume:
+            raise RuntimeError(
+                f"Project-tracking worktree {proj_wt_path} was expected "
+                f"to exist for --resume but does not. Run "
+                f"'tripwire session cleanup {session.id}' then "
+                f"spawn without --resume."
+            )
+        if branch_exists(project_dir, proj_branch):
+            raise RuntimeError(
+                f"Branch '{proj_branch}' already exists in {project_dir}. "
+                f"Delete the branch or pick a different session id."
+            )
+        worktree_add(project_dir, proj_wt_path, proj_branch, "HEAD")
+
+    return WorktreeEntry(
+        repo=project_dir.name,
+        clone_path=str(project_dir),
+        worktree_path=str(proj_wt_path),
+        branch=proj_branch,
+    )
 
 
 def _skills_hash(skill_names: list[str]) -> str:
@@ -402,6 +492,19 @@ def run(
     )
     if not worktrees:
         raise RuntimeError(f"session '{session.id}' has no repos configured")
+
+    # v0.7.4: cut a per-session project-tracking worktree so parallel
+    # sessions don't race on sessions/<id>/ or issues/<KEY>/developer.md
+    # writes. Only applies when project_dir is a git repo with a
+    # remote — otherwise this is a no-op and the session writes into
+    # the shared project_dir like pre-v0.7.4.
+    proj_entry = maybe_add_project_tracking_worktree(
+        project_dir=project_dir,
+        session=session,
+        resume=resume,
+    )
+    if proj_entry is not None:
+        worktrees.append(proj_entry)
 
     code_worktree = Path(worktrees[0].worktree_path)
 
