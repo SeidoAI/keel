@@ -16,7 +16,6 @@ import yaml
 
 from tripwire.templates import get_templates_dir
 
-
 # Canonical session-status vocabulary the tripwire CLI emits, in the
 # order listed by the v0.7.6 spec §2.B. Updated whenever a state is
 # added to or removed from the lifecycle:
@@ -124,9 +123,5 @@ class TestCIWorkflowTemplate:
         # `astral-sh/setup-uv@v8.1.0` — point release, not floating @v8.
         assert "astral-sh/setup-uv@v8.1.0" in contents, contents
         # And nothing's still on the old majors.
-        assert "actions/checkout@v4" not in contents, (
-            "checkout@v4 leaked back in"
-        )
-        assert "astral-sh/setup-uv@v3" not in contents, (
-            "setup-uv@v3 leaked back in"
-        )
+        assert "actions/checkout@v4" not in contents, "checkout@v4 leaked back in"
+        assert "astral-sh/setup-uv@v3" not in contents, "setup-uv@v3 leaked back in"

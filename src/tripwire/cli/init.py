@@ -521,14 +521,11 @@ def _setup_github_remote(
         )
     else:
         if github_client.repo_exists(owner, name, token=token):
-            console.print(
-                f"  [dim]✓ Using existing GitHub repo {owner}/{name}[/dim]"
-            )
+            console.print(f"  [dim]✓ Using existing GitHub repo {owner}/{name}[/dim]")
         else:
             visibility = "public" if public else "private"
             console.print(
-                f"  [green]+[/green] Creating {visibility} GitHub repo "
-                f"{owner}/{name}"
+                f"  [green]+[/green] Creating {visibility} GitHub repo {owner}/{name}"
             )
             response = github_client.create_repo(
                 owner,

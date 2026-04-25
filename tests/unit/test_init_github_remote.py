@@ -23,7 +23,6 @@ from tripwire.cli import init as init_module
 from tripwire.cli.init import init_cmd
 from tripwire.core import github_client
 
-
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -75,9 +74,7 @@ def fake_subprocess(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
 def fake_token(monkeypatch: pytest.MonkeyPatch) -> str:
     """Force the token resolver to return a known value."""
     monkeypatch.setattr(github_client, "resolve_token", lambda: "test-token")
-    monkeypatch.setattr(
-        github_client, "_authenticated_owner", lambda token: "alice"
-    )
+    monkeypatch.setattr(github_client, "_authenticated_owner", lambda token: "alice")
     return "test-token"
 
 
@@ -100,9 +97,7 @@ class TestHappyPath:
         fake_token: str,
     ) -> None:
         # GH API: 404 on repo_exists → create_repo returns the SSH URL.
-        monkeypatch.setattr(
-            github_client, "repo_exists", lambda *_a, **_kw: False
-        )
+        monkeypatch.setattr(github_client, "repo_exists", lambda *_a, **_kw: False)
         captured: dict[str, Any] = {}
 
         def _fake_create(owner: str, repo: str, **kwargs: Any) -> dict[str, Any]:
@@ -142,9 +137,7 @@ class TestHappyPath:
         fake_subprocess: list[list[str]],
         fake_token: str,
     ) -> None:
-        monkeypatch.setattr(
-            github_client, "repo_exists", lambda *_a, **_kw: True
-        )
+        monkeypatch.setattr(github_client, "repo_exists", lambda *_a, **_kw: True)
 
         def _unreachable_create(*_a: Any, **_kw: Any) -> dict[str, Any]:
             raise AssertionError(
@@ -170,9 +163,7 @@ class TestHappyPath:
         fake_subprocess: list[list[str]],
         fake_token: str,
     ) -> None:
-        monkeypatch.setattr(
-            github_client, "repo_exists", lambda *_a, **_kw: False
-        )
+        monkeypatch.setattr(github_client, "repo_exists", lambda *_a, **_kw: False)
         captured: dict[str, Any] = {}
 
         def _fake_create(owner: str, repo: str, **kwargs: Any) -> dict[str, Any]:
@@ -183,7 +174,7 @@ class TestHappyPath:
 
         target = tmp_path / "demo"
         runner = CliRunner()
-        result = runner.invoke(init_cmd, _base_args(target) + ["--public"])
+        result = runner.invoke(init_cmd, [*_base_args(target), "--public"])
 
         assert result.exit_code == 0, result.output
         assert captured["private"] is False
@@ -211,7 +202,7 @@ class TestOptOuts:
 
         target = tmp_path / "demo"
         runner = CliRunner()
-        result = runner.invoke(init_cmd, _base_args(target) + ["--no-remote"])
+        result = runner.invoke(init_cmd, [*_base_args(target), "--no-remote"])
 
         assert result.exit_code == 0, result.output
         # No remote commands (no remote add / push).
@@ -228,18 +219,14 @@ class TestOptOuts:
     ) -> None:
         # API check + create must NOT be called.
         def _exploding(*_a: Any, **_kw: Any) -> Any:
-            raise AssertionError(
-                "--no-github-repo must skip repo_exists / create_repo"
-            )
+            raise AssertionError("--no-github-repo must skip repo_exists / create_repo")
 
         monkeypatch.setattr(github_client, "repo_exists", _exploding)
         monkeypatch.setattr(github_client, "create_repo", _exploding)
 
         target = tmp_path / "demo"
         runner = CliRunner()
-        result = runner.invoke(
-            init_cmd, _base_args(target) + ["--no-github-repo"]
-        )
+        result = runner.invoke(init_cmd, [*_base_args(target), "--no-github-repo"])
 
         assert result.exit_code == 0, result.output
         # Remote still configured, push still attempted.
@@ -257,9 +244,7 @@ class TestOptOuts:
         fake_subprocess: list[list[str]],
         fake_token: str,
     ) -> None:
-        monkeypatch.setattr(
-            github_client, "repo_exists", lambda *_a, **_kw: False
-        )
+        monkeypatch.setattr(github_client, "repo_exists", lambda *_a, **_kw: False)
         monkeypatch.setattr(
             github_client,
             "create_repo",
@@ -268,7 +253,7 @@ class TestOptOuts:
 
         target = tmp_path / "demo"
         runner = CliRunner()
-        result = runner.invoke(init_cmd, _base_args(target) + ["--no-push"])
+        result = runner.invoke(init_cmd, [*_base_args(target), "--no-push"])
 
         assert result.exit_code == 0, result.output
         argv = _argv_summary(fake_subprocess)
@@ -313,7 +298,7 @@ class TestProjectYamlFieldRecorded:
     ) -> None:
         target = tmp_path / "demo"
         runner = CliRunner()
-        result = runner.invoke(init_cmd, _base_args(target) + ["--no-remote"])
+        result = runner.invoke(init_cmd, [*_base_args(target), "--no-remote"])
 
         assert result.exit_code == 0, result.output
         cfg = yaml.safe_load((target / "project.yaml").read_text())
@@ -328,9 +313,7 @@ class TestProjectYamlFieldRecorded:
         fake_subprocess: list[list[str]],
         fake_token: str,
     ) -> None:
-        monkeypatch.setattr(
-            github_client, "repo_exists", lambda *_a, **_kw: False
-        )
+        monkeypatch.setattr(github_client, "repo_exists", lambda *_a, **_kw: False)
         monkeypatch.setattr(
             github_client,
             "create_repo",

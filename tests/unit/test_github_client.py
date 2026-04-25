@@ -20,9 +20,7 @@ class _StubResponse:
     """Minimal stand-in for `httpx.Response` — only exposes the bits the
     client uses (`status_code`, `json()`, `raise_for_status()`)."""
 
-    def __init__(
-        self, status_code: int, payload: dict[str, Any] | None = None
-    ) -> None:
+    def __init__(self, status_code: int, payload: dict[str, Any] | None = None) -> None:
         self.status_code = status_code
         self._payload = payload or {}
 
@@ -118,9 +116,7 @@ class TestCreateRepo:
 
         def _fake_post(url: str, **kwargs: Any) -> _StubResponse:
             captured["url"] = url
-            return _StubResponse(
-                201, {"ssh_url": "git@github.com:SeidoAI/demo.git"}
-            )
+            return _StubResponse(201, {"ssh_url": "git@github.com:SeidoAI/demo.git"})
 
         monkeypatch.setattr(httpx, "post", _fake_post)
         monkeypatch.setattr(
