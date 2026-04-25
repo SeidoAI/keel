@@ -1,7 +1,7 @@
 """Validator rule `self_review_implies_pm_response` (v0.7.9 §A9).
 
 If a session's ``self-review.md`` is on origin/main, its
-``pm-response.md`` must be too. Catches the "PM forgot to respond"
+``pm-response.yaml`` must be too. Catches the "PM forgot to respond"
 state — a session whose author finished and pushed self-review but
 the PM never closed the loop.
 """
@@ -31,7 +31,7 @@ def _stub_main_unavailable(monkeypatch, message: str = "no remote") -> None:
 def test_self_review_without_pm_response_errors(
     tmp_path_project: Path, save_test_session, monkeypatch
 ):
-    """self-review.md on main but pm-response.md missing → 1 error
+    """self-review.md on main but pm-response.yaml missing → 1 error
     with code ``self_review_implies_pm_response/missing_pm_response``."""
     save_test_session(tmp_path_project, "s1", status="in_review")
     _stub_main(monkeypatch, {"sessions/s1/self-review.md"})
@@ -42,7 +42,7 @@ def test_self_review_without_pm_response_errors(
     assert len(results) == 1
     assert results[0].code == "self_review_implies_pm_response/missing_pm_response"
     assert results[0].severity == "error"
-    assert "sessions/s1/pm-response.md" in results[0].message
+    assert "sessions/s1/pm-response.yaml" in results[0].message
     assert "s1" in results[0].message
 
 
@@ -52,7 +52,7 @@ def test_self_review_with_pm_response_passes(
     save_test_session(tmp_path_project, "s1", status="in_review")
     _stub_main(
         monkeypatch,
-        {"sessions/s1/self-review.md", "sessions/s1/pm-response.md"},
+        {"sessions/s1/self-review.md", "sessions/s1/pm-response.yaml"},
     )
 
     ctx = load_context(tmp_path_project)
@@ -61,7 +61,7 @@ def test_self_review_with_pm_response_passes(
 
 def test_no_self_review_passes(tmp_path_project: Path, save_test_session, monkeypatch):
     """No self-review.md on main → rule has nothing to assert about
-    pm-response.md → no findings (regardless of session status)."""
+    pm-response.yaml → no findings (regardless of session status)."""
     save_test_session(tmp_path_project, "s1", status="executing")
     _stub_main(monkeypatch, set())
 

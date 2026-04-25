@@ -9,6 +9,11 @@ To add a new rule:
 2. Append ``<my_rule>.check`` to ``LINT_CHECKS`` below.
 
 That's it. No registry, no decorators.
+
+(``pm_response_followups_resolve`` is defined as an in-file function on
+``validator/__init__.py`` rather than a module here — it landed via
+KUI-86 with tighter coupling to the new pm-response.yaml format and
+its parser helpers in ``session_review_artifacts``.)
 """
 
 from __future__ import annotations
@@ -22,7 +27,6 @@ if TYPE_CHECKING:
 from . import (
     done_implies_artifacts_on_main,
     no_orphan_proj_branches,
-    pm_response_followups_resolve,
     self_review_implies_pm_response,
     worktree_paths_unique,
 )
@@ -32,7 +36,6 @@ CheckFunc = Callable[["ValidationContext"], "list[CheckResult]"]
 LINT_CHECKS: list[CheckFunc] = [
     done_implies_artifacts_on_main.check,
     self_review_implies_pm_response.check,
-    pm_response_followups_resolve.check,
     worktree_paths_unique.check,
     no_orphan_proj_branches.check,
 ]

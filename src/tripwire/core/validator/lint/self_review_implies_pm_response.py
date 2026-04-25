@@ -1,9 +1,14 @@
-"""v0.7.9 §A9 — self-review.md on main ⇒ pm-response.md on main.
+"""v0.7.9 §A9 — self-review.md on main ⇒ pm-response.yaml on main.
 
 Catches the "PM forgot to respond" state: a session whose author
 finished and pushed self-review, but the PM never wrote the closing
 response. Triggered by the presence of self-review.md on origin/main
 for any known session, regardless of session.status.
+
+KUI-86's ``check_pm_response_covers_self_review`` enforces the same
+contract on the *local* working tree (so missing pm-response.yaml is
+caught pre-merge); this rule is the post-merge mirror — we want main
+itself to never carry an unanswered self-review.
 
 Same offline-degradation pattern as
 ``done_implies_artifacts_on_main``: emit one ``main_unavailable``
@@ -50,7 +55,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     for entity in ctx.sessions:
         sid = entity.model.id
         self_review = f"sessions/{sid}/self-review.md"
-        pm_response = f"sessions/{sid}/pm-response.md"
+        pm_response = f"sessions/{sid}/pm-response.yaml"
         if self_review not in on_main:
             continue
         if pm_response in on_main:
