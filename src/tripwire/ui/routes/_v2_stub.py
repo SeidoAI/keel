@@ -15,7 +15,7 @@ from typing import NoReturn
 from fastapi import HTTPException
 
 V2_NOT_IMPLEMENTED_CODE = "v2/not_implemented"
-V2_DEFAULT_PLAN = "docs/tripwire-containers.md"
+V2_DEFAULT_PLAN = "docs/agent-containers.md"
 
 
 def raise_v2_not_implemented(
