@@ -16,7 +16,7 @@ dependencies = [
     "pydantic>=2.0,<3.0",
     "click>=8.1,<9.0",
     "pyyaml>=6.0,<7.0",
-    "rich>=13.0,<14.0",
+    "rich>=13.0,<16.0",
     "jinja2>=3.1,<4.0",
     # GitHub REST client used by `tripwire init` to auto-create the
     # project-tracking repo. Already pulled in transitively via
@@ -36,7 +36,7 @@ projects = [
     "pydantic>=2.0,<3.0",
     "click>=8.1,<9.0",
     "pyyaml>=6.0,<7.0",
-    "rich>=13.0,<14.0",
+    "rich>=13.0,<16.0",
     "jinja2>=3.1,<4.0",
 ]
 
