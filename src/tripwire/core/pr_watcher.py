@@ -143,15 +143,11 @@ class PRWatcher:
 
     # --- per-session evaluation ----------------------------------------
 
-    def _tick_session(
-        self, ws: WatchedSession, now: datetime
-    ) -> list[WatcherAction]:
+    def _tick_session(self, ws: WatchedSession, now: datetime) -> list[WatcherAction]:
         if ws.code_pr_number is None:
             return []
         owner, repo = self._split_repo(ws.code_repo)
-        code_state = self._fetch_pr(
-            (owner, repo), ws.code_pr_number, token=self._token
-        )
+        code_state = self._fetch_pr((owner, repo), ws.code_pr_number, token=self._token)
         actions: list[WatcherAction] = []
         # #17 — code PR merged but status still executing
         if code_state.merged and ws.session_status == "executing":
@@ -240,9 +236,7 @@ class PRWatcher:
         if not ws.required_artifacts:
             return
         owner, repo = self._split_repo(ws.pt_repo)
-        files = self._fetch_pr_files(
-            (owner, repo), ws.pt_pr_number, token=self._token
-        )
+        files = self._fetch_pr_files((owner, repo), ws.pt_pr_number, token=self._token)
         present = {entry.get("filename") for entry in files if entry.get("filename")}
         missing = [a for a in ws.required_artifacts if a not in present]
         if not missing:

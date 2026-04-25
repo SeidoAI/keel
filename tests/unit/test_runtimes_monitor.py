@@ -84,9 +84,7 @@ def test_cost_includes_cache_tokens(tmp_path):
     }
     monitor.process_event(event)
     # 100*15 + 100*75 + 1000*18.75 + 10000*1.50 all per Mtok
-    expected = (
-        100 * 15.0 + 100 * 75.0 + 1000 * 18.75 + 10000 * 1.50
-    ) / 1_000_000
+    expected = (100 * 15.0 + 100 * 75.0 + 1000 * 18.75 + 10000 * 1.50) / 1_000_000
     assert abs(monitor.cumulative_cost_usd - expected) < 1e-9
 
 
@@ -191,8 +189,7 @@ def test_normal_result_no_quota_action(tmp_path):
     }
     actions = monitor.process_event(event)
     assert not any(
-        isinstance(a, TransitionStatus) and a.new_status == "failed"
-        for a in actions
+        isinstance(a, TransitionStatus) and a.new_status == "failed" for a in actions
     )
 
 
@@ -353,9 +350,7 @@ def test_pr_create_with_empty_pt_branch_emits_inject(tmp_path):
             ]
         },
     }
-    with patch(
-        "tripwire.runtimes.monitor._pt_branch_has_commits", return_value=False
-    ):
+    with patch("tripwire.runtimes.monitor._pt_branch_has_commits", return_value=False):
         actions = monitor.process_event(pr_create)
     injects = [a for a in actions if isinstance(a, InjectFollowUp)]
     assert injects
@@ -371,16 +366,12 @@ def test_pr_create_with_populated_pt_branch_no_action(tmp_path):
                 {
                     "type": "tool_use",
                     "name": "Bash",
-                    "input": {
-                        "command": "gh pr create --repo SeidoAI/code --title x"
-                    },
+                    "input": {"command": "gh pr create --repo SeidoAI/code --title x"},
                 }
             ]
         },
     }
-    with patch(
-        "tripwire.runtimes.monitor._pt_branch_has_commits", return_value=True
-    ):
+    with patch("tripwire.runtimes.monitor._pt_branch_has_commits", return_value=True):
         actions = monitor.process_event(pr_create)
     assert not any(isinstance(a, InjectFollowUp) for a in actions)
 
@@ -395,9 +386,7 @@ def test_session_complete_text_with_missing_artifacts_emits_inject(tmp_path):
     final_msg = {
         "type": "assistant",
         "message": {
-            "content": [
-                {"type": "text", "text": "All done. Session complete."}
-            ]
+            "content": [{"type": "text", "text": "All done. Session complete."}]
         },
     }
     monitor.process_event(final_msg)
@@ -416,9 +405,7 @@ def test_session_complete_with_artifacts_no_action(tmp_path):
     monitor = RuntimeMonitor(_ctx(tmp_path, required_artifacts=["self-review.md"]))
     final = {
         "type": "assistant",
-        "message": {
-            "content": [{"type": "text", "text": "Session complete."}]
-        },
+        "message": {"content": [{"type": "text", "text": "Session complete."}]},
     }
     monitor.process_event(final)
     with patch(
@@ -456,9 +443,7 @@ def test_no_session_complete_no_action(tmp_path):
 def test_commits_outside_key_files_emit_warning(tmp_path):
     """Files committed to the code worktree branch that aren't in
     session.key_files → log warning (no block)."""
-    monitor = RuntimeMonitor(
-        _ctx(tmp_path, key_files=["src/foo.py", "src/bar.py"])
-    )
+    monitor = RuntimeMonitor(_ctx(tmp_path, key_files=["src/foo.py", "src/bar.py"]))
     with patch(
         "tripwire.runtimes.monitor._commits_diff_files",
         return_value={"src/foo.py", "src/wandered_off.py"},
@@ -476,9 +461,7 @@ def test_commits_outside_key_files_emit_warning(tmp_path):
 
 
 def test_commits_within_key_files_no_warning(tmp_path):
-    monitor = RuntimeMonitor(
-        _ctx(tmp_path, key_files=["src/foo.py", "src/bar.py"])
-    )
+    monitor = RuntimeMonitor(_ctx(tmp_path, key_files=["src/foo.py", "src/bar.py"]))
     with patch(
         "tripwire.runtimes.monitor._commits_diff_files",
         return_value={"src/foo.py", "src/bar.py"},

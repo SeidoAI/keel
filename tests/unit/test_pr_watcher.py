@@ -39,7 +39,10 @@ def _ws(**kw) -> WatchedSession:
         "pt_repo": "SeidoAI/tripwire-v0",
         "pt_branch": "proj/s1",
         "pt_pr_number": None,
-        "required_artifacts": ["sessions/s1/self-review.md", "sessions/s1/insights.yaml"],
+        "required_artifacts": [
+            "sessions/s1/self-review.md",
+            "sessions/s1/insights.yaml",
+        ],
         "session_status": "executing",
     }
     base.update(kw)
@@ -133,7 +136,8 @@ def test_pr_merged_but_executing_emits_transition_and_followup():
     transitions = [
         a
         for a in actions
-        if isinstance(a, TransitionStatus) and a.tripwire_id == "watcher/merged_executing"
+        if isinstance(a, TransitionStatus)
+        and a.tripwire_id == "watcher/merged_executing"
     ]
     assert len(transitions) == 1
     assert transitions[0].new_status == "paused"
@@ -182,7 +186,8 @@ def test_pt_pr_missing_artifact_emits_comment_and_reengage():
     comments = [
         a
         for a in actions
-        if isinstance(a, CommentOnPR) and a.tripwire_id == "watcher/pt_pr_missing_artifacts"
+        if isinstance(a, CommentOnPR)
+        and a.tripwire_id == "watcher/pt_pr_missing_artifacts"
     ]
     assert len(comments) == 1
     assert "sessions/s1/insights.yaml" in comments[0].body
@@ -251,9 +256,7 @@ def test_fetch_failure_yields_no_actions_for_that_session():
     # Did not raise. ws_b's actions are silently skipped; ws_a still
     # gets evaluated.
     sessions_with_actions = {
-        getattr(a, "session_id", None)
-        for a in actions
-        if hasattr(a, "session_id")
+        getattr(a, "session_id", None) for a in actions if hasattr(a, "session_id")
     }
     assert "s_bad" not in sessions_with_actions
 
@@ -273,5 +276,7 @@ def _no_files(repo, pr_number, token=None):
     return []
 
 
-def _panic_fetch(repo, pr_number, token=None):  # pragma: no cover — should never be called
+def _panic_fetch(
+    repo, pr_number, token=None
+):  # pragma: no cover — should never be called
     raise AssertionError("fetch_pr should not have been called")

@@ -74,9 +74,7 @@ def read_runner_config(source: Path) -> RunnerConfig:
     raw = json.loads(source.read_text(encoding="utf-8"))
     raw["log_path"] = Path(raw["log_path"])
     raw["code_worktree"] = Path(raw["code_worktree"])
-    raw["pt_worktree"] = (
-        Path(raw["pt_worktree"]) if raw.get("pt_worktree") else None
-    )
+    raw["pt_worktree"] = Path(raw["pt_worktree"]) if raw.get("pt_worktree") else None
     raw["project_dir"] = Path(raw["project_dir"])
     raw["monitor_log_path"] = Path(raw["monitor_log_path"])
     return RunnerConfig(**raw)
@@ -173,8 +171,10 @@ def spawn_monitor_runner(
 def main(argv: list[str] | None = None) -> int:
     args = list(argv if argv is not None else sys.argv[1:])
     if len(args) != 1:
-        print("usage: python -m tripwire.runtimes.monitor_runner <ctx.json>",
-              file=sys.stderr)
+        print(
+            "usage: python -m tripwire.runtimes.monitor_runner <ctx.json>",
+            file=sys.stderr,
+        )
         return 2
     ctx_path = Path(args[0])
     cfg = read_runner_config(ctx_path)

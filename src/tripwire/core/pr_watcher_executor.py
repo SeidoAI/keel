@@ -157,9 +157,7 @@ class WatcherActionExecutor:
         save_session(self.project_dir, session)
 
     def _do_inject(self, action: InjectFollowUp) -> None:
-        plan_path = (
-            self.project_dir / "sessions" / action.session_id / "plan.md"
-        )
+        plan_path = self.project_dir / "sessions" / action.session_id / "plan.md"
         if not plan_path.exists():
             logger.warning(
                 "watcher: plan.md missing for session '%s'", action.session_id
@@ -204,17 +202,28 @@ class WatcherActionExecutor:
         # decoupled from the running daemon — the spawned agent is
         # then owned by its own process group.
         for argv in (
-            ["tripwire", "session", "pause", action.session_id,
-             "--project-dir", str(self.project_dir)],
-            ["tripwire", "session", "spawn", action.session_id, "--resume",
-             "--project-dir", str(self.project_dir)],
+            [
+                "tripwire",
+                "session",
+                "pause",
+                action.session_id,
+                "--project-dir",
+                str(self.project_dir),
+            ],
+            [
+                "tripwire",
+                "session",
+                "spawn",
+                action.session_id,
+                "--resume",
+                "--project-dir",
+                str(self.project_dir),
+            ],
         ):
             try:
                 subprocess.run(argv, check=False, timeout=120)
             except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
-                logger.warning(
-                    "watcher: re-engage step %r failed: %s", argv, exc
-                )
+                logger.warning("watcher: re-engage step %r failed: %s", argv, exc)
 
 
 __all__ = [

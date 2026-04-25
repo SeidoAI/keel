@@ -27,9 +27,7 @@ def project(tmp_path: Path, save_test_session) -> Path:
 
 def test_watch_status_reports_not_running(project: Path):
     runner = CliRunner()
-    result = runner.invoke(
-        watch_cmd, ["status", "--project-dir", str(project)]
-    )
+    result = runner.invoke(watch_cmd, ["status", "--project-dir", str(project)])
     assert result.exit_code == 0
     assert "not running" in result.output.lower()
 
@@ -40,9 +38,7 @@ def test_watch_status_reports_running_with_pid(project: Path):
 
     write_pidfile(project, os.getpid())
     runner = CliRunner()
-    result = runner.invoke(
-        watch_cmd, ["status", "--project-dir", str(project)]
-    )
+    result = runner.invoke(watch_cmd, ["status", "--project-dir", str(project)])
     assert result.exit_code == 0
     assert "running" in result.output.lower()
     assert str(os.getpid()) in result.output
@@ -52,9 +48,7 @@ def test_watch_start_foreground_invokes_run_forever(project: Path):
     """Foreground mode: blocks on WatchDaemon.run_forever()."""
     fake_daemon = MagicMock()
     runner = CliRunner()
-    with patch(
-        "tripwire.cli.watch.WatchDaemon", return_value=fake_daemon
-    ) as mock_cls:
+    with patch("tripwire.cli.watch.WatchDaemon", return_value=fake_daemon) as mock_cls:
         result = runner.invoke(
             watch_cmd,
             ["start", "--project-dir", str(project), "--poll-interval", "0.05"],
@@ -104,18 +98,14 @@ def test_watch_stop_sends_sigterm_to_pid(project: Path):
     write_pidfile(project, 9999)
     runner = CliRunner()
     with patch("tripwire.cli.watch.send_sigterm", return_value=True) as mock_term:
-        result = runner.invoke(
-            watch_cmd, ["stop", "--project-dir", str(project)]
-        )
+        result = runner.invoke(watch_cmd, ["stop", "--project-dir", str(project)])
     assert result.exit_code == 0
     mock_term.assert_called_once_with(9999)
 
 
 def test_watch_stop_no_op_when_not_running(project: Path):
     runner = CliRunner()
-    result = runner.invoke(
-        watch_cmd, ["stop", "--project-dir", str(project)]
-    )
+    result = runner.invoke(watch_cmd, ["stop", "--project-dir", str(project)])
     assert result.exit_code == 0
     assert "not running" in result.output.lower()
 

@@ -127,9 +127,7 @@ class SubprocessRuntime:
         # Failure to spawn the monitor is logged but does not abort
         # the agent launch (degraded mode > no-launch).
         if prepped.spawn_defaults.invocation.monitor:
-            spawn_monitor_runner(
-                cfg=_build_runner_config(prepped, proc.pid, log_path)
-            )
+            spawn_monitor_runner(cfg=_build_runner_config(prepped, proc.pid, log_path))
 
         return RuntimeStartResult(
             claude_session_id=prepped.claude_session_id,

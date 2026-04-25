@@ -120,7 +120,7 @@ def _project_repo_slug(project_dir: Path) -> str | None:
     # Parse git@github.com:owner/repo.git or https://github.com/owner/repo(.git)
     for prefix in ("git@github.com:", "https://github.com/", "ssh://git@github.com/"):
         if url.startswith(prefix):
-            tail = url[len(prefix):]
+            tail = url[len(prefix) :]
             if tail.endswith(".git"):
                 tail = tail[:-4]
             if "/" in tail:
@@ -203,9 +203,7 @@ def build_watched_sessions(project_dir: Path) -> list[WatchedSession]:
                 pt_repo=pt_slug or "",
                 pt_branch=f"proj/{sess.id}",
                 pt_pr_number=sess_state.get("pt_pr_number"),
-                required_artifacts=[
-                    f"sessions/{sess.id}/{name}" for name in manifest
-                ],
+                required_artifacts=[f"sessions/{sess.id}/{name}" for name in manifest],
                 session_status=sess.status,
             )
         )

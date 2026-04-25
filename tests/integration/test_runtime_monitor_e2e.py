@@ -167,7 +167,9 @@ def test_post_pr_watcher_e2e_reengages_on_missing_pt_pr_after_10_min(
 
     def fake_fetch_pr(repo, pr_number, token=None):
         fetch_pr_calls.append((repo, pr_number))
-        return PRState(number=pr_number, state="open", merged=False, head_branch="feat/s_active")
+        return PRState(
+            number=pr_number, state="open", merged=False, head_branch="feat/s_active"
+        )
 
     def fake_fetch_files(repo, pr_number, token=None):
         return []
@@ -184,12 +186,13 @@ def test_post_pr_watcher_e2e_reengages_on_missing_pt_pr_after_10_min(
         token=None,
     )
 
-    with patch(
-        "tripwire.core.pr_watcher_daemon._project_repo_slug",
-        return_value="SeidoAI/tripwire-v0",
-    ), patch(
-        "tripwire.core.pr_watcher_executor.subprocess.run"
-    ) as mock_run:
+    with (
+        patch(
+            "tripwire.core.pr_watcher_daemon._project_repo_slug",
+            return_value="SeidoAI/tripwire-v0",
+        ),
+        patch("tripwire.core.pr_watcher_executor.subprocess.run") as mock_run,
+    ):
         mock_run.return_value = MagicMock(returncode=0)
         # First tick: bootstraps state.json with code_pr_opened_at = now.
         daemon.tick(now=datetime.now(tz=timezone.utc))
@@ -213,6 +216,4 @@ def test_post_pr_watcher_e2e_reengages_on_missing_pt_pr_after_10_min(
     # The re-engage was called: we expect at least one pause + one spawn.
     invocations = [" ".join(c.args[0]) for c in mock_run.call_args_list]
     assert any("session pause s_active" in c for c in invocations)
-    assert any(
-        "session spawn s_active" in c and "--resume" in c for c in invocations
-    )
+    assert any("session spawn s_active" in c and "--resume" in c for c in invocations)

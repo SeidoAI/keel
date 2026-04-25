@@ -66,9 +66,7 @@ def watch_cmd() -> None:
     help="Seconds between PR poll cycles.",
 )
 @_project_dir_option()
-def watch_start_cmd(
-    background: bool, poll_interval: float, project_dir: Path
-) -> None:
+def watch_start_cmd(background: bool, poll_interval: float, project_dir: Path) -> None:
     """Start the watch daemon."""
     project_dir = project_dir.expanduser().resolve()
     if is_daemon_running(project_dir):
@@ -131,9 +129,13 @@ def watch_status_cmd(project_dir: Path) -> None:
         click.echo("watch daemon: pidfile present but unreadable")
         return
     if is_alive(pid):
-        click.echo(f"watch daemon: running (pid {pid}) — log at {logfile_path(project_dir)}")
+        click.echo(
+            f"watch daemon: running (pid {pid}) — log at {logfile_path(project_dir)}"
+        )
     else:
-        click.echo(f"watch daemon: not running (stale pidfile {pid_path}, last pid {pid})")
+        click.echo(
+            f"watch daemon: not running (stale pidfile {pid_path}, last pid {pid})"
+        )
 
 
 @watch_cmd.command("stop")
@@ -161,7 +163,9 @@ def watch_stop_cmd(project_dir: Path) -> None:
 
 
 @watch_cmd.command("logs")
-@click.option("--no-follow", is_flag=True, help="Print once and exit instead of tailing.")
+@click.option(
+    "--no-follow", is_flag=True, help="Print once and exit instead of tailing."
+)
 @_project_dir_option()
 def watch_logs_cmd(no_follow: bool, project_dir: Path) -> None:
     """Tail the daemon log."""

@@ -137,7 +137,9 @@ def test_execute_sigterm_records_engagement_outcome(tmp_project: Path):
 
     session = load_session(tmp_project, "s1")
     session.engagements.append(
-        EngagementEntry(started_at=datetime.now(tz=timezone.utc), trigger="initial_launch")
+        EngagementEntry(
+            started_at=datetime.now(tz=timezone.utc), trigger="initial_launch"
+        )
     )
     save_session(tmp_project, session)
     executor = ActionExecutor(project_dir=tmp_project, session_id="s1")

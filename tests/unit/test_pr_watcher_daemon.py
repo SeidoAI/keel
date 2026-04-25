@@ -93,9 +93,7 @@ def test_is_daemon_running_returns_true_for_live_pid(tmp_path: Path):
     assert is_daemon_running(tmp_path) is True
 
 
-def test_daemon_one_tick_invokes_watcher_and_executor(
-    project: Path, save_test_session
-):
+def test_daemon_one_tick_invokes_watcher_and_executor(project: Path, save_test_session):
     """One tick: build sessions, run watcher.tick, dispatch actions."""
     save_test_session(
         project,

@@ -63,9 +63,7 @@ class ActionExecutor:
 
     def _do_sigterm(self, action: SigtermProcess) -> None:
         sent = send_sigterm(action.pid)
-        outcome = (
-            f"sigterm/{action.tripwire_id} pid={action.pid} sent={sent}: {action.reason}"
-        )
+        outcome = f"sigterm/{action.tripwire_id} pid={action.pid} sent={sent}: {action.reason}"
         self._stamp_engagement(outcome)
         self._append_monitor_log(action.tripwire_id, action.reason)
         if not sent:
@@ -103,9 +101,7 @@ class ActionExecutor:
             )
             self._append_monitor_log(action.tripwire_id, action.message)
             return
-        plan_path = (
-            self.project_dir / "sessions" / self.session_id / "plan.md"
-        )
+        plan_path = self.project_dir / "sessions" / self.session_id / "plan.md"
         if not plan_path.exists():
             logger.warning("monitor: plan.md missing for session '%s'", self.session_id)
             return

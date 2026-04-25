@@ -338,9 +338,7 @@ class RuntimeMonitor:
         if cmd and self._is_pr_create(cmd):
             self._check_code_pr_no_pt(actions)
 
-    def _handle_user(
-        self, event: dict[str, Any], actions: list[MonitorAction]
-    ) -> None:
+    def _handle_user(self, event: dict[str, Any], actions: list[MonitorAction]) -> None:
         message = event.get("message") or {}
         content = message.get("content") or []
         if not isinstance(content, list):
@@ -593,7 +591,9 @@ class MonitorThread:
     def start(self) -> None:
         if self._thread is not None:
             return
-        self._thread = threading.Thread(target=self._run, daemon=True, name="tw-monitor")
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name="tw-monitor"
+        )
         self._thread.start()
 
     def stop(self, timeout: float = 2.0) -> None:
