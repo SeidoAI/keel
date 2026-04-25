@@ -6,6 +6,7 @@ registered. ``src/tripwire/cli/lint.py`` does so at module load time.
 
 from . import (
     branch_convention,  # noqa: F401
+    concept_drift,  # noqa: F401
     gap_analysis,  # noqa: F401
     orphan_concepts,  # noqa: F401
     session_stale,  # noqa: F401
