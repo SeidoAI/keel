@@ -1,0 +1,23 @@
+name: tripwire validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      # setup-uv pinned to v8.1.0 (point release) — v8 dropped the
+      # floating major tag per its immutable-tag policy.
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.13"
+      - name: Install tripwire
+        run: uv tool install tripwire-pm=={{ tripwire_version }}
+      - name: Validate (strict)
+        run: tripwire validate --strict
