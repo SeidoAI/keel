@@ -8,7 +8,6 @@ artifact presence per the project's ``templates/artifacts/manifest.yaml``.
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from tripwire.core import paths
 from tripwire.core.parser import ParseError, parse_frontmatter_body
+from tripwire.core.task_checklist import parse_task_checklist
 from tripwire.models.manifest import ArtifactManifest
 from tripwire.models.session import AgentSession
 from tripwire.models.session import RepoBinding as CoreRepoBinding
@@ -85,63 +85,11 @@ class SessionDetail(SessionSummary):
 
 _TASK_CHECKLIST_FILENAME = "task-checklist.md"
 
-# Match a Markdown table row with a status cell.
-# Example: `| #1 | Do thing | done |` → status = "done"
-_TABLE_ROW_RE = re.compile(r"^\s*\|\s*(?P<cols>.*?)\s*\|?\s*$")
-
 
 def _parse_task_checklist(text: str) -> TaskProgress:
-    """Parse a ``task-checklist.md`` body into completed + total row counts.
-
-    Expects a Markdown table — one row per task, with a final ``status``
-    cell containing values like ``todo`` / ``in_progress`` / ``done``.
-    The status enum is project-specific; we count ``done``
-    (case-insensitive) as complete. Header + separator lines are skipped.
-
-    Returns ``TaskProgress(done=0, total=0)`` when the file has no
-    recognisable rows.
-    """
-    done = 0
-    total = 0
-
-    # Table detection: scan lines that look like table rows.
-    table_rows: list[list[str]] = []
-    for line in text.splitlines():
-        m = _TABLE_ROW_RE.match(line)
-        if m is None:
-            continue
-        cols = [c.strip() for c in m.group("cols").split("|")]
-        # Separator rows like `|---|---|---|` have empty cells or dashes.
-        if all(not c or set(c) <= {"-", ":"} for c in cols):
-            continue
-        table_rows.append(cols)
-
-    # Strip the header if the second row is all dashes in the original.
-    # Simpler heuristic: treat first row as header if the rest share an
-    # "in_progress" / "done" / "todo" token in the last column.
-    if len(table_rows) >= 2:
-        header = [c.lower() for c in table_rows[0]]
-        data_rows = table_rows[1:]
-        # Look for a status-shaped column name.
-        status_idx: int | None = None
-        for i, h in enumerate(header):
-            if h in {"status", "state"}:
-                status_idx = i
-                break
-        if status_idx is None:
-            status_idx = len(header) - 1
-
-        for row in data_rows:
-            if status_idx >= len(row):
-                continue
-            cell = row[status_idx].strip().lower()
-            if not cell:
-                continue
-            total += 1
-            if cell == "done":
-                done += 1
-
-    return TaskProgress(done=done, total=total)
+    """Parse a ``task-checklist.md`` body into completed + total row counts."""
+    progress = parse_task_checklist(text)
+    return TaskProgress(done=progress.done, total=progress.total)
 
 
 def _load_manifest(project_dir: Path) -> ArtifactManifest | None:
