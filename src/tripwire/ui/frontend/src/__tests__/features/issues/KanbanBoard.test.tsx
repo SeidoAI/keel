@@ -23,8 +23,8 @@ vi.mock("@/app/ProjectShell", () => ({
 
 const ENUM = makeIssueStatusEnum();
 
-function issue(id: string, status: string): IssueSummary {
-  return makeIssueSummary({ id, title: `title ${id}`, status });
+function issue(id: string, status: string, overrides: Partial<IssueSummary> = {}): IssueSummary {
+  return makeIssueSummary({ id, title: `title ${id}`, status, ...overrides });
 }
 
 /**

@@ -8,7 +8,6 @@ import { parseChecklist } from "@/features/artifacts/TaskChecklistRender";
 import type {
   ArtifactContent,
   ArtifactManifest,
-  ArtifactSpec,
   ArtifactStatus,
 } from "@/lib/api/endpoints/artifacts";
 import { queryKeys } from "@/lib/api/queryKeys";
@@ -25,7 +24,7 @@ vi.mock("sonner", () => ({
   toast: { success: toastMocks.success, error: toastMocks.error },
 }));
 
-const SPECS: Record<string, ArtifactSpec> = {
+const SPECS = {
   plan: makeArtifactSpec({ name: "plan", approval_gate: true }),
   "task-checklist": makeArtifactSpec({
     name: "task-checklist",
@@ -72,10 +71,8 @@ function fixtureManifest(): ArtifactManifest {
   };
 }
 
-function statusFor(name: string, present: boolean): ArtifactStatus {
-  const spec = SPECS[name];
-  if (!spec) throw new Error(`Unknown artifact name in fixture: ${name}`);
-  return makeArtifactStatus(spec, present);
+function statusFor(name: keyof typeof SPECS, present: boolean): ArtifactStatus {
+  return makeArtifactStatus(SPECS[name], present);
 }
 
 function renderWithCache(
