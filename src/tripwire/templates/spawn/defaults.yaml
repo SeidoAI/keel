@@ -44,6 +44,29 @@ prompt_template: |
   your question as plain text in your final response and stop. The
   PM will read the log, update the plan, and respawn you.
 
+  If during execution you make a change not described in the plan
+  (new dependency, new DTO field, interface widening, library version
+  substitution, mounting a globally-scoped UI element, etc.), append
+  it to `decisions.md` in the project-tracking worktree before
+  continuing. One paragraph per decision: what you did, what the plan
+  said vs reality, why your choice was the minimum scope to meet the
+  stated AC. Do NOT treat scope expansions as implicit — name them.
+  This file is part of your PR; the PM reviews it alongside the
+  diff.
+
+  Test-Driven Development is required for every component you write
+  that has observable behaviour. Sequence per component:
+    1. Write a failing test that asserts the AC.
+    2. Commit the red test with message `test: <component> red`.
+    3. Implement the component until the test passes.
+    4. Commit the implementation with message
+       `feat(<key>): <component>`.
+  The `superpowers:test-driven-development` skill defines edge cases.
+  "The spec was detailed enough that the red step was tautological"
+  is not a valid skip — write the test anyway. Two parallel sessions
+  in v0.7.3 used that exact rationalization; we caught it. Don't
+  repeat it.
+
   Exit protocol — how you signal you're done:
 
   CLAUDE.md lists your worktrees. For every worktree that has commits
@@ -55,6 +78,13 @@ prompt_template: |
      where <body> summarises the work in that worktree.
   3. If there are two PRs (code + project-tracking), cross-link them
      in the PR bodies.
+
+  Commit cadence during execution:
+  - After each numbered plan step, commit your changes with message
+    `step-N(<key>): <step title>` before moving to the next step.
+  - This breaks the single-squash anti-pattern that makes large PRs
+    unreviewable. The PM gets natural rollback points. Squash on
+    merge is the PR's job, not yours.
 
   PR-open is your exit signal. Once every dirty worktree has a PR, you
   are done. The PM reviews and merges; `tripwire session complete`
