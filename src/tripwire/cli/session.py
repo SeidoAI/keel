@@ -828,9 +828,7 @@ def session_reopen_cmd(session_id: str, reason: str, project_dir: Path) -> None:
     )
 
     click.echo(f"Session '{session_id}' reopened (→ paused). Reason: {reason}")
-    click.echo(
-        f"Spawn the resumed agent: tripwire session spawn {session_id} --resume"
-    )
+    click.echo(f"Spawn the resumed agent: tripwire session spawn {session_id} --resume")
 
 
 @session_cmd.command("cleanup")

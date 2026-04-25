@@ -9,9 +9,6 @@ fall back to ``gh pr create`` so a PR exists to merge.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from tripwire.core import session_complete as mod
 from tripwire.models.session import AgentSession, RuntimeState, WorktreeEntry
@@ -85,9 +82,7 @@ class TestFlipDraftsToReady:
         ]
         assert ready_calls[1]["cwd"] == str(tmp_path / "proj-wt-s1")
 
-    def test_falls_back_to_gh_pr_create_when_no_draft_url(
-        self, monkeypatch, tmp_path
-    ):
+    def test_falls_back_to_gh_pr_create_when_no_draft_url(self, monkeypatch, tmp_path):
         """Sessions started before v0.7.5 have no ``draft_pr_url`` —
         complete must create a PR via ``gh pr create`` instead."""
         calls: list[dict] = []

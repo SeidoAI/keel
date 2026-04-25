@@ -225,9 +225,7 @@ class TestResolveWorktreesPopulatesDraftPrUrl:
         with patch(
             "tripwire.runtimes.prep._resolve_clone_path", return_value=code_clone
         ):
-            with patch(
-                "subprocess.run", side_effect=_selective_subprocess_run(calls)
-            ):
+            with patch("subprocess.run", side_effect=_selective_subprocess_run(calls)):
                 entries = resolve_worktrees(
                     session=session,
                     project_dir=tmp_path_project,
