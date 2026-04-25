@@ -22,20 +22,24 @@ from tripwire.core.validator import (
 
 def _stub_main(monkeypatch, paths: set[str]) -> None:
     """Patch :func:`list_paths_on_main` to return a fixed set of paths."""
-    from tripwire.core import validator
+    from tripwire.core.validator.lint import done_implies_artifacts_on_main
 
     monkeypatch.setattr(
-        validator, "list_paths_on_main", lambda _project_dir: set(paths)
+        done_implies_artifacts_on_main,
+        "list_paths_on_main",
+        lambda _project_dir: set(paths),
     )
 
 
 def _stub_main_unavailable(monkeypatch, message: str = "no remote") -> None:
-    from tripwire.core import validator
+    from tripwire.core.validator.lint import done_implies_artifacts_on_main
 
     def _raise(_project_dir):
         raise git_helpers.MainTreeUnavailable(message)
 
-    monkeypatch.setattr(validator, "list_paths_on_main", _raise)
+    monkeypatch.setattr(
+        done_implies_artifacts_on_main, "list_paths_on_main", _raise
+    )
 
 
 def test_no_done_entities_returns_empty(
