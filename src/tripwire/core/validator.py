@@ -4,8 +4,9 @@
 This module implements the engine: load every entity, run every check in the
 catalogue, optionally apply auto-fixes, and emit a structured report.
 
-The check catalogue (matches `docs/tripwire-plan.md` "The Validation
-Gate" section):
+The check catalogue (matches the "The Validation Gate" section of
+`tripwire-plan.md` in the tripwire-workspace repo:
+https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/tripwire-plan.md):
 
 1. Schema checks — file parses, matches Pydantic model, has required fields
 2. UUID — every entity has a uuid4

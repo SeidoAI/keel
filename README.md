@@ -322,7 +322,7 @@ Everything resolves. One clone carries the whole project.
 
 Running a real PM agent against an 8,000-line planning corpus surfaced seven recurring failure modes.
 
-See [`docs/learnings.md`](docs/learnings.md).
+See [`learnings.md`](https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/learnings.md) in the tripwire-workspace repo.
 
 </details>
 

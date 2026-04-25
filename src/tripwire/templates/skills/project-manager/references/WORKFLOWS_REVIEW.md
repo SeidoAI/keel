@@ -52,9 +52,10 @@ the specific errors from the JSON output (one line per error, with
 file + field + message).
 
 ### 4. Run the full check catalogue
-The validator runs all 14 checks from
-`docs/tripwire-plan.md` "The Validation Gate" section. Focus
-especially on:
+The validator runs all 14 checks from the "The Validation Gate"
+section of `tripwire-plan.md` in the tripwire-workspace repo
+(https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/tripwire-plan.md).
+Focus especially on:
 
 - **Schema validation** — every YAML file parses and matches its model
 - **Reference integrity** — all `[[refs]]` resolve, all `blocked_by`

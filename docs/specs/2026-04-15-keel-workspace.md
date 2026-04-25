@@ -3,7 +3,7 @@
 **Status**: design approved, ready for implementation planning
 **Date**: 2026-04-15
 **Replaces**: nothing (additive to v0.5)
-**Companion doc**: `docs/backlog.md` (deferred features)
+**Companion doc**: [`backlog.md`](https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/backlog.md) in the tripwire-workspace repo (deferred features)
 
 ---
 
@@ -911,10 +911,10 @@ None blocking. Implementation plan should resolve:
 
 ## 11. Cross-references
 
-- `docs/keel-plan.md` — original v0.1 plan; data model and ID system
-- `docs/overarching-plan.md` — three-module package architecture
-- `docs/keel-core-features.md` — current feature inventory
-- `docs/backlog.md` — deferred features (hybrid YAML+markdown,
+- [`tripwire-plan.md`](https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/tripwire-plan.md) — original v0.1 plan; data model and ID system
+- [`overarching-plan.md`](https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/overarching-plan.md) — three-module package architecture
+- [`tripwire-core-features.md`](https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/tripwire-core-features.md) — current feature inventory
+- [`backlog.md`](https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/backlog.md) — deferred features (hybrid YAML+markdown,
   cross-project refs, etc.)
 - `templates/skills/project-manager/SKILL.md` — PM skill that gains
   workspace awareness

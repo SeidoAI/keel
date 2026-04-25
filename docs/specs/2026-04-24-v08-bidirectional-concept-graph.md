@@ -110,7 +110,7 @@ Default `N=1` (direct referrers). Output is per-kind grouped:
 - **websocket-hub** — pinned `@v1` — ⚠ stale (2 versions behind)
 
 ## Docs (1)
-- `docs/tripwire-ui.md` — no pin — ⚠ unacknowledged
+- `docs/specs/2026-04-24-v075-handoff.md` — no pin — ⚠ unacknowledged
 
 ## Plans (1)
 - `sessions/frontend-views-detail/plan.md` — pinned `@v3` — ✓ current

@@ -315,8 +315,10 @@ def _render_text(data: ScaffoldData) -> str:
     """Render the scaffold data as human-readable text.
 
     The output shape matches the spec's example in the "scaffold-for-creation"
-    section of `docs/tripwire-plan.md` — the same output an agent reads
-    when it runs this command as its first tool call.
+    section of `tripwire-plan.md` in the tripwire-workspace repo
+    (https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/tripwire-plan.md)
+    — the same output an agent reads when it runs this command as its first
+    tool call.
     """
     lines: list[str] = []
 

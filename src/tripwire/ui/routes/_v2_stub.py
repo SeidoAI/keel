@@ -16,7 +16,9 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 
 V2_NOT_IMPLEMENTED_CODE = "v2/not_implemented"
-V2_DEFAULT_PLAN = "docs/agent-containers.md"
+V2_DEFAULT_PLAN = (
+    "https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/agent-containers.md"
+)
 
 
 class V2NotImplementedDetail(BaseModel):
