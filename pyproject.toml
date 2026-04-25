@@ -106,3 +106,11 @@ markers = [
 
 [tool.codespell]
 skip = "uv.lock,.venv,*.lock"
+
+[tool.coverage.report]
+# Coverage floor enforced in CI via `pytest --cov-fail-under`. The flag
+# stays the source of truth for the gate; this section documents the
+# expected baseline so a drop is visible to anyone reading the config.
+# Current measured coverage is ~88% (2026-04); floor is set 2pp below
+# that to absorb routine churn. Bump up when sustained coverage rises.
+fail_under = 86

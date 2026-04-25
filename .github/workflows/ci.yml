@@ -20,7 +20,7 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check
       - name: Pytest
-        run: uv run pytest tests/ -q --cov=src/tripwire --cov-report=term-missing
+        run: uv run pytest tests/ -q --cov=src/tripwire --cov-report=term-missing --cov-fail-under=86
 
   frontend-build:
     # Smoke-test the React build on every PR so broken Vite/TS configs
