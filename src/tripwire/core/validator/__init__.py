@@ -51,7 +51,6 @@ from pydantic import ValidationError
 from tripwire.core import freshness as freshness_mod
 from tripwire.core import paths
 from tripwire.core.enum_loader import EnumRegistry, load_enums
-from tripwire.core.git_helpers import MainTreeUnavailable, list_paths_on_main
 from tripwire.core.id_generator import parse_key
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.parser import ParseError, parse_frontmatter_body
@@ -2283,13 +2282,12 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
 # Imported at the bottom of this module to avoid a circular dependency
 # (lint rules import ``CheckResult`` / ``ValidationContext`` from here).
 from tripwire.core.validator.lint import LINT_CHECKS  # noqa: E402
-
-# Backwards-compat re-export so ``from tripwire.core.validator import
-# check_done_implies_artifacts_on_main`` still resolves.
-from tripwire.core.validator.lint.done_implies_artifacts_on_main import (  # noqa: E402
+from tripwire.core.validator.lint.done_implies_artifacts_on_main import (  # noqa: E402, F401
+    # Backwards-compat re-export so existing
+    # ``from tripwire.core.validator import check_done_implies_artifacts_on_main``
+    # imports still resolve.
     check as check_done_implies_artifacts_on_main,
 )
-
 
 ALL_CHECKS = [
     check_uuid_present,
