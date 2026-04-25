@@ -29,7 +29,7 @@ class SpawnConfigValues(BaseModel):
 
     model: str = "opus"
     fallback_model: str = "sonnet"
-    effort: str = "max"
+    effort: str = "xhigh"
     permission_mode: str = "bypassPermissions"
     disallowed_tools: list[str] = Field(
         default_factory=lambda: [
@@ -39,7 +39,7 @@ class SpawnConfigValues(BaseModel):
         ]
     )
     max_turns: int = 200
-    max_budget_usd: int = 50
+    max_budget_usd: int = 100
     output_format: str = "stream-json"
 
 

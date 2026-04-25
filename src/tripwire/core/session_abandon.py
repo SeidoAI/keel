@@ -95,10 +95,19 @@ def abandon_session(
             result.errors.append(f"runtime tear-down failed: {exc}")
 
     # 2. Close any open PRs for the session's branches. Merged PRs
-    #    stay merged — closing them is meaningless. `gh pr close`
-    #    on a merged PR errors anyway, so we filter merged ones first.
+    #    stay merged — closing them is meaningless. Per worktree:
+    #    - If the worktree carries a v0.7.5 ``draft_pr_url``, close
+    #      that URL directly. Faster than `gh pr list` + `pr close
+    #      <number>`, and matches the v0.7.5 contract for orphan
+    #      drafts on session-start.
+    #    - Otherwise, find any open PR via `gh pr list --head` and
+    #      close it. This covers non-draft PRs and v0.7.4 dual-PR
+    #      worktrees that came up before draft_pr_url existed.
     for wt in session.runtime_state.worktrees:
-        verdict = _close_pr_for_branch(wt.branch, wt.worktree_path)
+        if wt.draft_pr_url:
+            verdict = _close_pr_by_url(wt.draft_pr_url, wt.worktree_path)
+        else:
+            verdict = _close_pr_for_branch(wt.branch, wt.worktree_path)
         if verdict.error:
             result.errors.append(verdict.error)
         if verdict.merged_pr is not None:
@@ -139,6 +148,40 @@ class _PrCloseVerdict:
     closed_pr: int | None = None
     merged_pr: int | None = None
     error: str | None = None
+
+
+def _close_pr_by_url(pr_url: str, worktree_path: str) -> _PrCloseVerdict:
+    """Close a PR by its URL (the v0.7.5 fast path).
+
+    Used when the worktree carries a ``draft_pr_url`` from prep. Skips
+    the `gh pr list` round trip. The PR number is parsed from the URL
+    tail purely so the caller's per-step accounting (``prs_closed``)
+    stays integer-typed; if the URL doesn't end in ``/<digits>``, we
+    fall back to recording -1.
+    """
+    verdict = _PrCloseVerdict()
+    try:
+        close = subprocess.run(
+            ["gh", "pr", "close", pr_url],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            cwd=worktree_path,
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        verdict.error = f"gh pr close {pr_url} failed: {exc}"
+        return verdict
+
+    if close.returncode != 0:
+        verdict.error = (
+            f"gh pr close {pr_url} exit={close.returncode}: "
+            f"{(close.stderr or '').strip()}"
+        )
+        return verdict
+
+    tail = pr_url.rsplit("/", 1)[-1]
+    verdict.closed_pr = int(tail) if tail.isdigit() else -1
+    return verdict
 
 
 def _close_pr_for_branch(branch: str, worktree_path: str) -> _PrCloseVerdict:

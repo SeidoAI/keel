@@ -30,7 +30,7 @@ def test_deep_merge_lists_replaced():
 def test_default_resolves_from_shipped(tmp_path_project: Path):
     resolved = load_resolved_spawn_config(tmp_path_project, session=None)
     assert resolved.config.model == "opus"
-    assert resolved.config.max_budget_usd == 50
+    assert resolved.config.max_budget_usd == 100
 
 
 def test_project_inline_override_wins_over_default(tmp_path_project: Path):
@@ -106,7 +106,7 @@ def test_build_claude_args_shape():
     # All spec §8.1 flags emitted.
     assert "--effort" in args
     assert "--max-budget-usd" in args
-    assert "50" in args  # default max_budget_usd
+    assert "100" in args  # default max_budget_usd
     assert "--model" in args
     assert "--fallback-model" in args
     assert "--permission-mode" in args
