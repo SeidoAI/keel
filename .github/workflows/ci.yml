@@ -8,6 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
@@ -24,6 +25,7 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
@@ -38,6 +40,7 @@ jobs:
     # Smoke-test the React build on every PR so broken Vite/TS configs
     # surface before the release workflow runs them.
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -54,6 +57,7 @@ jobs:
 
   frontend-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: src/tripwire/ui/frontend
@@ -74,6 +78,7 @@ jobs:
     # broken hatch hook or empty static/ bundle surfaces on the PR
     # rather than during the tag push.
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -98,6 +103,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [test, frontend-test]
     steps:
       - uses: actions/checkout@v6
