@@ -652,33 +652,40 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     show_default=True,
 )
 def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
-    """Kill the session's runtime handle if running, transition to abandoned."""
-    from tripwire.core.spawn_config import load_resolved_spawn_config
-    from tripwire.runtimes import get_runtime
+    """Abandon a session: kill runtime, close open PRs, remove worktrees,
+    transition to `abandoned`.
+
+    `abandoned` is the terminal-but-not-claimed-success path (v0.7.9
+    §A4). Use it for sessions that can't legitimately reach `done`.
+    Issues are NOT closed as `done` — they stay where they are; move
+    them to backlog/canceled separately if appropriate.
+    """
+    from tripwire.core.session_abandon import (
+        AbandonError,
+        abandon_session,
+    )
 
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
     try:
-        session = load_session(resolved, session_id)
+        result = abandon_session(resolved, session_id)
     except FileNotFoundError as exc:
         raise click.ClickException(f"session '{session_id}' not found") from exc
+    except AbandonError as exc:
+        raise click.ClickException(str(exc)) from exc
 
-    if session.status in ("completed", "abandoned"):
-        raise click.ClickException(
-            f"session '{session_id}' is already '{session.status}'"
-        )
-
-    spawn = load_resolved_spawn_config(resolved, session=session)
-    runtime = get_runtime(spawn.invocation.runtime)
-
-    if session.status == "executing":
-        runtime.abandon(session)
-
-    session.status = "abandoned"
-    session.updated_at = datetime.now(tz=timezone.utc)
-    save_session(resolved, session)
     click.echo(f"Session '{session_id}' → abandoned")
+    if result.runtime_killed:
+        click.echo("  killed runtime handle")
+    for pr in result.prs_closed:
+        click.echo(f"  closed PR #{pr}")
+    for pr in result.prs_skipped_merged:
+        click.echo(f"  skipped merged PR #{pr}")
+    for wt in result.worktrees_removed:
+        click.echo(f"  removed worktree: {wt}")
+    for err in result.errors:
+        click.echo(f"  warning: {err}", err=True)
 
 
 @session_cmd.command("cleanup")
@@ -1307,32 +1314,17 @@ session_cmd.add_command(artifacts_list, name="artifacts")
 @click.argument("session_id")
 @click.option("--project-dir", type=click.Path(path_type=Path), default=".")
 @click.option("--dry-run", is_flag=True, default=False)
-@click.option(
-    "--force",
-    is_flag=True,
-    default=False,
-    help="Bypass all gates (use sparingly).",
-)
-@click.option(
-    "--force-review",
-    is_flag=True,
-    default=False,
-    help="Proceed even if the most recent review failed or was never run.",
-)
-@click.option("--skip-artifact-check", is_flag=True, default=False)
-@click.option("--skip-worktree-cleanup", is_flag=True, default=False)
-@click.option("--skip-pr-merge-check", is_flag=True, default=False)
 def session_complete_cmd(
     session_id: str,
     project_dir: Path,
     dry_run: bool,
-    force: bool,
-    force_review: bool,
-    skip_artifact_check: bool,
-    skip_worktree_cleanup: bool,
-    skip_pr_merge_check: bool,
 ) -> None:
-    """Complete a session: verify PRs merged, close issues, cleanup."""
+    """Complete a session: verify PRs merged, close issues, cleanup.
+
+    Every gate is mandatory. If a session can't pass them, run
+    `tripwire session abandon` — that's the terminal-but-not-claimed-
+    success path. There are no bypass flags by design (v0.7.9 §A4).
+    """
     from tripwire.core.session_complete import (
         CompleteError,
         complete_session,
@@ -1342,16 +1334,7 @@ def session_complete_cmd(
     _require_project(resolved)
 
     try:
-        result = complete_session(
-            resolved,
-            session_id,
-            dry_run=dry_run,
-            force=force,
-            force_review=force_review,
-            skip_artifact_check=skip_artifact_check,
-            skip_worktree_cleanup=skip_worktree_cleanup,
-            skip_pr_merge_check=skip_pr_merge_check,
-        )
+        result = complete_session(resolved, session_id, dry_run=dry_run)
     except CompleteError as exc:
         raise click.ClickException(str(exc)) from exc
 
