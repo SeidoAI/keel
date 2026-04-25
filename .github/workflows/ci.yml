@@ -22,6 +22,18 @@ jobs:
       - name: Pytest
         run: uv run pytest tests/ -q --cov=src/tripwire --cov-report=term-missing --cov-fail-under=86
 
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.13"
+      - name: Sync
+        run: uv sync
+      - name: Mypy
+        run: uv run mypy src/tripwire
+
   frontend-build:
     # Smoke-test the React build on every PR so broken Vite/TS configs
     # surface before the release workflow runs them.

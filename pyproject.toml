@@ -49,6 +49,8 @@ dev = [
     "pre-commit>=3.0,<5.0",
     "pytest-cov>=7.1.0",
     "pytest-asyncio>=1.3.0",
+    "mypy>=1.10,<2.0",
+    "types-pyyaml>=6.0",
 ]
 
 [build-system]
@@ -106,6 +108,31 @@ markers = [
 
 [tool.codespell]
 skip = "uv.lock,.venv,*.lock"
+
+[tool.mypy]
+# Permissive baseline. The goal of the typecheck CI job at this stage
+# is to catch syntax-level type errors and obvious mistakes — not to
+# enforce strict typing across a codebase that wasn't written for it.
+# The disabled error codes below are categories that surface real but
+# deferred-fix issues; they will be re-enabled and addressed
+# incrementally in follow-up PRs. See KUI-83.
+python_version = "3.10"
+ignore_missing_imports = true
+follow_imports = "silent"
+warn_unused_ignores = false
+check_untyped_defs = false
+disallow_untyped_defs = false
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "attr-defined",
+    "call-arg",
+    "list-item",
+    "operator",
+    "return-value",
+    "valid-type",
+    "misc",
+]
 
 [tool.coverage.report]
 # Coverage floor enforced in CI via `pytest --cov-fail-under`. The flag
