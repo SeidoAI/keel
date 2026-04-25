@@ -12,7 +12,6 @@ from unittest.mock import patch
 
 import pytest
 
-from tripwire.models.session import AgentSession
 from tripwire.runtimes.monitor import (
     InjectFollowUp,
     LogWarning,
@@ -131,8 +130,9 @@ def test_execute_log_warning_writes_monitor_log(tmp_project: Path, tmp_path: Pat
 def test_execute_sigterm_records_engagement_outcome(tmp_project: Path):
     """A SIGTERM tripwire stamps the active engagement outcome so post-mortem
     bookkeeping can see why the agent was killed."""
-    from tripwire.core.session_store import load_session, save_session
     from datetime import datetime, timezone
+
+    from tripwire.core.session_store import load_session, save_session
     from tripwire.models.session import EngagementEntry
 
     session = load_session(tmp_project, "s1")

@@ -17,8 +17,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import pytest
-
 from tripwire.core.pr_watcher import (
     CommentOnPR,
     InjectFollowUp,
@@ -31,25 +29,25 @@ from tripwire.core.pr_watcher import (
 
 
 def _ws(**kw) -> WatchedSession:
-    base = dict(
-        session_id="s1",
-        project_dir=Path("/tmp/proj"),
-        code_repo="SeidoAI/code",
-        code_branch="feat/s1",
-        code_pr_number=42,
-        code_pr_opened_at=datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc),
-        pt_repo="SeidoAI/tripwire-v0",
-        pt_branch="proj/s1",
-        pt_pr_number=None,
-        required_artifacts=["sessions/s1/self-review.md", "sessions/s1/insights.yaml"],
-        session_status="executing",
-    )
+    base = {
+        "session_id": "s1",
+        "project_dir": Path("/tmp/proj"),
+        "code_repo": "SeidoAI/code",
+        "code_branch": "feat/s1",
+        "code_pr_number": 42,
+        "code_pr_opened_at": datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc),
+        "pt_repo": "SeidoAI/tripwire-v0",
+        "pt_branch": "proj/s1",
+        "pt_pr_number": None,
+        "required_artifacts": ["sessions/s1/self-review.md", "sessions/s1/insights.yaml"],
+        "session_status": "executing",
+    }
     base.update(kw)
     return WatchedSession(**base)
 
 
 def _state(**kw) -> PRState:
-    base = dict(number=42, state="open", merged=False, head_branch="feat/s1")
+    base = {"number": 42, "state": "open", "merged": False, "head_branch": "feat/s1"}
     base.update(kw)
     return PRState(**base)
 

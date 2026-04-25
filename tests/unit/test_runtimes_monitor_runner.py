@@ -20,8 +20,8 @@ import pytest
 from tripwire.runtimes.monitor_runner import (
     MonitorRunner,
     RunnerConfig,
-    write_runner_config,
     read_runner_config,
+    write_runner_config,
 )
 
 

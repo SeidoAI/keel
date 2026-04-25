@@ -12,8 +12,6 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from tripwire.runtimes.monitor import (
     InjectFollowUp,
     LogWarning,
@@ -29,18 +27,18 @@ def _ctx(tmp_path: Path, **overrides) -> MonitorContext:
     pt.mkdir(exist_ok=True)
     code = tmp_path / "code"
     code.mkdir(exist_ok=True)
-    base = dict(
-        session_id="s1",
-        pid=1234,
-        log_path=tmp_path / "log.jsonl",
-        code_worktree=code,
-        pt_worktree=pt,
-        project_dir=tmp_path / "proj",
-        max_budget_usd=10.0,
-        model_name="claude-opus-4-7",
-        key_files=["src/foo.py"],
-        required_artifacts=["self-review.md"],
-    )
+    base = {
+        "session_id": "s1",
+        "pid": 1234,
+        "log_path": tmp_path / "log.jsonl",
+        "code_worktree": code,
+        "pt_worktree": pt,
+        "project_dir": tmp_path / "proj",
+        "max_budget_usd": 10.0,
+        "model_name": "claude-opus-4-7",
+        "key_files": ["src/foo.py"],
+        "required_artifacts": ["self-review.md"],
+    }
     base.update(overrides)
     return MonitorContext(**base)
 
@@ -334,8 +332,8 @@ def test_successful_push_resets_counter(tmp_path):
 def test_pr_create_with_empty_pt_branch_emits_inject(tmp_path):
     """`gh pr create` from code worktree but PT worktree has no commits
     beyond main → inject reminder."""
-    pt = tmp_path / "pt"
-    code = tmp_path / "code"
+    tmp_path / "pt"
+    tmp_path / "code"
     monitor = RuntimeMonitor(_ctx(tmp_path))
     pr_create = {
         "type": "assistant",
