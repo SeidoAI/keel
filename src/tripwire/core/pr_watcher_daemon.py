@@ -24,14 +24,12 @@ import logging
 import os
 import subprocess
 import threading
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 
-from tripwire.core.process_helpers import is_alive
 from tripwire.core.pr_watcher import (
     PRWatcher,
     WatchedSession,
@@ -41,6 +39,7 @@ from tripwire.core.pr_watcher_executor import (
     fetch_pr_files,
     fetch_pr_state,
 )
+from tripwire.core.process_helpers import is_alive
 from tripwire.core.session_store import list_sessions
 
 logger = logging.getLogger(__name__)
@@ -243,14 +242,14 @@ class WatchDaemon:
         now = now or datetime.now(tz=timezone.utc)
         try:
             sessions = build_watched_sessions(self.cfg.project_dir)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("watch: build_watched_sessions failed")
             return
         actions = self.watcher.tick(sessions, now=now)
         for action in actions:
             try:
                 self.executor.execute(action)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.exception("watch: executor failed on %r", action)
 
     def stop(self) -> None:

@@ -21,10 +21,10 @@ calls :meth:`PRWatcher.tick`, and dispatches the actions.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable, Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ class PRWatcher:
         for ws in sessions:
             try:
                 actions.extend(self._tick_session(ws, now))
-            except Exception:  # noqa: BLE001 — one bad session must not break the rest
+            except Exception:
                 logger.exception(
                     "pr_watcher: tick raised for session %r — skipping",
                     ws.session_id,

@@ -32,10 +32,10 @@ import json
 import logging
 import subprocess
 import threading
-import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import yaml
 
@@ -533,7 +533,7 @@ class RuntimeMonitor:
     @staticmethod
     def _is_git_push(cmd: str) -> bool:
         cmd = cmd.strip()
-        return "git push" in cmd or cmd.startswith("git -C") and " push " in cmd
+        return "git push" in cmd or (cmd.startswith("git -C") and " push " in cmd)
 
     @staticmethod
     def _is_pr_create(cmd: str) -> bool:
