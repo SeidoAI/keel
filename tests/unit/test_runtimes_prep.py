@@ -388,6 +388,21 @@ class TestRenderKickoff:
 
 
 class TestPrepRun:
+    @pytest.fixture(autouse=True)
+    def _stub_v075_prereqs(self):
+        """Bypass v0.7.5 spawn-time gh + draft-PR prerequisites.
+
+        These end-to-end tests exercise the prep orchestration; the
+        gh/draft-PR mechanics are unit-tested separately in
+        ``test_prep_draft_pr.py``.
+        """
+        with patch("tripwire.runtimes.prep._check_gh_available"):
+            with patch(
+                "tripwire.runtimes.prep._open_draft_pr",
+                return_value=None,
+            ):
+                yield
+
     def test_end_to_end(
         self, tmp_path, tmp_path_project, save_test_session, write_handoff_yaml
     ):
