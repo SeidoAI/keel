@@ -49,4 +49,6 @@ async def respond_to_message(message_id: str, body: MessageRespond) -> Message:
 
 @router.get("/unread", response_model=UnreadCount)
 async def get_unread_count() -> UnreadCount:
-    raise_v2_not_implemented(_DETAIL)
+    # v1 has no agent containers, so the inbox is always empty. v2 will
+    # replace this with a sqlite-backed query (see [[dec-v2-stubs-not-deferred]]).
+    return UnreadCount(count=0)
