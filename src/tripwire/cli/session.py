@@ -675,6 +675,26 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
     if session.status == "executing":
         runtime.abandon(session)
 
+    # v0.7.5 — close any draft PRs that prep opened at session-start so
+    # they don't pile up as orphan drafts on the remote. Best-effort:
+    # the abandon transition lands even if `gh pr close` errors out.
+    for wt in session.runtime_state.worktrees:
+        if not wt.draft_pr_url:
+            continue
+        try:
+            subprocess.run(
+                ["gh", "pr", "close", wt.draft_pr_url],
+                cwd=wt.worktree_path,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (subprocess.SubprocessError, OSError, FileNotFoundError):
+            # Worktree path may already be gone; abandon doesn't depend
+            # on the close succeeding.
+            pass
+
     session.status = "abandoned"
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
