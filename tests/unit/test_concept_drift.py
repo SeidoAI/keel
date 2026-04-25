@@ -114,19 +114,34 @@ class TestCandidateExtraction:
         msgs = [f.message for f in _findings(tmp_path_project)]
         assert any("WebSocket Hub" in m for m in msgs)
 
-    def test_kebab_case_single_mention_flagged(
+    def test_kebab_case_repeated_flagged(
         self, save_test_issue, tmp_path_project
     ):
-        """kebab-case is a strong signal even with one mention — operator
-        almost certainly meant `[[kanban-board]]`."""
+        """kebab-case in prose strongly suggests a missing-bracket ref,
+        but on real-world spec content single mentions are mostly
+        implementation-detail noise. Require ≥2 occurrences (across or
+        within issues) — calibrated on tripwire-v0."""
         save_test_issue(
             tmp_path_project,
             key="TMP-1",
             title="Stub",
-            body="The kanban-board is the central thing.\n",
+            body="The kanban-board matters. Update kanban-board layout.\n",
         )
         msgs = [f.message for f in _findings(tmp_path_project)]
         assert any("kanban-board" in m for m in msgs)
+
+    def test_kebab_case_single_mention_not_flagged(
+        self, save_test_issue, tmp_path_project
+    ):
+        """One mention of a kebab term isn't enough signal anymore."""
+        save_test_issue(
+            tmp_path_project,
+            key="TMP-1",
+            title="Stub",
+            body="The kanban-board appears once.\n",
+        )
+        msgs = [f.message for f in _findings(tmp_path_project)]
+        assert not any("kanban-board" in m for m in msgs)
 
     def test_single_word_title_case_not_flagged(
         self, save_test_issue, tmp_path_project
@@ -268,22 +283,32 @@ class TestAllowlist:
 
 
 class TestReporting:
-    def test_capped_at_ten_per_issue(self, save_test_issue, tmp_path_project):
-        """Cap at 10 findings per issue — protects against noise floods."""
-        # 15 distinct kebab-case terms in one issue.
-        terms = "\n".join(f"the alpha-beta-{i} matters" for i in range(15))
+    def test_global_cap(self, save_test_issue, tmp_path_project):
+        """Cap total findings at MAX_FINDINGS (one finding per term)."""
+        from tripwire.core.lint_rules.concept_drift import MAX_FINDINGS
+
+        # Generate enough qualifying kebab-case terms (each appearing
+        # within-issue ≥2) to exceed the cap.
+        n_terms = MAX_FINDINGS + 5
+        body_lines = []
+        for i in range(n_terms):
+            body_lines.append(f"foo alpha{i:03}-beta{i:03} matters.")
+            body_lines.append(f"foo alpha{i:03}-beta{i:03} matters again.")
         save_test_issue(
-            tmp_path_project, key="TMP-1", title="Stub", body=terms + "\n"
+            tmp_path_project,
+            key="TMP-1",
+            title="Stub",
+            body="\n".join(body_lines) + "\n",
         )
-        per_issue = [f for f in _findings(tmp_path_project) if "TMP-1" in f.file]
-        assert len(per_issue) <= 10
+        findings = _findings(tmp_path_project)
+        assert len(findings) <= MAX_FINDINGS
 
     def test_finding_includes_fix_hint(self, save_test_issue, tmp_path_project):
         save_test_issue(
             tmp_path_project,
             key="TMP-1",
             title="Stub",
-            body="The kanban-board is central.\n",
+            body="The kanban-board is central. The kanban-board ships next.\n",
         )
         findings = _findings(tmp_path_project)
         kanban = [f for f in findings if "kanban-board" in f.message]

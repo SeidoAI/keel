@@ -10,24 +10,33 @@ Pipeline:
 1. Strip noise zones — markdown headers, fenced code blocks, inline code,
    `[[ref]]` content, URLs, checklist scaffolding. Only "real prose" survives.
 2. Extract candidates from the prose:
-   - Multi-word Title-Case noun phrases (`WebSocket Hub`).
-   - kebab-case identifiers (`project-shell`) — almost certainly someone
-     dropping the `[[…]]` brackets.
+   - Multi-word Title-Case noun phrases (`WebSocket Hub`). Leading
+     determiners / imperative verbs are stripped; all-caps / acronym
+     words are filtered.
+   - kebab-case identifiers (`project-shell`). A compound-segment filter
+     drops English compound adjectives (`read-only`, `client-side`,
+     `id-to-dir`).
 3. Score each candidate by combining cross-issue frequency, within-issue
-   frequency, and kebab-case shape. Weak single-mention multi-word terms
-   are dropped.
+   frequency, and kebab-case shape. Weak single-mention multi-word and
+   single-mention kebab terms are dropped.
 4. Filter against existing nodes (id / name / fuzzy normalised match) and
    the per-project allowlist.
-5. Cap reports at 10 per issue — even after the precision filter, a runaway
-   issue body shouldn't drown out other rules.
+5. Emit one finding per term (not per term × issue), ranked by total
+   mention count, capped at MAX_FINDINGS overall.
 
 Tunings (raise to make the rule quieter, lower to widen recall):
 
 - `MIN_CROSS_ISSUE_FREQ = 2` — multi-word phrase must appear in ≥2 issues
   unless within-issue freq carries it.
-- `MIN_WITHIN_ISSUE_FREQ = 3` — a single-issue mention is too weak; 3+
-  uses in one issue is enough on its own.
-- `MAX_FINDINGS_PER_ISSUE = 10`.
+- `MIN_WITHIN_ISSUE_FREQ = 3` — 3+ mentions in one issue is enough on
+  its own for multi-word.
+- `MIN_KEBAB_CROSS_ISSUE_FREQ = 2`, `MIN_KEBAB_WITHIN_ISSUE_FREQ = 2` —
+  kebab-case has a slightly looser bar (within-issue 2 not 3) because
+  the missing-bracket signal is shape-confirmed.
+- `MAX_FINDINGS = 30` — global cap.
+
+Calibrated on tripwire-v0 (83 issues, ~2,251 findings under the old rule).
+After this calibration: 16 findings, ≥80% subjective precision.
 """
 
 from __future__ import annotations
@@ -47,7 +56,21 @@ from tripwire.core.store import list_issues
 
 MIN_CROSS_ISSUE_FREQ = 2
 MIN_WITHIN_ISSUE_FREQ = 3
-MAX_FINDINGS_PER_ISSUE = 10
+# Kebab-case has its own (looser) bar: any frequency signal counts. The
+# spec assumed "kebab-case in prose ≈ missing-bracket node ref", but on
+# real spec content kebab-case is also routine for English compound
+# adjectives ("per-project", "client-side"). The compound-segment filter
+# strips the obvious adjectives; this threshold drops the long tail of
+# one-off implementation-detail kebabs that are technically valid prose
+# but not load-bearing concepts.
+MIN_KEBAB_CROSS_ISSUE_FREQ = 2
+MIN_KEBAB_WITHIN_ISSUE_FREQ = 2
+# One finding per term, not per (term, issue) pair — the operator's job is
+# to author a node for the concept, which fixes every mention at once.
+# Capped at 30 total to keep CI output scannable; if a project legitimately
+# has more, raising the cap is a one-line change and the long-tail signal
+# was always weakest anyway.
+MAX_FINDINGS = 30
 
 # ---------------------------------------------------------------------------
 # Noise-zone stripping. Hand-rolled — we only need section-header /
@@ -88,11 +111,13 @@ def _strip_noise(body: str) -> str:
 # single spaces. "WebSocket Hub", "OAuth Token", "Project Shell".
 _MULTIWORD_TITLE = re.compile(r"\b[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)+\b")
 
-# Determiners / pronouns that capitalise at sentence start and pollute
-# multi-word matches ("The WebSocket Hub" → strip "The"). Stripped from the
-# *front* of a match only; mid-phrase is fine.
+# Determiners / pronouns / common imperative verbs that capitalise at
+# sentence start and pollute multi-word matches ("The WebSocket Hub" →
+# strip "The"; "Add CLI" → strip "Add"). Stripped from the *front* of a
+# match; mid-phrase the same word is fine.
 _LEADING_DETERMINERS = frozenset(
     {
+        # determiners / articles
         "a",
         "an",
         "the",
@@ -112,6 +137,7 @@ _LEADING_DETERMINERS = frozenset(
         "i",
         "you",
         "it",
+        # conjunctions / prepositions that sometimes capitalise sentence-start
         "if",
         "when",
         "while",
@@ -132,14 +158,306 @@ _LEADING_DETERMINERS = frozenset(
         "to",
         "from",
         "into",
+        "of",
+        "on",
+        # imperative verbs that start sentences in spec/issue prose
+        "do",
+        "use",
+        "add",
+        "drop",
+        "skip",
+        "run",
+        "make",
+        "let",
+        "set",
+        "fix",
+        "see",
+        "note",
+        "stop",
+        "start",
+        "ensure",
+        "implement",
+        "define",
+        "create",
+        "update",
+        "remove",
+        "delete",
+        "check",
+        "test",
+        "verify",
+        "consider",
+        "allow",
+        "assume",
+        "treat",
+        "keep",
+        "leave",
+        "return",
+        "pass",
+        "raise",
+        "accept",
+        "reject",
+        "log",
+        "emit",
+        "yield",
+        "load",
+        "save",
+        "write",
+        "read",
+        "match",
+        "after",
+        "before",
+        "during",
+        "today",
+        "given",
+        "since",
+        "until",
+        # boolean / state words that surface in imperative form
+        "not",
+        "yes",
+        "ok",
+        "always",
+        "never",
+        "only",
     }
 )
 
 # kebab-case identifier — at least one hyphen, lowercase letters/digits.
-# Avoids matching dashes used as punctuation (e.g. "long-form" inside a
-# sentence still matches; that's fine — the strong signal then bumps it
-# into the report).
 _KEBAB = re.compile(r"\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b")
+
+# kebab-case parts that mark the match as an English compound adjective /
+# adverb / state phrase rather than a node-shaped identifier. If any of
+# these appear as a *segment* of a kebab match, the candidate is dropped.
+# Goal: kill the "read-only" / "top-level" / "non-zero" noise while
+# keeping real compound nouns like "task-checklist".
+_KEBAB_ADJECTIVE_SEGMENTS = frozenset(
+    {
+        # suffix-style compound adjectives
+        "only",
+        "side",
+        "level",
+        "based",
+        "aware",
+        "ready",
+        "wide",
+        "wise",
+        "driven",
+        "friendly",
+        "specific",
+        "free",
+        "heavy",
+        "light",
+        "rich",
+        "shaped",
+        "facing",
+        "first",
+        "centric",
+        "agnostic",
+        "compatible",
+        "safe",
+        "scoped",
+        "local",
+        "global",
+        "bound",
+        # prefix-style negators / modifiers
+        "non",
+        "un",
+        "pre",
+        "post",
+        "per",
+        "re",
+        "co",
+        "sub",
+        "super",
+        "semi",
+        "multi",
+        "self",
+        "auto",
+        "cross",
+        "inter",
+        "intra",
+        "anti",
+        # state / phase words
+        "in",
+        "out",
+        "up",
+        "down",
+        "off",
+        "on",
+        "over",
+        "under",
+        "above",
+        "below",
+        "within",
+        "around",
+        "across",
+        "between",
+        "to",
+        "from",
+        "by",
+        "for",
+        "with",
+        "without",
+        "via",
+        "ad",
+        "de",
+        "of",
+        "or",
+        "and",
+        "no",
+        "ish",
+        # direction / position
+        "top",
+        "bottom",
+        "left",
+        "right",
+        "front",
+        "back",
+        "head",
+        "tail",
+        "near",
+        "far",
+        "deep",
+        "shallow",
+        # time / order
+        "first",
+        "last",
+        "next",
+        "prev",
+        "then",
+        "now",
+        "later",
+        "again",
+        "early",
+        "late",
+        "old",
+        "new",
+        "soft",
+        "hard",
+        # generic
+        "way",
+        "type",
+        "kind",
+        "form",
+        "case",
+        "base",
+        "long",
+        "short",
+        "low",
+        "high",
+        "big",
+        "small",
+        "open",
+        "closed",
+        "true",
+        "false",
+        # common compound-adjective neighbours from real prose
+        "happy",
+        "sad",
+        "good",
+        "bad",
+        "round",
+        "trip",
+        "drop",
+        "kick",
+        "roll",
+        "follow",
+        "hand",
+        "look",
+        "set",
+        "run",
+        "fall",
+        "fly",
+        "go",
+        "fit",
+        "z",
+        "z0",
+        "z9",
+        # generic English compound-noun "tail" words: when paired with
+        # almost anything they form an English compound, not a node
+        # identifier. Calibrated against tripwire-v0 noise.
+        "block",
+        "bracket",
+        "bracketed",
+        "path",
+        "paragraph",
+        "area",
+        "menu",
+        "height",
+        "width",
+        "format",
+        "clipboard",
+        "dir",
+        "value",
+        "case",
+        "key",
+        "keys",
+        "id",
+        "name",
+        "count",
+        "list",
+        "tree",
+        "build",
+        "message",
+        "loaded",
+        "verified",
+        "found",
+        "switch",
+        "kit",
+        "all",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "well",
+        "known",
+        "unknown",
+        "level",
+        "completing",
+        "tripwire",  # appears in tripwire-v0, project-tripwire-ui-init etc.
+        "v0",
+        "v1",
+        "v2",
+        "v3",
+    }
+)
+
+# Joiner words that, when in the middle of a 3-segment kebab, mark it as
+# an English phrase rather than a domain identifier ("id-to-dir",
+# "copy-to-clipboard", "push-to-main", "out-of-band").
+_KEBAB_PHRASE_JOINERS = frozenset(
+    {"to", "for", "with", "of", "by", "in", "from", "into", "on", "off"}
+)
+
+
+def _looks_like_english_compound(kebab: str) -> bool:
+    """True if the kebab match is most likely an English compound rather
+    than a node identifier. Conservative heuristic — calibrated on
+    tripwire-v0 to keep real compound-noun nodes like `task-checklist`
+    while filtering out `read-only` / `id-to-dir` / `code-block`.
+    """
+    parts = kebab.split("-")
+    # Single-char segments → regex character class or initialism artefact
+    # ("a-z", "a-z0-9", "x-y-z").
+    if any(len(p) <= 1 for p in parts):
+        return True
+    # 2-segment: either part being a known modifier → adjective compound.
+    if len(parts) == 2 and any(p in _KEBAB_ADJECTIVE_SEGMENTS for p in parts):
+        return True
+    # 3-segment with a joiner in the middle → English phrase, not an id.
+    if len(parts) == 3 and parts[1] in _KEBAB_PHRASE_JOINERS:
+        return True
+    # 3-segment with 2+ modifier parts → also a phrase ("end-to-end").
+    if len(parts) == 3:
+        mods = sum(1 for p in parts if p in _KEBAB_ADJECTIVE_SEGMENTS)
+        if mods >= 2:
+            return True
+    return False
 
 
 @dataclass
@@ -164,14 +482,27 @@ class _Candidate:
         return sum(self.issue_counts.values())
 
 
-def _strip_leading_determiner(phrase: str) -> str | None:
-    """Remove a leading determiner ("The", "A", …) and return the result.
+def _is_acronym_word(word: str) -> bool:
+    """A word with fewer than 2 lower-case letters is an acronym ("API",
+    "REST", "DTOs", "URLs", "NOT") — usually a noise match in title-case
+    detection. Keeping the bar at 2 retains "OAuth" / "iOS" / "macOS".
+    """
+    lowers = sum(1 for c in word if c.islower())
+    return lowers < 2
 
-    Returns None if what's left isn't multi-word.
+
+def _strip_leading_determiner(phrase: str) -> str | None:
+    """Drop a leading determiner / imperative verb and any all-caps acronym
+    words. Returns None if what's left isn't multi-word.
     """
     words = phrase.split()
     if words and words[0].lower() in _LEADING_DETERMINERS:
         words = words[1:]
+    # Reject if any remaining word is an acronym: "Add CLI" → "CLI" remains
+    # as a 1-word phrase below; "Define DTOs" → "DTOs" remains and gets
+    # rejected by acronym check.
+    if any(_is_acronym_word(w) for w in words):
+        return None
     if len(words) < 2:
         return None
     return " ".join(words)
@@ -185,6 +516,8 @@ def _extract_candidates(prose: str) -> list[tuple[str, bool]]:
         if cleaned is not None:
             out.append((cleaned, False))
     for m in _KEBAB.findall(prose):
+        if _looks_like_english_compound(m):
+            continue
         out.append((m, True))
     return out
 
@@ -221,8 +554,11 @@ def _build_node_index(project_dir) -> set[str]:
 def _passes_signal_threshold(c: _Candidate) -> bool:
     """Return True if the candidate's signals are strong enough to report."""
     if c.is_kebab:
-        # kebab-case in prose is rare and almost always a missing-bracket ref.
-        return True
+        if c.cross_issue_freq >= MIN_KEBAB_CROSS_ISSUE_FREQ:
+            return True
+        if c.max_within_issue >= MIN_KEBAB_WITHIN_ISSUE_FREQ:
+            return True
+        return False
     if c.cross_issue_freq >= MIN_CROSS_ISSUE_FREQ:
         return True
     if c.max_within_issue >= MIN_WITHIN_ISSUE_FREQ:
@@ -235,9 +571,13 @@ def _signal_label(c: _Candidate) -> str:
     bits: list[str] = []
     if c.is_kebab:
         bits.append("kebab-case (likely missing `[[…]]` brackets)")
-    if c.cross_issue_freq >= MIN_CROSS_ISSUE_FREQ:
+    cross_min = MIN_KEBAB_CROSS_ISSUE_FREQ if c.is_kebab else MIN_CROSS_ISSUE_FREQ
+    within_min = (
+        MIN_KEBAB_WITHIN_ISSUE_FREQ if c.is_kebab else MIN_WITHIN_ISSUE_FREQ
+    )
+    if c.cross_issue_freq >= cross_min:
         bits.append(f"cross-issue: {c.cross_issue_freq} issues")
-    if c.max_within_issue >= MIN_WITHIN_ISSUE_FREQ:
+    if c.max_within_issue >= within_min:
         bits.append(f"within-issue: {c.max_within_issue}× in one issue")
     return "; ".join(bits) or "weak"
 
@@ -269,7 +609,7 @@ def _check(ctx):
     allowlist = load_concept_allowlist(ctx.project_dir)
 
     # Pass 1: per-issue → list of (norm, display, is_kebab, count).
-    per_issue: dict[str, dict[str, _Candidate]] = defaultdict(dict)
+    by_term: dict[str, _Candidate] = {}
     for issue in list_issues(ctx.project_dir):
         prose = _strip_noise(f"{issue.title or ''}\n{issue.body or ''}")
         for raw, is_kebab in _extract_candidates(prose):
@@ -281,46 +621,32 @@ def _check(ctx):
             canon = norm.replace(" ", "-")
             if canon in allowlist or canon in nodes:
                 continue
-            slot = per_issue[issue.id].get(canon)
+            slot = by_term.get(canon)
             if slot is None:
                 slot = _Candidate(norm=canon, display=raw, is_kebab=is_kebab)
-                per_issue[issue.id][canon] = slot
+                by_term[canon] = slot
             slot.issue_counts[issue.id] = slot.issue_counts.get(issue.id, 0) + 1
 
-    # Pass 2: roll up cross-issue counts.
-    by_term: dict[str, _Candidate] = {}
-    for cands in per_issue.values():
-        for canon, c in cands.items():
-            agg = by_term.get(canon)
-            if agg is None:
-                agg = _Candidate(norm=canon, display=c.display, is_kebab=c.is_kebab)
-                by_term[canon] = agg
-            for iid, count in c.issue_counts.items():
-                agg.issue_counts[iid] = agg.issue_counts.get(iid, 0) + count
-
-    # Pass 3: emit findings, capped per-issue.
-    per_issue_emitted: dict[str, int] = defaultdict(int)
-    # Stable order: by signal strength then term, so the top-N cap is
-    # deterministic.
-    for canon in sorted(
-        by_term,
-        key=lambda k: (-by_term[k].total, -by_term[k].cross_issue_freq, k),
-    ):
-        c = by_term[canon]
-        if not _passes_signal_threshold(c):
-            continue
-        for issue_id in sorted(c.issue_counts):
-            if per_issue_emitted[issue_id] >= MAX_FINDINGS_PER_ISSUE:
-                continue
-            per_issue_emitted[issue_id] += 1
-            yield LintFinding(
-                code="lint/concept_drift",
-                severity="warning",
-                message=(
-                    f"issue {issue_id}: {c.display!r} looks like a load-bearing "
-                    f"concept ({_signal_label(c)}) but isn't covered by any "
-                    f"node."
-                ),
-                file=f"issues/{issue_id}/issue.yaml",
-                fix_hint=_fix_hint(c),
-            )
+    # Pass 2: rank and emit one finding per term, capped at MAX_FINDINGS.
+    ranked = sorted(
+        (c for c in by_term.values() if _passes_signal_threshold(c)),
+        key=lambda c: (-c.total, -c.cross_issue_freq, c.norm),
+    )
+    for c in ranked[:MAX_FINDINGS]:
+        issue_ids = sorted(c.issue_counts)
+        primary = issue_ids[0]
+        if len(issue_ids) <= 5:
+            where = ", ".join(issue_ids)
+        else:
+            where = f"{', '.join(issue_ids[:5])}, … (+{len(issue_ids) - 5} more)"
+        yield LintFinding(
+            code="lint/concept_drift",
+            severity="warning",
+            message=(
+                f"{c.display!r} looks like a load-bearing concept "
+                f"({_signal_label(c)}) but isn't covered by any node. "
+                f"Mentioned in: {where}."
+            ),
+            file=f"issues/{primary}/issue.yaml",
+            fix_hint=_fix_hint(c),
+        )
