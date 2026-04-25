@@ -19,11 +19,16 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from tripwire.core.validator import CheckResult, ValidationContext
 
-from . import done_implies_artifacts_on_main, self_review_implies_pm_response
+from . import (
+    done_implies_artifacts_on_main,
+    pm_response_followups_resolve,
+    self_review_implies_pm_response,
+)
 
 CheckFunc = Callable[["ValidationContext"], "list[CheckResult]"]
 
 LINT_CHECKS: list[CheckFunc] = [
     done_implies_artifacts_on_main.check,
     self_review_implies_pm_response.check,
+    pm_response_followups_resolve.check,
 ]
