@@ -10,6 +10,22 @@ export default defineConfig({
     environment: "jsdom",
     passWithNoTests: true,
     setupFiles: ["./src/__tests__/setup.ts"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      // Scope: features + components. Endpoint wrappers and
+      // query-client glue (under lib/) are mostly query-string
+      // assembly and would drag branch coverage below the bar
+      // without telling us anything new about the UI contract.
+      include: ["src/components/**", "src/features/**"],
+      exclude: ["**/*.d.ts", "**/__tests__/**", "src/components/ui/**"],
+      thresholds: {
+        lines: 70,
+        functions: 70,
+        branches: 70,
+        statements: 70,
+      },
+    },
   },
   build: {
     outDir: "../static",

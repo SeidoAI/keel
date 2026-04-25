@@ -1,8 +1,6 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactElement, ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactList } from "@/features/artifacts/ArtifactList";
 import { ArtifactViewer } from "@/features/artifacts/ArtifactViewer";
@@ -13,6 +11,9 @@ import type {
   ArtifactStatus,
 } from "@/lib/api/endpoints/artifacts";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { makeArtifactSpec, makeArtifactStatus } from "../../mocks/fixtures";
+import { server } from "../../mocks/server";
+import { makeTestQueryClient, renderWithProviders } from "../../test-utils";
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -23,108 +24,79 @@ vi.mock("sonner", () => ({
   toast: { success: toastMocks.success, error: toastMocks.error },
 }));
 
-function baseManifest(): ArtifactManifest {
+const SPECS = {
+  plan: makeArtifactSpec({ name: "plan", approval_gate: true }),
+  "task-checklist": makeArtifactSpec({
+    name: "task-checklist",
+    file: "task-checklist.md",
+    template: "task-checklist",
+    produced_at: "executing",
+    produced_by: "executor",
+  }),
+  handoff: makeArtifactSpec({
+    name: "handoff",
+    file: "handoff.yaml",
+    template: "handoff",
+    produced_at: "reviewing",
+    produced_by: "agent",
+    required: false,
+  }),
+  "extra-1": makeArtifactSpec({
+    name: "extra-1",
+    file: "extra-1.md",
+    template: "plain",
+    produced_at: "executing",
+    produced_by: "agent",
+    required: false,
+  }),
+  "extra-2": makeArtifactSpec({
+    name: "extra-2",
+    file: "extra-2.md",
+    template: "plain",
+    produced_at: "executing",
+    produced_by: "agent",
+    required: false,
+  }),
+};
+
+function fixtureManifest(): ArtifactManifest {
   return {
     artifacts: [
-      {
-        name: "plan",
-        file: "plan.md",
-        template: "plan",
-        produced_at: "planning",
-        produced_by: "pm",
-        owned_by: null,
-        required: true,
-        approval_gate: true,
-      },
-      {
-        name: "task-checklist",
-        file: "task-checklist.md",
-        template: "task-checklist",
-        produced_at: "executing",
-        produced_by: "executor",
-        owned_by: null,
-        required: true,
-        approval_gate: false,
-      },
-      {
-        name: "handoff",
-        file: "handoff.yaml",
-        template: "handoff",
-        produced_at: "reviewing",
-        produced_by: "agent",
-        owned_by: null,
-        required: false,
-        approval_gate: false,
-      },
-      {
-        name: "extra-1",
-        file: "extra-1.md",
-        template: "plain",
-        produced_at: "executing",
-        produced_by: "agent",
-        owned_by: null,
-        required: false,
-        approval_gate: false,
-      },
-      {
-        name: "extra-2",
-        file: "extra-2.md",
-        template: "plain",
-        produced_at: "executing",
-        produced_by: "agent",
-        owned_by: null,
-        required: false,
-        approval_gate: false,
-      },
+      SPECS.plan,
+      SPECS["task-checklist"],
+      SPECS.handoff,
+      SPECS["extra-1"],
+      SPECS["extra-2"],
     ],
   };
 }
 
-function makeStatus(name: string, present: boolean): ArtifactStatus {
-  const spec = baseManifest().artifacts.find((a) => a.name === name);
-  if (!spec) throw new Error(`Unknown artifact name in fixture: ${name}`);
-  return {
-    spec,
-    present,
-    size_bytes: present ? 120 : null,
-    last_modified: present ? new Date().toISOString() : null,
-    approval: null,
-  };
+function statusFor(name: keyof typeof SPECS, present: boolean): ArtifactStatus {
+  return makeArtifactStatus(SPECS[name], present);
 }
 
-function prime(opts: {
-  manifest: ArtifactManifest;
-  statuses: ArtifactStatus[];
-  content?: Record<string, ArtifactContent>;
-}): { wrapper: ({ children }: { children: ReactNode }) => ReactElement; qc: QueryClient } {
-  const qc = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
-  });
+function renderWithCache(
+  ui: React.ReactElement,
+  opts: {
+    manifest: ArtifactManifest;
+    statuses: ArtifactStatus[];
+    content?: Record<string, ArtifactContent>;
+  },
+) {
+  const qc = makeTestQueryClient();
   qc.setQueryData(queryKeys.artifactManifest("p1"), opts.manifest);
   qc.setQueryData(queryKeys.sessionArtifacts("p1", "s1"), opts.statuses);
   for (const [name, content] of Object.entries(opts.content ?? {})) {
     qc.setQueryData(queryKeys.artifact("p1", "s1", name), content);
   }
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={qc}>
-      <MemoryRouter>
-        <TooltipProvider>{children}</TooltipProvider>
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
-  return { wrapper, qc };
+  return renderWithProviders(ui, {
+    queryClient: qc,
+    wrap: (children) => <TooltipProvider>{children}</TooltipProvider>,
+  });
 }
-
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockImplementation(() => new Promise(() => {})),
-  );
-});
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
   toastMocks.success.mockReset();
   toastMocks.error.mockReset();
 });
@@ -159,17 +131,16 @@ describe("parseChecklist", () => {
 
 describe("ArtifactList", () => {
   it("renders one tab per manifest entry in order, with missing ones greyed", () => {
-    const { wrapper } = prime({
-      manifest: baseManifest(),
+    const { container } = renderWithCache(<ArtifactList projectId="p1" sessionId="s1" />, {
+      manifest: fixtureManifest(),
       statuses: [
-        makeStatus("plan", true),
-        makeStatus("task-checklist", true),
-        makeStatus("handoff", false),
-        makeStatus("extra-1", true),
-        makeStatus("extra-2", false),
+        statusFor("plan", true),
+        statusFor("task-checklist", true),
+        statusFor("handoff", false),
+        statusFor("extra-1", true),
+        statusFor("extra-2", false),
       ],
     });
-    const { container } = render(<ArtifactList projectId="p1" sessionId="s1" />, { wrapper });
 
     const tabs = container.querySelectorAll("[data-tab-name]");
     expect(tabs.length).toBe(5);
@@ -179,17 +150,16 @@ describe("ArtifactList", () => {
   });
 
   it("shows the 'not yet produced' tooltip hint for missing artifacts", () => {
-    const { wrapper } = prime({
-      manifest: baseManifest(),
+    renderWithCache(<ArtifactList projectId="p1" sessionId="s1" />, {
+      manifest: fixtureManifest(),
       statuses: [
-        makeStatus("plan", false),
-        makeStatus("task-checklist", false),
-        makeStatus("handoff", false),
-        makeStatus("extra-1", false),
-        makeStatus("extra-2", false),
+        statusFor("plan", false),
+        statusFor("task-checklist", false),
+        statusFor("handoff", false),
+        statusFor("extra-1", false),
+        statusFor("extra-2", false),
       ],
     });
-    render(<ArtifactList projectId="p1" sessionId="s1" />, { wrapper });
 
     // Default tab is "plan" which is missing — viewer shows empty state
     expect(screen.getByTestId("artifact-missing")).toBeInTheDocument();
@@ -202,30 +172,18 @@ describe("ArtifactList", () => {
         name: "task-checklist",
         file_path: "sessions/s1/task-checklist.md",
         body: "- [x] a\n- [ ] b\n- [x] c",
-        mtime: new Date().toISOString(),
+        mtime: "2026-04-24T00:00:00Z",
       },
     };
-    const { wrapper } = prime({
-      manifest: {
-        artifacts: [
-          {
-            name: "task-checklist",
-            file: "task-checklist.md",
-            template: "task-checklist",
-            produced_at: "executing",
-            produced_by: "executor",
-            owned_by: null,
-            required: true,
-            approval_gate: false,
-          },
-        ],
-      },
-      statuses: [makeStatus("task-checklist", true)],
+    renderWithCache(<ArtifactList projectId="p1" sessionId="s1" />, {
+      manifest: { artifacts: [SPECS["task-checklist"]] },
+      statuses: [statusFor("task-checklist", true)],
       content,
     });
-    render(<ArtifactList projectId="p1" sessionId="s1" />, { wrapper });
 
-    await waitFor(() => expect(screen.getByTestId("task-checklist-progress")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("task-checklist-progress")).toBeInTheDocument(),
+    );
     expect(screen.getByText("2/3")).toBeInTheDocument();
   });
 });
@@ -236,40 +194,38 @@ describe("ArtifactViewer approval gate", () => {
       name: "plan",
       file_path: "sessions/s1/plan.md",
       body: "Plan body.",
-      mtime: new Date().toISOString(),
+      mtime: "2026-04-24T00:00:00Z",
     };
 
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(makeStatus("plan", true)), {
-        status: 200,
-        headers: { "content-type": "application/json" },
+    const approveSpy = vi.fn();
+    server.use(
+      http.post("/api/projects/p1/sessions/s1/artifacts/plan/approve", ({ request }) => {
+        approveSpy(request.url, request.method);
+        return HttpResponse.json(statusFor("plan", true));
       }),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
-    const { wrapper } = prime({
-      manifest: baseManifest(),
-      statuses: [makeStatus("plan", true)],
-      content: { plan: content },
-    });
-    render(
+    renderWithCache(
       <ArtifactViewer
         projectId="p1"
         sessionId="s1"
         name="plan"
-        status={makeStatus("plan", true)}
+        status={statusFor("plan", true)}
       />,
-      { wrapper },
+      {
+        manifest: fixtureManifest(),
+        statuses: [statusFor("plan", true)],
+        content: { plan: content },
+      },
     );
 
     fireEvent.click(screen.getByRole("button", { name: /Approve/ }));
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/projects/p1/sessions/s1/artifacts/plan/approve",
-        expect.objectContaining({ method: "POST" }),
-      ),
-    );
+    await waitFor(() => expect(approveSpy).toHaveBeenCalled());
+    expect(approveSpy.mock.calls[0]).toEqual([
+      expect.stringContaining("/api/projects/p1/sessions/s1/artifacts/plan/approve"),
+      "POST",
+    ]);
     expect(toastMocks.success).toHaveBeenCalledWith("Artifact approved.");
   });
 
@@ -278,30 +234,29 @@ describe("ArtifactViewer approval gate", () => {
       name: "plan",
       file_path: "sessions/s1/plan.md",
       body: "Plan body.",
-      mtime: new Date().toISOString(),
+      mtime: "2026-04-24T00:00:00Z",
     };
 
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(makeStatus("plan", true)), {
-        status: 200,
-        headers: { "content-type": "application/json" },
+    const rejectSpy = vi.fn();
+    server.use(
+      http.post("/api/projects/p1/sessions/s1/artifacts/plan/reject", ({ request }) => {
+        rejectSpy(request.url, request.method);
+        return HttpResponse.json(statusFor("plan", true));
       }),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
-    const { wrapper } = prime({
-      manifest: baseManifest(),
-      statuses: [makeStatus("plan", true)],
-      content: { plan: content },
-    });
-    render(
+    renderWithCache(
       <ArtifactViewer
         projectId="p1"
         sessionId="s1"
         name="plan"
-        status={makeStatus("plan", true)}
+        status={statusFor("plan", true)}
       />,
-      { wrapper },
+      {
+        manifest: fixtureManifest(),
+        statuses: [statusFor("plan", true)],
+        content: { plan: content },
+      },
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^Reject/ }));
@@ -310,48 +265,43 @@ describe("ArtifactViewer approval gate", () => {
     // Submit without feedback — should show inline error, no fetch call
     fireEvent.click(sendBtn);
     expect(await screen.findByRole("alert")).toHaveTextContent("Feedback is required");
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      expect.stringContaining("/reject"),
-      expect.anything(),
-    );
+    expect(rejectSpy).not.toHaveBeenCalled();
 
     // Fill in feedback and retry
     const textarea = screen.getByLabelText("Rejection feedback");
     fireEvent.change(textarea, { target: { value: "Please redo this." } });
     fireEvent.click(sendBtn);
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/projects/p1/sessions/s1/artifacts/plan/reject",
-        expect.objectContaining({ method: "POST" }),
-      ),
-    );
+    await waitFor(() => expect(rejectSpy).toHaveBeenCalled());
+    expect(rejectSpy.mock.calls[0]).toEqual([
+      expect.stringContaining("/api/projects/p1/sessions/s1/artifacts/plan/reject"),
+      "POST",
+    ]);
   });
 
   it("renders the recorded approval read-only when approval already exists", () => {
-    const status: ArtifactStatus = {
-      ...makeStatus("plan", true),
+    const status: ArtifactStatus = makeArtifactStatus(SPECS.plan, true, {
       approval: {
         approved: true,
         reviewer: "sean",
         reviewed_at: "2026-04-20T12:00:00Z",
         feedback: "LGTM",
       },
-    };
+    });
     const content: ArtifactContent = {
       name: "plan",
       file_path: "sessions/s1/plan.md",
       body: "Body.",
-      mtime: new Date().toISOString(),
+      mtime: "2026-04-24T00:00:00Z",
     };
-    const { wrapper } = prime({
-      manifest: baseManifest(),
-      statuses: [status],
-      content: { plan: content },
-    });
-    render(<ArtifactViewer projectId="p1" sessionId="s1" name="plan" status={status} />, {
-      wrapper,
-    });
+    renderWithCache(
+      <ArtifactViewer projectId="p1" sessionId="s1" name="plan" status={status} />,
+      {
+        manifest: fixtureManifest(),
+        statuses: [status],
+        content: { plan: content },
+      },
+    );
 
     expect(screen.getByText(/Approved/)).toBeInTheDocument();
     expect(screen.getByText(/sean/)).toBeInTheDocument();
