@@ -34,7 +34,6 @@ from tripwire.core.pr_summary_renderer import (
     WorkspaceSyncSection,
 )
 
-
 # ============================================================================
 # Snapshot
 # ============================================================================
@@ -181,15 +180,11 @@ def _read_state(project_dir: Path) -> _StateSnapshot:
     state.validate_errors = len(report.errors)
     state.validate_warnings = len(report.warnings)
     state.orphan_ref_count = sum(
-        1
-        for f in (*report.errors, *report.warnings)
-        if f.code.startswith("ref/")
+        1 for f in (*report.errors, *report.warnings) if f.code.startswith("ref/")
     )
 
     # Critical path comes from the dependency graph over current issues.
-    state.critical_path_length = len(
-        build_dependency_graph(issues).critical_path
-    )
+    state.critical_path_length = len(build_dependency_graph(issues).critical_path)
 
     # Stale-node count comes from the graph cache when present; if the
     # cache hasn't been built at this SHA, fall back to 0 — validate
@@ -207,9 +202,7 @@ def _read_state(project_dir: Path) -> _StateSnapshot:
     # Workspace state. Only populated when the project is linked.
     if project.workspace is not None:
         state.workspace_linked = True
-        state.workspace_origin_count = sum(
-            1 for n in nodes if n.origin == "workspace"
-        )
+        state.workspace_origin_count = sum(1 for n in nodes if n.origin == "workspace")
         state.workspace_promotion_candidates = sum(
             1 for n in nodes if n.origin == "local" and n.scope == "workspace"
         )
@@ -259,7 +252,9 @@ def _issues_section(base: _StateSnapshot, head: _StateSnapshot) -> IssuesSection
     base_counts = dict(Counter(base.issue_status_by_id.values()))
     head_counts = dict(Counter(head.issue_status_by_id.values()))
     changes: list[IssueStatusChange] = []
-    for issue_id in sorted(base.issue_status_by_id.keys() | head.issue_status_by_id.keys()):
+    for issue_id in sorted(
+        base.issue_status_by_id.keys() | head.issue_status_by_id.keys()
+    ):
         b = base.issue_status_by_id.get(issue_id)
         h = head.issue_status_by_id.get(issue_id)
         if b is None and h is not None:
@@ -273,9 +268,7 @@ def _issues_section(base: _StateSnapshot, head: _StateSnapshot) -> IssuesSection
     )
 
 
-def _sessions_section(
-    base: _StateSnapshot, head: _StateSnapshot
-) -> SessionsSection:
+def _sessions_section(base: _StateSnapshot, head: _StateSnapshot) -> SessionsSection:
     base_counts = dict(Counter(base.session_status_by_id.values()))
     head_counts = dict(Counter(head.session_status_by_id.values()))
     changes: list[SessionLifecycleChange] = []

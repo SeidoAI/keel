@@ -118,9 +118,12 @@ def test_cli_outputs_marker_first(two_state_repo):
         cli,
         [
             "pr-summary",
-            "--project-dir", str(repo),
-            "--base", base_sha,
-            "--head", head_sha,
+            "--project-dir",
+            str(repo),
+            "--base",
+            base_sha,
+            "--head",
+            head_sha,
         ],
     )
     assert result.exit_code == 0, result.output
@@ -134,9 +137,12 @@ def test_cli_includes_section_summaries(two_state_repo):
         cli,
         [
             "pr-summary",
-            "--project-dir", str(repo),
-            "--base", base_sha,
-            "--head", head_sha,
+            "--project-dir",
+            str(repo),
+            "--base",
+            base_sha,
+            "--head",
+            head_sha,
         ],
     )
     assert result.exit_code == 0, result.output
@@ -160,9 +166,12 @@ def test_cli_surfaces_issue_status_change(two_state_repo):
         cli,
         [
             "pr-summary",
-            "--project-dir", str(repo),
-            "--base", base_sha,
-            "--head", head_sha,
+            "--project-dir",
+            str(repo),
+            "--base",
+            base_sha,
+            "--head",
+            head_sha,
         ],
     )
     assert result.exit_code == 0, result.output
@@ -176,10 +185,14 @@ def test_cli_json_format_returns_parseable_json(two_state_repo):
         cli,
         [
             "pr-summary",
-            "--project-dir", str(repo),
-            "--base", base_sha,
-            "--head", head_sha,
-            "--format", "json",
+            "--project-dir",
+            str(repo),
+            "--base",
+            base_sha,
+            "--head",
+            head_sha,
+            "--format",
+            "json",
         ],
     )
     assert result.exit_code == 0, result.output

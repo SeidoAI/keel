@@ -19,7 +19,6 @@ import pytest
 
 from tripwire.core.pr_summary_compute import compute_pr_summary
 
-
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -46,8 +45,10 @@ def _commit_all(repo: Path, msg: str) -> str:
     _git(repo, "add", "-A")
     _git(
         repo,
-        "-c", "user.email=test@example.com",
-        "-c", "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "user.name=Test",
         "commit",
         "-q",
         "--allow-empty",
@@ -126,7 +127,9 @@ def _save_session(repo: Path, sid: str, status: str = "planned") -> None:
     )
 
 
-def _save_node(repo: Path, nid: str, *, scope: str = "local", origin: str = "local") -> None:
+def _save_node(
+    repo: Path, nid: str, *, scope: str = "local", origin: str = "local"
+) -> None:
     from tripwire.core.node_store import save_node
     from tripwire.models import ConceptNode
 

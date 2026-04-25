@@ -99,9 +99,7 @@ class PrSummary:
     sessions: SessionsSection = field(default_factory=SessionsSection)
     concept_graph: ConceptGraphSection = field(default_factory=ConceptGraphSection)
     critical_path: CriticalPathSection = field(default_factory=CriticalPathSection)
-    workspace_sync: WorkspaceSyncSection = field(
-        default_factory=WorkspaceSyncSection
-    )
+    workspace_sync: WorkspaceSyncSection = field(default_factory=WorkspaceSyncSection)
     lint: LintSection = field(default_factory=LintSection)
 
 
@@ -196,9 +194,7 @@ def _render_validation(v: ValidationSection) -> str:
 def _render_issues(i: IssuesSection) -> str:
     is_open = bool(i.changes)
     moved = len(i.changes)
-    summary_line = (
-        f"{'⚠' if moved else '✓'} Issues — {moved} status change(s)"
-    )
+    summary_line = f"{'⚠' if moved else '✓'} Issues — {moved} status change(s)"
 
     body_parts: list[str] = []
     counts_table = _counts_table(i.base_counts, i.head_counts, axis_label="status")
@@ -207,9 +203,7 @@ def _render_issues(i: IssuesSection) -> str:
 
     if i.changes:
         capped = i.changes[:ID_LIST_CAP]
-        lines = [
-            f"- `{c.id}`: {c.from_status} → {c.to_status}" for c in capped
-        ]
+        lines = [f"- `{c.id}`: {c.from_status} → {c.to_status}" for c in capped]
         if len(i.changes) > ID_LIST_CAP:
             lines.append(f"- _…+{len(i.changes) - ID_LIST_CAP} more_")
         body_parts.append("**Changes:**\n" + "\n".join(lines))
@@ -223,9 +217,7 @@ def _render_issues(i: IssuesSection) -> str:
 def _render_sessions(s: SessionsSection) -> str:
     is_open = bool(s.changes)
     moved = len(s.changes)
-    summary_line = (
-        f"{'⚠' if moved else '✓'} Sessions — {moved} status change(s)"
-    )
+    summary_line = f"{'⚠' if moved else '✓'} Sessions — {moved} status change(s)"
 
     body_parts: list[str] = []
     counts_table = _counts_table(s.base_counts, s.head_counts, axis_label="status")
@@ -234,9 +226,7 @@ def _render_sessions(s: SessionsSection) -> str:
 
     if s.changes:
         capped = s.changes[:ID_LIST_CAP]
-        lines = [
-            f"- `{c.id}`: {c.from_status} → {c.to_status}" for c in capped
-        ]
+        lines = [f"- `{c.id}`: {c.from_status} → {c.to_status}" for c in capped]
         if len(s.changes) > ID_LIST_CAP:
             lines.append(f"- _…+{len(s.changes) - ID_LIST_CAP} more_")
         body_parts.append("**Changes:**\n" + "\n".join(lines))
@@ -251,8 +241,11 @@ def _render_concept_graph(g: ConceptGraphSection) -> str:
     orphan_delta = g.head_orphan_refs - g.base_orphan_refs
     stale_delta = g.head_stale_nodes - g.base_stale_nodes
     has_changes = bool(
-        g.nodes_added or g.nodes_removed or g.nodes_promoted
-        or orphan_delta or stale_delta
+        g.nodes_added
+        or g.nodes_removed
+        or g.nodes_promoted
+        or orphan_delta
+        or stale_delta
     )
     is_open = has_changes
 
@@ -299,8 +292,7 @@ def _render_critical_path(cp: CriticalPathSection) -> str:
         icon = "✓"
 
     summary_line = (
-        f"{icon} Critical path — {verb} "
-        f"(base {cp.base_length} → head {cp.head_length})"
+        f"{icon} Critical path — {verb} (base {cp.base_length} → head {cp.head_length})"
     )
     body = (
         "| | base | head | Δ |\n"

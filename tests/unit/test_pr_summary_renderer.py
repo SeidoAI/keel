@@ -44,9 +44,7 @@ def _open_summary_lines(out: str) -> list[str]:
         if raw.startswith("<details open>") and i + 1 < len(out_lines):
             nxt = out_lines[i + 1].strip()
             if nxt.startswith("<summary>") and nxt.endswith("</summary>"):
-                open_summaries.append(
-                    nxt[len("<summary>") : -len("</summary>")]
-                )
+                open_summaries.append(nxt[len("<summary>") : -len("</summary>")])
     return open_summaries
 
 
@@ -247,9 +245,7 @@ def test_over_cap_truncates_to_max_chars():
         PrSummary(
             base_sha="aaaaaaa",
             head_sha="bbbbbbb",
-            issues=IssuesSection(
-                changes=[IssueStatusChange(huge_id, "todo", "done")]
-            ),
+            issues=IssuesSection(changes=[IssueStatusChange(huge_id, "todo", "done")]),
         )
     )
     assert len(out) <= MAX_CHARS
@@ -263,7 +259,7 @@ def test_id_list_caps_at_constant():
         IssueStatusChange(f"X-{i}", "todo", "done") for i in range(ID_LIST_CAP + 5)
     ]
     out = render(PrSummary(issues=IssuesSection(changes=changes)))
-    assert f"…+5 more" in out
+    assert "…+5 more" in out
     # First N appear, but the (N+1)-th does not
     assert f"`X-{ID_LIST_CAP - 1}`" in out
     assert f"`X-{ID_LIST_CAP}`:" not in out
@@ -271,11 +267,9 @@ def test_id_list_caps_at_constant():
 
 def test_concept_graph_added_list_caps():
     nodes = [f"node-{i}" for i in range(ID_LIST_CAP + 3)]
-    out = render(
-        PrSummary(concept_graph=ConceptGraphSection(nodes_added=nodes))
-    )
+    out = render(PrSummary(concept_graph=ConceptGraphSection(nodes_added=nodes)))
     assert f"Added ({ID_LIST_CAP + 3})" in out
-    assert f"…+3 more" in out
+    assert "…+3 more" in out
 
 
 # ============================================================================
@@ -307,9 +301,7 @@ def test_validation_unchanged_renders_clean_icon():
 
 
 def test_validation_with_errors_renders_failure_icon():
-    out = render(
-        PrSummary(validation=ValidationSection(head_errors=3))
-    )
+    out = render(PrSummary(validation=ValidationSection(head_errors=3)))
     summaries = _section_summary_lines(out)
     val_line = next(s for s in summaries if "Validation" in s)
     assert val_line.startswith("✗")

@@ -69,7 +69,8 @@ def test_template_uses_full_clone_for_base_ref_resolution():
     rendered = _render_template("0.7.7")
     data = yaml.safe_load(rendered)
     checkout_step = next(
-        s for s in data["jobs"]["summary"]["steps"]
+        s
+        for s in data["jobs"]["summary"]["steps"]
         if s.get("uses", "").startswith("actions/checkout@")
     )
     assert checkout_step["with"]["fetch-depth"] == 0
@@ -83,9 +84,12 @@ def test_init_stamps_workflow_into_project(tmp_path: Path):
         [
             "init",
             str(target),
-            "--name", "stamp-test",
-            "--key-prefix", "ST",
-            "--base-branch", "main",
+            "--name",
+            "stamp-test",
+            "--key-prefix",
+            "ST",
+            "--base-branch",
+            "main",
             "--non-interactive",
             "--no-git",
         ],
