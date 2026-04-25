@@ -12,14 +12,14 @@ invocation:
 config:
   model: opus
   fallback_model: sonnet
-  effort: max
+  effort: xhigh
   permission_mode: bypassPermissions
   # AskUserQuestion and SendUserMessage block in -p mode (no TTY to answer)
   # and the agent will retry-loop until max-turns. Disallow upfront so the
   # agent falls back to plain-text stop-and-ask.
   disallowed_tools: [Agent, AskUserQuestion, SendUserMessage]
   max_turns: 200
-  max_budget_usd: 50
+  max_budget_usd: 100
   output_format: stream-json
 
 prompt_template: |
