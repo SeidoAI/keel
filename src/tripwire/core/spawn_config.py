@@ -108,9 +108,11 @@ def _project_explicitly_pins_runtime(project_dir: Path) -> bool:
     except Exception:
         proj = None
     if proj is not None and proj.spawn_defaults:
-        inv = proj.spawn_defaults.get("invocation") if isinstance(
-            proj.spawn_defaults, dict
-        ) else None
+        inv = (
+            proj.spawn_defaults.get("invocation")
+            if isinstance(proj.spawn_defaults, dict)
+            else None
+        )
         if isinstance(inv, dict) and "runtime" in inv:
             return True
     return False

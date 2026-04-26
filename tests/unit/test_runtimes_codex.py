@@ -150,7 +150,9 @@ def test_start_with_resume_uses_exec_resume_subcommand(tmp_path, monkeypatch):
     fake_proc = MagicMock()
     fake_proc.pid = 99
 
-    with patch("tripwire.runtimes.codex._sp.Popen", return_value=fake_proc) as mock_popen:
+    with patch(
+        "tripwire.runtimes.codex._sp.Popen", return_value=fake_proc
+    ) as mock_popen:
         CodexRuntime().start(prepped)
 
     argv = mock_popen.call_args[0][0]

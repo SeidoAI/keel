@@ -21,7 +21,7 @@ Notes:
     ``reasoning_output_tokens`` (sometimes absent). ``cached_input_tokens``
     is informational and NOT double-counted.
   - Codex does NOT emit ``cost_usd`` inline — the monitor computes USD
-    from ``total_tokens`` × a model price table. ``cost_usd`` stays
+    from ``total_tokens`` x a model price table. ``cost_usd`` stays
     None on codex events.
 """
 

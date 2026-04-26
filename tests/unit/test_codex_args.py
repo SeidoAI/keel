@@ -50,9 +50,7 @@ def test_build_args_first_spawn_shape():
     m_idx = argv.index("-m")
     assert argv[m_idx + 1] == "gpt-5-codex"
     # -c model_reasoning_effort=… is a single arg-string (TOML pair)
-    assert any(
-        "model_reasoning_effort" in a and '"medium"' in a for a in argv
-    )
+    assert any("model_reasoning_effort" in a and '"medium"' in a for a in argv)
     # --sandbox <mode>
     s_idx = argv.index("--sandbox")
     assert argv[s_idx + 1] == "read-only"
