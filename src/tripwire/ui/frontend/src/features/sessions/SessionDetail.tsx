@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
+import { Stamp } from "@/components/ui/stamp";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -52,12 +52,8 @@ function SessionDetailInner({ projectId, sid }: { projectId: string; sid: string
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold text-foreground">{session.name}</h1>
-          <Badge variant="outline" data-badge="status">
-            {session.status}
-          </Badge>
-          {session.estimated_size ? (
-            <Badge variant="secondary">size: {session.estimated_size}</Badge>
-          ) : null}
+          <Stamp data-badge="status">{session.status}</Stamp>
+          {session.estimated_size ? <Stamp tone="info">size: {session.estimated_size}</Stamp> : null}
           <span className="ml-auto text-xs text-muted-foreground">{session.id}</span>
         </div>
         {session.blocked_by_sessions.length > 0 ? (

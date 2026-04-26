@@ -77,21 +77,20 @@ describe("IssueCard", () => {
   });
 
   it.each([
-    ["critical", /red-/],
-    ["high", /amber-/],
-    ["medium", /muted/],
-    ["low", /muted/],
-  ])("applies the priority style for %s", (priority, classMatcher) => {
+    ["critical", "rule"],
+    ["high", "tripwire"],
+    ["medium", "default"],
+    ["low", "default"],
+  ])("applies the priority tone for %s", (priority, expectedTone) => {
     renderWithProviders(<IssueCard issue={makeIssueSummary({ id: "X-1", priority })} />, {
       initialPath: "/p/p1/board",
       routePath: "/p/:projectId/board",
       wrap: withDnd,
     });
-    const badge = screen.getByText(priority);
-    expect(badge.className).toMatch(classMatcher);
+    expect(screen.getByText(priority)).toHaveAttribute("data-tone", expectedTone);
   });
 
-  it("falls back to medium styling for an unknown priority value", () => {
+  it("falls back to default tone for an unknown priority value", () => {
     renderWithProviders(
       <IssueCard issue={makeIssueSummary({ id: "X-1", priority: "made-up" })} />,
       {
@@ -100,6 +99,6 @@ describe("IssueCard", () => {
         wrap: withDnd,
       },
     );
-    expect(screen.getByText("made-up").className).toMatch(/muted/);
+    expect(screen.getByText("made-up")).toHaveAttribute("data-tone", "default");
   });
 });
