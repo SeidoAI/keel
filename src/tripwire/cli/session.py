@@ -60,6 +60,7 @@ class SessionSummary:
     issue_count: int
     repo_count: int
     cost_usd: float = 0.0
+    over_budget: bool = False
 
 
 @click.group(name="session")
@@ -106,6 +107,7 @@ def session_list_cmd(project_dir: Path, output_format: str) -> None:
                 issue_count=len(s.issues),
                 repo_count=len(s.repos),
                 cost_usd=cost,
+                over_budget=s.runtime_state.cost_overrun_at is not None,
             )
         )
 
@@ -126,11 +128,15 @@ def session_list_cmd(project_dir: Path, output_format: str) -> None:
     table.add_column("repos", justify="right")
     table.add_column("cost", justify="right")
     for s in summaries:
+        # v0.7.10 §3.A4 — flag budget-driven pauses next to status so a
+        # human reading `session list` can tell apart manual pauses
+        # from monitor-driven cost-overrun pauses.
+        status_cell = f"{s.status} (over budget)" if s.over_budget else s.status
         table.add_row(
             s.id,
             s.name,
             s.agent,
-            s.status,
+            status_cell,
             str(s.issue_count),
             str(s.repo_count),
             f"${s.cost_usd:.4f}" if s.cost_usd else "—",
@@ -188,6 +194,23 @@ def session_show_cmd(
 
     yaml_path = session_yaml_path(resolved, session_id)
     click.echo(yaml_path.read_text(encoding="utf-8"))
+
+    # v0.7.10 §3.A2 — show the resolved (provider, model, effort) so a
+    # human can confirm the route before launch.
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.core.spawn_routing import UnknownTaskKindError, resolve_route
+
+    spawn_defaults = load_resolved_spawn_config(resolved, session=session)
+    task_kind = spawn_defaults.config.task_kind
+    click.echo("Routing:")
+    try:
+        route = resolve_route(task_kind, resolved)
+        click.echo(f"  task_kind: {route.task_kind}")
+        click.echo(f"  provider: {route.provider}")
+        click.echo(f"  model: {route.model}")
+        click.echo(f"  effort: {route.effort}")
+    except UnknownTaskKindError as exc:
+        click.echo(f"  task_kind: {task_kind!r} — UNKNOWN ({exc})")
 
     sdir = resolved / "sessions" / session_id
     sr_path = sdir / "self-review.md"
