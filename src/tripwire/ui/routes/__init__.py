@@ -37,6 +37,7 @@ def register_routes(app: FastAPI) -> None:
         pm_reviews,
         projects,
         sessions,
+        workflow,
         ws,
     )
 
@@ -54,6 +55,7 @@ def register_routes(app: FastAPI) -> None:
         orchestration,
         actions,
         events,
+        workflow,
         ws,
         # v2 stubs
         messages,
