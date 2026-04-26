@@ -61,4 +61,25 @@ describe("LifecycleWire", () => {
     const active = screen.getByText("executing").closest("[aria-current]");
     expect(active).toHaveAttribute("aria-current", "step");
   });
+
+  it("renders without count badges when the counts prop is omitted", () => {
+    // Per PM follow-up — the `counts?` optional branch wasn't covered.
+    // With no counts supplied, no station should show a numeric badge.
+    render(<LifecycleWire stations={STATIONS} />);
+    for (const s of STATIONS) {
+      expect(screen.getByText(s.label)).toBeInTheDocument();
+    }
+    // The wire should still draw the SVG without throwing on an absent
+    // counts map (the inner `counts?.[s.id]` access falls through cleanly).
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
+  });
+
+  it("handles a single-station wire without dividing by zero", () => {
+    // The component computes step spacing as `innerW / Math.max(n - 1, 1)`
+    // — the Math.max guard exists so a 1-station wire doesn't NaN out.
+    // This test pins that branch.
+    const { container } = render(<LifecycleWire stations={[{ id: "only", label: "only" }]} />);
+    expect(screen.getByText("only")).toBeInTheDocument();
+    expect(container.querySelectorAll("svg circle").length).toBeGreaterThanOrEqual(1);
+  });
 });

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -69,5 +69,61 @@ describe("TweaksPanel", () => {
     // LifecycleWire's `stroke="var(--color-rule)"`) pick it up
     // automatically without React re-renders.
     expect(document.documentElement.style.getPropertyValue("--color-rule")).not.toBe("");
+  });
+
+  // Per PM follow-up — exercise the alternative-pick path on every
+  // dimension so the conditional render branches in TweaksPanel are
+  // covered. Each select.options-change writes to localStorage and to
+  // the CSS-var tree; we assert both effects in one shot per dimension.
+  it.each([
+    ["density", "loose", "--space-density"],
+    ["stamp shape", "ticket-cut", "--radius-stamp"],
+    ["serif family", "EB Garamond", "--font-serif"],
+    ["mono family", "JetBrains Mono", "--font-mono"],
+  ])("propagates a non-default %s pick to localStorage + CSS vars", async (label, choice, cssVar) => {
+    const user = userEvent.setup();
+    render(wrap(<TweaksPanel defaultOpen />));
+    await user.selectOptions(screen.getByLabelText(new RegExp(label, "i")), choice);
+    expect(document.documentElement.style.getPropertyValue(cssVar)).not.toBe("");
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+    // Stored key uses camelCase; map label → key.
+    const camel = label
+      .split(" ")
+      .map((part, i) => (i === 0 ? part : part[0].toUpperCase() + part.slice(1)))
+      .join("");
+    expect(stored[camel]).toBe(choice);
+  });
+
+  it("auto-opens when the URL has ?tweaks=1", () => {
+    render(wrap(<TweaksPanel />, "/?tweaks=1"));
+    expect(screen.getByRole("dialog", { name: /tweaks/i })).toBeInTheDocument();
+  });
+
+  it("closes when the close button is clicked", async () => {
+    const user = userEvent.setup();
+    render(wrap(<TweaksPanel defaultOpen />));
+    await user.click(screen.getByRole("button", { name: /close tweaks/i }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("opens when the tripwire:tweaks-toggle window event fires", () => {
+    render(wrap(<TweaksPanel />));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // Wrap the dispatch in act() — the state update from the toggle
+    // listener has to flush before the next assertion or the panel
+    // hasn't re-rendered yet.
+    act(() => {
+      window.dispatchEvent(new CustomEvent("tripwire:tweaks-toggle"));
+    });
+    expect(screen.getByRole("dialog", { name: /tweaks/i })).toBeInTheDocument();
+  });
+
+  it("falls back to defaults when localStorage holds garbage JSON", () => {
+    localStorage.setItem(STORAGE_KEY, "{not json");
+    render(wrap(<TweaksPanel defaultOpen />));
+    // The defensive try/catch in loadFromStorage routes to TWEAK_DEFAULTS
+    // — the cream/red/comfortable defaults render without crashing.
+    expect(screen.getByLabelText(/paper warmth/i)).toHaveValue("cream");
+    expect(screen.getByLabelText(/rule colour/i)).toHaveValue("red");
   });
 });
