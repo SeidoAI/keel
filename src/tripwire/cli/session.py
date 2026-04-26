@@ -58,6 +58,7 @@ class SessionSummary:
     status: str
     issue_count: int
     repo_count: int
+    cost_usd: float = 0.0
 
 
 @click.group(name="session")
@@ -81,21 +82,31 @@ def session_cmd() -> None:
 )
 def session_list_cmd(project_dir: Path, output_format: str) -> None:
     """List every session in the project."""
+    from tripwire.core.session_cost import compute_cost_from_log
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
     sessions = list_sessions(resolved)
-    summaries = [
-        SessionSummary(
-            id=s.id,
-            name=s.name,
-            agent=s.agent,
-            status=s.status,
-            issue_count=len(s.issues),
-            repo_count=len(s.repos),
+    summaries: list[SessionSummary] = []
+    for s in sessions:
+        # KUI-96 §E2 — cost column. Walk the persisted log if any; a
+        # session that never spawned has no log_path → zero cost.
+        log_path_str = s.runtime_state.log_path
+        cost = 0.0
+        if log_path_str:
+            cost = compute_cost_from_log(Path(log_path_str).expanduser()).total_usd
+        summaries.append(
+            SessionSummary(
+                id=s.id,
+                name=s.name,
+                agent=s.agent,
+                status=s.status,
+                issue_count=len(s.issues),
+                repo_count=len(s.repos),
+                cost_usd=cost,
+            )
         )
-        for s in sessions
-    ]
 
     if output_format == "json":
         click.echo(json.dumps([asdict(s) for s in summaries], indent=2))
@@ -112,6 +123,7 @@ def session_list_cmd(project_dir: Path, output_format: str) -> None:
     table.add_column("status")
     table.add_column("issues", justify="right")
     table.add_column("repos", justify="right")
+    table.add_column("cost", justify="right")
     for s in summaries:
         table.add_row(
             s.id,
@@ -120,6 +132,7 @@ def session_list_cmd(project_dir: Path, output_format: str) -> None:
             s.status,
             str(s.issue_count),
             str(s.repo_count),
+            f"${s.cost_usd:.4f}" if s.cost_usd else "—",
         )
     console.print(table)
 
@@ -1469,6 +1482,65 @@ def session_summary_cmd(
         click.echo(_json.dumps(payload, indent=2))
     else:
         click.echo(format_text(summary))
+
+
+@session_cmd.command("cost")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    show_default=True,
+)
+def session_cost_cmd(
+    session_id: str,
+    project_dir: Path,
+    output_format: str,
+) -> None:
+    """Sum the per-token-category cost for a session's stream-json log.
+
+    Pricing comes from ``data/anthropic_pricing.yaml`` (refresh
+    manually). Sessions that have never spawned (no recorded
+    ``runtime_state.log_path``) report a zero breakdown rather than
+    erroring — useful for the ``Cost`` column in ``session list``.
+    """
+    from tripwire.core.session_cost import compute_session_cost
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        breakdown = compute_session_cost(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+
+    if output_format == "json":
+        payload = {"session_id": session_id, **breakdown.as_dict()}
+        click.echo(json.dumps(payload, indent=2))
+        return
+
+    table = Table(title=f"Cost: {session_id}", show_header=True)
+    table.add_column("category")
+    table.add_column("tokens", justify="right")
+    table.add_column("usd", justify="right")
+    rows: list[tuple[str, int, float]] = [
+        ("input", breakdown.input_tokens, breakdown.input_usd),
+        ("output", breakdown.output_tokens, breakdown.output_usd),
+        ("cache_read", breakdown.cache_read_tokens, breakdown.cache_read_usd),
+        ("cache_write", breakdown.cache_write_tokens, breakdown.cache_write_usd),
+    ]
+    for label, tokens, usd in rows:
+        table.add_row(label, f"{tokens:,}", f"${usd:.4f}")
+    table.add_row("[bold]total[/bold]", "", f"[bold]${breakdown.total_usd:.4f}[/bold]")
+    console.print(table)
+    if breakdown.models_used:
+        console.print(f"[dim]models seen: {', '.join(breakdown.models_used)}[/dim]")
 
 
 @session_cmd.command("agenda")

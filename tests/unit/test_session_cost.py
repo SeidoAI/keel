@@ -1,8 +1,8 @@
 """Tests for ``tripwire.core.session_cost`` (KUI-96 §E2).
 
 The cost module must read a stream-json log produced by ``claude -p``
-and return a :class:`CostBreakdown` summing each token category × the
-appropriate model rate from ``data/anthropic_pricing.yaml``.
+and return a :class:`CostBreakdown` summing each token category times
+the appropriate model rate from ``data/anthropic_pricing.yaml``.
 
 Coverage targets:
 - per-token-type accumulation (input, output, cache_read, cache_write)
@@ -40,8 +40,12 @@ def test_compute_cost_from_log_sums_assistant_usage(tmp_path: Path) -> None:
     _write_log(
         log,
         [
-            _assistant_event("claude-opus-4-7", {"input_tokens": 1000, "output_tokens": 500}),
-            _assistant_event("claude-opus-4-7", {"input_tokens": 200, "output_tokens": 100}),
+            _assistant_event(
+                "claude-opus-4-7", {"input_tokens": 1000, "output_tokens": 500}
+            ),
+            _assistant_event(
+                "claude-opus-4-7", {"input_tokens": 200, "output_tokens": 100}
+            ),
         ],
     )
     result = compute_cost_from_log(log)
@@ -97,9 +101,13 @@ def test_compute_cost_dispatches_per_event_model(tmp_path: Path) -> None:
         log,
         [
             # Sonnet rates: input 3.00, output 15.00.
-            _assistant_event("claude-sonnet-4-6", {"input_tokens": 1000, "output_tokens": 1000}),
+            _assistant_event(
+                "claude-sonnet-4-6", {"input_tokens": 1000, "output_tokens": 1000}
+            ),
             # Haiku rates: input 0.80, output 4.00.
-            _assistant_event("claude-haiku-4-5", {"input_tokens": 1000, "output_tokens": 1000}),
+            _assistant_event(
+                "claude-haiku-4-5", {"input_tokens": 1000, "output_tokens": 1000}
+            ),
         ],
     )
     result = compute_cost_from_log(log)
@@ -114,7 +122,11 @@ def test_compute_cost_unknown_model_uses_default(tmp_path: Path) -> None:
     log = tmp_path / "session.log"
     _write_log(
         log,
-        [_assistant_event("totally-unknown-model", {"input_tokens": 1000, "output_tokens": 0})],
+        [
+            _assistant_event(
+                "totally-unknown-model", {"input_tokens": 1000, "output_tokens": 0}
+            )
+        ],
     )
     result = compute_cost_from_log(log)
     # Default rates: input 15.00 (Anthropic-conservative).
@@ -142,7 +154,9 @@ def test_compute_cost_skips_malformed_and_empty_lines(tmp_path: Path) -> None:
     assert result.input_usd == pytest.approx(100 * 15.0 / 1_000_000)
 
 
-def test_compute_cost_falls_back_to_event_message_model_when_missing(tmp_path: Path) -> None:
+def test_compute_cost_falls_back_to_event_message_model_when_missing(
+    tmp_path: Path,
+) -> None:
     """``fallback_model`` arg is used only when the event has no model field."""
     from tripwire.core.session_cost import compute_cost_from_log
 
@@ -150,7 +164,12 @@ def test_compute_cost_falls_back_to_event_message_model_when_missing(tmp_path: P
     # Note: usage is present but model is missing — falls back to argument.
     _write_log(
         log,
-        [{"type": "assistant", "message": {"usage": {"input_tokens": 1000, "output_tokens": 0}}}],
+        [
+            {
+                "type": "assistant",
+                "message": {"usage": {"input_tokens": 1000, "output_tokens": 0}},
+            }
+        ],
     )
     # Force sonnet via fallback.
     result = compute_cost_from_log(log, fallback_model="claude-sonnet-4-6")
@@ -177,7 +196,14 @@ def test_compute_session_cost_reads_log_from_runtime_state(tmp_path: Path) -> No
 
     log = tmp_path / "logs" / "demo.log"
     log.parent.mkdir(parents=True, exist_ok=True)
-    _write_log(log, [_assistant_event("claude-opus-4-7", {"input_tokens": 1000, "output_tokens": 0})])
+    _write_log(
+        log,
+        [
+            _assistant_event(
+                "claude-opus-4-7", {"input_tokens": 1000, "output_tokens": 0}
+            )
+        ],
+    )
 
     project_dir = tmp_path / "proj"
     (project_dir / "sessions" / "demo").mkdir(parents=True, exist_ok=True)
