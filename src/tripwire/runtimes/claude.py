@@ -1,4 +1,4 @@
-"""SubprocessRuntime — launches ``claude -p`` via Popen, streams output to a log.
+"""ClaudeRuntime — launches ``claude -p`` via Popen, streams output to a log.
 
 The runtime is headless by design: claude runs to completion (opens
 PR, exits) or stops early with a plain-text question in the log.
@@ -89,8 +89,8 @@ def _build_runner_config(
     )
 
 
-class SubprocessRuntime:
-    name = "subprocess"
+class ClaudeRuntime:
+    name = "claude"
 
     def validate_environment(self) -> None:
         # claude-on-PATH is checked by the CLI layer before prep runs.

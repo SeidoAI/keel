@@ -15,11 +15,11 @@ from tripwire.runtimes.base import (
     RuntimeStatus,
     SessionRuntime,
 )
+from tripwire.runtimes.claude import ClaudeRuntime
 from tripwire.runtimes.manual import ManualRuntime
-from tripwire.runtimes.subprocess import SubprocessRuntime
 
 RUNTIMES: dict[str, SessionRuntime] = {
-    "subprocess": SubprocessRuntime(),
+    "claude": ClaudeRuntime(),
     "manual": ManualRuntime(),
 }
 
@@ -38,11 +38,11 @@ __all__ = [
     "AttachCommand",
     "AttachExec",
     "AttachInstruction",
+    "ClaudeRuntime",
     "ManualRuntime",
     "PreppedSession",
     "RuntimeStartResult",
     "RuntimeStatus",
     "SessionRuntime",
-    "SubprocessRuntime",
     "get_runtime",
 ]

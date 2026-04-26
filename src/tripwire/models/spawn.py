@@ -17,7 +17,7 @@ class SpawnInvocation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     command: str = "claude"
-    runtime: Literal["subprocess", "manual"] = "subprocess"
+    runtime: Literal["claude", "manual"] = "claude"
     background: bool = True
     log_path_template: str = (
         "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.log"

@@ -5,7 +5,7 @@
 
 invocation:
   command: claude
-  runtime: subprocess
+  runtime: claude
   background: true
   log_path_template: "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.log"
 
