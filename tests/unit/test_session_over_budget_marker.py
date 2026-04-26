@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from click.testing import CliRunner
 
 from tripwire.cli.session import session_cmd
-from tripwire.core.session_store import load_session, save_session
+from tripwire.core.session_store import load_session
 from tripwire.models.session import RuntimeState
 from tripwire.runtimes.monitor import SigtermProcess
 from tripwire.runtimes.monitor_actions import ActionExecutor

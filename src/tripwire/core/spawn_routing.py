@@ -111,8 +111,7 @@ def resolve_route(task_kind: str, project_dir: Path) -> RouteResolution:
         default_name = table.get("default") or ""
         if not default_name or default_name not in routes:
             raise UnknownTaskKindError(
-                f"routing.yaml has no usable default route "
-                f"(default={default_name!r})"
+                f"routing.yaml has no usable default route (default={default_name!r})"
             )
         return _build_resolution(default_name, routes[default_name])
 

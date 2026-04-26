@@ -36,7 +36,9 @@ def test_spawn_config_values_accepts_task_kind() -> None:
 def test_build_claude_args_uses_route_when_provided(tmp_path: Path) -> None:
     """A non-empty ``task_kind`` causes ``build_claude_args`` to substitute
     the route's model+effort for the cfg defaults."""
-    defaults = SpawnDefaults.model_validate({"config": {"task_kind": "lint_or_template_edit"}})
+    defaults = SpawnDefaults.model_validate(
+        {"config": {"task_kind": "lint_or_template_edit"}}
+    )
     args = build_claude_args(
         defaults,
         prompt="x",
@@ -96,7 +98,9 @@ def test_resolve_route_for_session_show_returns_tuple(tmp_path: Path) -> None:
     assert (route.provider, route.model, route.effort) == ("claude", "opus", "max")
 
 
-def test_session_show_renders_resolved_route(save_test_session, tmp_path_project) -> None:
+def test_session_show_renders_resolved_route(
+    save_test_session, tmp_path_project
+) -> None:
     """``tripwire session show`` text output contains a ``Routing:`` block
     naming the resolved provider, model, and effort for the session."""
     from click.testing import CliRunner
