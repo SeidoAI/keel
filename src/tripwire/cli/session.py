@@ -1886,6 +1886,107 @@ session_cmd.add_command(artifacts_list, name="artifacts")
 
 
 # ----------------------------------------------------------------------------
+# `tripwire session log` — per-session tripwire fire log (KUI-99)
+# ----------------------------------------------------------------------------
+
+
+@session_cmd.command("log")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--web",
+    is_flag=True,
+    default=False,
+    help="Print a deep-link to the UI Tripwire Log filtered to this session.",
+)
+@click.option(
+    "--reveal",
+    is_flag=True,
+    default=False,
+    help="Reveal each fire's prompt body (PM-only).",
+)
+def session_log_cmd(
+    session_id: str, project_dir: Path, web: bool, reveal: bool
+) -> None:
+    """Show all tripwire fires for a session, with timestamps and acks.
+
+    Reads ``.tripwire/events/firings/<sid>/*.json`` (written by
+    ``FileEmitter`` from the registry) and joins each entry against
+    the per-tripwire ack marker. Distinct from ``tripwire session
+    logs`` (plural) which surfaces agent stdout/stderr — this is the
+    process-event surface added by KUI-99.
+    """
+    import json as _json
+
+    from tripwire.cli.tripwires import _is_pm
+
+    resolved = project_dir.expanduser().resolve()
+    fire_dir = resolved / ".tripwire" / "events" / "firings" / session_id
+
+    if web:
+        click.echo(
+            f"Tripwire Log: http://localhost:8000/tripwires"
+            f"?session_id={session_id}"
+        )
+
+    if not fire_dir.is_dir():
+        click.echo(f"No tripwire fires for session {session_id!r}.")
+        return
+
+    files = sorted(fire_dir.glob("*.json"))
+    if not files:
+        click.echo(f"No tripwire fires for session {session_id!r}.")
+        return
+
+    pm_mode = _is_pm()
+
+    for path in files:
+        try:
+            payload = _json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, _json.JSONDecodeError):
+            click.echo(f"  <unreadable: {path.name}>")
+            continue
+
+        tw_id = payload.get("tripwire_id", "?")
+        fired_at = payload.get("fired_at", "?")
+        event = payload.get("event", "?")
+        escalated = payload.get("escalated", False)
+
+        marker_path = (
+            resolved / ".tripwire" / "acks" / f"{tw_id}-{session_id}.json"
+        )
+        ack_status = "unacked"
+        ack_detail = ""
+        if marker_path.is_file():
+            try:
+                marker = _json.loads(marker_path.read_text(encoding="utf-8"))
+                if marker.get("declared_no_findings"):
+                    ack_status = "acked (declared_no_findings)"
+                elif marker.get("fix_commits"):
+                    fixes = marker["fix_commits"]
+                    ack_status = "acked"
+                    ack_detail = f"  fix_commits={','.join(fixes)}"
+            except (OSError, _json.JSONDecodeError):
+                ack_status = "acked (unreadable marker)"
+
+        flag = " ESCALATED" if escalated else ""
+        click.echo(
+            f"  {fired_at}  {tw_id}  on={event}  status={ack_status}"
+            f"{ack_detail}{flag}"
+        )
+
+        if reveal and pm_mode:
+            body = payload.get("prompt_revealed") or "(prompt not persisted)"
+            indented = "\n".join("    " + line for line in body.splitlines())
+            click.echo(indented)
+
+
+# ----------------------------------------------------------------------------
 # `tripwire session complete` — close-out orchestration
 # ----------------------------------------------------------------------------
 
