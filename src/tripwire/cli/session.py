@@ -175,6 +175,23 @@ def session_show_cmd(
     yaml_path = session_yaml_path(resolved, session_id)
     click.echo(yaml_path.read_text(encoding="utf-8"))
 
+    # v0.7.10 §3.A2 — show the resolved (provider, model, effort) so a
+    # human can confirm the route before launch.
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.core.spawn_routing import UnknownTaskKindError, resolve_route
+
+    spawn_defaults = load_resolved_spawn_config(resolved, session=session)
+    task_kind = spawn_defaults.config.task_kind
+    click.echo("Routing:")
+    try:
+        route = resolve_route(task_kind, resolved)
+        click.echo(f"  task_kind: {route.task_kind}")
+        click.echo(f"  provider: {route.provider}")
+        click.echo(f"  model: {route.model}")
+        click.echo(f"  effort: {route.effort}")
+    except UnknownTaskKindError as exc:
+        click.echo(f"  task_kind: {task_kind!r} — UNKNOWN ({exc})")
+
     sdir = resolved / "sessions" / session_id
     sr_path = sdir / "self-review.md"
     pr_path = sdir / "pm-response.yaml"
