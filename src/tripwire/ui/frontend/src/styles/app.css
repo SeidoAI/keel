@@ -1,10 +1,10 @@
-@import "tailwindcss";
-@plugin "@tailwindcss/typography";
-
 /* Self-hosted fonts (per dec-cream-paper-canonical / spec §3.1 C0.2).
  * Bricolage = body/headings (400/500/600/700).
  * Instrument Serif italic = annotations/voice (400 italic).
- * Geist Mono = stamps/IDs/timestamps (400/500/600). */
+ * Geist Mono = stamps/IDs/timestamps (400/500/600).
+ *
+ * @import must precede @plugin/@theme/etc. per CSS spec; biome flags
+ * any out-of-order @import as an error. */
 @import "@fontsource/bricolage-grotesque/400.css";
 @import "@fontsource/bricolage-grotesque/500.css";
 @import "@fontsource/bricolage-grotesque/600.css";
@@ -13,6 +13,8 @@
 @import "@fontsource/geist-mono/400.css";
 @import "@fontsource/geist-mono/500.css";
 @import "@fontsource/geist-mono/600.css";
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   /* Paper — cream palette per dec-cream-paper-canonical. */

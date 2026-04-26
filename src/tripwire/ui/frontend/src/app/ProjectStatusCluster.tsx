@@ -8,11 +8,7 @@ import { useProjectShell } from "./ProjectShell";
  * of the breadcrumbs in ScreenShell. Keeps the shell file small by
  * extracting the data-fetching parts out of the layout chrome.
  */
-export function ProjectStatusCluster({
-  wsStatus,
-}: {
-  wsStatus: UseProjectWebSocketStatus;
-}) {
+export function ProjectStatusCluster({ wsStatus }: { wsStatus: UseProjectWebSocketStatus }) {
   return (
     <div className="flex items-center gap-3 text-[12px]">
       <PhaseStamp />

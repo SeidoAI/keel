@@ -50,7 +50,9 @@ export function ProjectDashboard() {
   }
 
   const heading = project.data?.name ?? projectId;
-  const description = stats.isLoading ? null : describeProject(project.data?.phase, stats.totalIssues);
+  const description = stats.isLoading
+    ? null
+    : describeProject(project.data?.phase, stats.totalIssues);
 
   return (
     <div className="bg-(--color-paper) px-7 pt-6 pb-8 text-(--color-ink)">
@@ -72,9 +74,7 @@ export function ProjectDashboard() {
           ) : null}
         </div>
         <div className="flex flex-col items-end gap-1.5 font-mono text-[11px] text-(--color-ink-3)">
-          {project.data?.phase ? (
-            <Stamp tone="rule">phase · {project.data.phase}</Stamp>
-          ) : null}
+          {project.data?.phase ? <Stamp tone="rule">phase · {project.data.phase}</Stamp> : null}
         </div>
       </header>
 
@@ -97,7 +97,8 @@ export function ProjectDashboard() {
 }
 
 function describeProject(phase: string | undefined, totalIssues: number): string {
-  const issueClause = totalIssues === 0 ? "no issues yet" : `${totalIssues} issues across the project`;
+  const issueClause =
+    totalIssues === 0 ? "no issues yet" : `${totalIssues} issues across the project`;
   switch (phase) {
     case "scoping":
       return `${issueClause} — defining what needs to be built.`;
@@ -118,7 +119,9 @@ function SectionTitle({ children, sub }: { children: React.ReactNode; sub?: stri
       <h2 className="m-0 font-sans font-semibold text-[22px] leading-tight tracking-[-0.02em] text-(--color-ink)">
         {children}
       </h2>
-      {sub ? <MarginNote className="mt-1 text-[14px] text-(--color-ink-3)">{sub}</MarginNote> : null}
+      {sub ? (
+        <MarginNote className="mt-1 text-[14px] text-(--color-ink-3)">{sub}</MarginNote>
+      ) : null}
     </div>
   );
 }

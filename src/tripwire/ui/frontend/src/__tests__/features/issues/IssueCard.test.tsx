@@ -35,14 +35,11 @@ describe("IssueCard", () => {
   });
 
   it("renders the blocked indicator when is_blocked is true", () => {
-    renderWithProviders(
-      <IssueCard issue={makeIssueSummary({ id: "X-1", is_blocked: true })} />,
-      {
-        initialPath: "/p/p1/board",
-        routePath: "/p/:projectId/board",
-        wrap: withDnd,
-      },
-    );
+    renderWithProviders(<IssueCard issue={makeIssueSummary({ id: "X-1", is_blocked: true })} />, {
+      initialPath: "/p/p1/board",
+      routePath: "/p/:projectId/board",
+      wrap: withDnd,
+    });
     expect(screen.getByRole("img", { name: "Blocked" })).toBeInTheDocument();
   });
 

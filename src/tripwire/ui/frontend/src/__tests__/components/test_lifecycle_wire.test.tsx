@@ -41,10 +41,7 @@ describe("LifecycleWire", () => {
 
   it("renders count badges when counts are supplied", () => {
     render(
-      <LifecycleWire
-        stations={STATIONS}
-        counts={{ planned: 2, executing: 5, completed: 1 }}
-      />,
+      <LifecycleWire stations={STATIONS} counts={{ planned: 2, executing: 5, completed: 1 }} />,
     );
     // Each station with a non-zero count surfaces the digit so the user
     // can see the load on the wire at a glance.

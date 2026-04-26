@@ -150,8 +150,7 @@ export function TweaksProvider({ children }: { children: ReactNode }) {
   const ctx = useMemo<TweaksContextValue>(
     () => ({
       values,
-      setTweak: (key, value) =>
-        setValues((prev) => ({ ...prev, [key]: value })),
+      setTweak: (key, value) => setValues((prev) => ({ ...prev, [key]: value })),
       reset: () => setValues(TWEAK_DEFAULTS),
     }),
     [values],

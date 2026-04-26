@@ -60,7 +60,9 @@ export function LifecycleWire({
         preserveAspectRatio="none"
         className="block"
         aria-hidden
+        role="presentation"
       >
+        <title>Lifecycle wire</title>
         <line
           x1={PADDING_X}
           y1={cy}
@@ -88,10 +90,7 @@ export function LifecycleWire({
         })}
       </svg>
 
-      <div
-        className="absolute inset-0 grid"
-        style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}
-      >
+      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${n}, 1fr)` }}>
         {stations.map((s, i) => {
           const isActive = currentIndex === i;
           const c = counts?.[s.id];
@@ -109,9 +108,7 @@ export function LifecycleWire({
               <div
                 className={cn(
                   "font-sans text-[12px] leading-tight",
-                  isActive
-                    ? "text-(--color-ink) font-semibold"
-                    : "text-(--color-ink-2)",
+                  isActive ? "text-(--color-ink) font-semibold" : "text-(--color-ink-2)",
                 )}
               >
                 {s.label}

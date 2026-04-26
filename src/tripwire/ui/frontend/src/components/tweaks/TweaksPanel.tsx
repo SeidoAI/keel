@@ -26,9 +26,7 @@ interface TweaksPanelProps {
 export function TweaksPanel({ defaultOpen = false }: TweaksPanelProps) {
   const { values, setTweak } = useTweaks();
   const [searchParams] = useSearchParams();
-  const [open, setOpen] = useState<boolean>(
-    defaultOpen || searchParams.get("tweaks") === "1",
-  );
+  const [open, setOpen] = useState<boolean>(defaultOpen || searchParams.get("tweaks") === "1");
 
   // Sync the URL flag with the open state; if the URL changes
   // mid-session (e.g., user pastes a `?tweaks=1` link into the address
@@ -77,22 +75,40 @@ export function TweaksPanel({ defaultOpen = false }: TweaksPanelProps) {
         </button>
       </div>
 
-      <Field label="Paper warmth" value={values.paperWarmth} onChange={(v) => setTweak("paperWarmth", v as PaperWarmth)}
+      <Field
+        label="Paper warmth"
+        value={values.paperWarmth}
+        onChange={(v) => setTweak("paperWarmth", v as PaperWarmth)}
         options={["cream", "off-white", "linen"]}
       />
-      <Field label="Rule colour" value={values.ruleColour} onChange={(v) => setTweak("ruleColour", v as RuleColour)}
+      <Field
+        label="Rule colour"
+        value={values.ruleColour}
+        onChange={(v) => setTweak("ruleColour", v as RuleColour)}
         options={["red", "ochre", "indigo"]}
       />
-      <Field label="Density" value={values.density} onChange={(v) => setTweak("density", v as Density)}
+      <Field
+        label="Density"
+        value={values.density}
+        onChange={(v) => setTweak("density", v as Density)}
         options={["compact", "comfortable", "loose"]}
       />
-      <Field label="Stamp shape" value={values.stampShape} onChange={(v) => setTweak("stampShape", v as StampShape)}
+      <Field
+        label="Stamp shape"
+        value={values.stampShape}
+        onChange={(v) => setTweak("stampShape", v as StampShape)}
         options={["rect", "pill", "ticket-cut"]}
       />
-      <Field label="Serif family" value={values.serifFamily} onChange={(v) => setTweak("serifFamily", v as SerifFamily)}
+      <Field
+        label="Serif family"
+        value={values.serifFamily}
+        onChange={(v) => setTweak("serifFamily", v as SerifFamily)}
         options={["Instrument Serif", "EB Garamond", "Iowan Old Style"]}
       />
-      <Field label="Mono family" value={values.monoFamily} onChange={(v) => setTweak("monoFamily", v as MonoFamily)}
+      <Field
+        label="Mono family"
+        value={values.monoFamily}
+        onChange={(v) => setTweak("monoFamily", v as MonoFamily)}
         options={["Geist Mono", "JetBrains Mono", "IBM Plex Mono"]}
       />
     </div>

@@ -9,17 +9,10 @@ import { cn } from "@/lib/utils";
  * "voice" content that should read as commentary on the surrounding
  * structured information rather than as part of it.
  */
-export function MarginNote({
-  className,
-  children,
-  ...rest
-}: HTMLAttributes<HTMLSpanElement>) {
+export function MarginNote({ className, children, ...rest }: HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
-      className={cn(
-        "font-serif text-[16px] italic text-(--color-ink-2) leading-snug",
-        className,
-      )}
+      className={cn("font-serif text-[16px] italic text-(--color-ink-2) leading-snug", className)}
       {...rest}
     >
       {children}

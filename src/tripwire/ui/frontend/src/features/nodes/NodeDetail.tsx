@@ -2,9 +2,9 @@ import { AlertTriangle } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
 import { MarkdownBody } from "@/components/MarkdownBody";
-import { Stamp } from "@/components/ui/stamp";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Stamp } from "@/components/ui/stamp";
 import { ApiError } from "@/lib/api/client";
 import { useNode, useNodes, useReverseRefs } from "@/lib/api/endpoints/nodes";
 import { NodeRelatedPanel } from "./NodeRelatedPanel";

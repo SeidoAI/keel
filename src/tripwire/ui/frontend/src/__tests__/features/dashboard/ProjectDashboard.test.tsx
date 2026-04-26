@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProjectDashboard } from "@/features/dashboard/ProjectDashboard";
 import type { EnumDescriptor } from "@/lib/api/endpoints/enums";
 import type { EventsResponse } from "@/lib/api/endpoints/events";
-import type { IssueSummary } from "@/lib/api/endpoints/issues";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
 import type { SessionSummary } from "@/lib/api/endpoints/sessions";
 import { queryKeys } from "@/lib/api/queryKeys";
@@ -18,7 +17,7 @@ vi.mock("@/app/ProjectShell", () => ({
 
 interface Seed {
   project?: ProjectDetail;
-  issues?: IssueSummary[];
+  issues?: unknown[];
   statusEnum?: EnumDescriptor;
   sessions?: SessionSummary[];
   events?: EventsResponse;
@@ -39,12 +38,7 @@ function seed(data: Seed) {
     qc.setQueryData(
       queryKeys.events("p1", {
         limit: 6,
-        kinds: [
-          "tripwire_fire",
-          "validator_fail",
-          "artifact_rejected",
-          "pm_review_opened",
-        ],
+        kinds: ["tripwire_fire", "validator_fail", "artifact_rejected", "pm_review_opened"],
       }),
       data.events,
     );
@@ -67,27 +61,6 @@ const ENUM: EnumDescriptor = {
     { value: "done", label: "Done", color: "#0f0", description: null },
   ],
 };
-
-function issue(id: string, status: string): IssueSummary {
-  return {
-    id,
-    title: `title ${id}`,
-    status,
-    priority: "medium",
-    executor: "ai",
-    verifier: "required",
-    kind: null,
-    agent: null,
-    labels: [],
-    parent: null,
-    repo: null,
-    blocked_by: [],
-    is_blocked: false,
-    is_epic: false,
-    created_at: null,
-    updated_at: null,
-  };
-}
 
 function session(id: string, current_state: string | null = null): SessionSummary {
   return {
@@ -140,10 +113,7 @@ describe("ProjectDashboard", () => {
       project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
       issues: [],
       statusEnum: ENUM,
-      sessions: [
-        session("sessA", "executing"),
-        session("sessB", "in_review"),
-      ],
+      sessions: [session("sessA", "executing"), session("sessB", "in_review")],
     });
     render(<ProjectDashboard />, { wrapper });
     expect(screen.getByRole("link", { name: /Session sessA/ })).toHaveAttribute(

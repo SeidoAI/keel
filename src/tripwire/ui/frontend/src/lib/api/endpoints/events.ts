@@ -75,9 +75,7 @@ function buildQuery(params: ListEventsParams): string {
 
 export const eventsApi = {
   list: (pid: string, params: ListEventsParams = {}) =>
-    apiGet<EventsResponse>(
-      `/api/projects/${encodeURIComponent(pid)}/events${buildQuery(params)}`,
-    ),
+    apiGet<EventsResponse>(`/api/projects/${encodeURIComponent(pid)}/events${buildQuery(params)}`),
   get: (pid: string, eventId: string) =>
     apiGet<ProcessEvent>(
       `/api/projects/${encodeURIComponent(pid)}/events/${encodeURIComponent(eventId)}`,

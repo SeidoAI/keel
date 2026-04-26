@@ -3,9 +3,8 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-import { TweaksPanel } from "@/components/tweaks/TweaksPanel";
 import { TWEAK_DEFAULTS, TweaksProvider } from "@/components/tweaks/TweaksContext";
+import { TweaksPanel } from "@/components/tweaks/TweaksPanel";
 
 const STORAGE_KEY = "tripwire.tweaks.v1";
 
@@ -56,10 +55,7 @@ describe("TweaksPanel", () => {
   });
 
   it("loads stored settings on mount", () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ ...TWEAK_DEFAULTS, ruleColour: "ochre" }),
-    );
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...TWEAK_DEFAULTS, ruleColour: "ochre" }));
     render(wrap(<TweaksPanel defaultOpen />));
     expect(screen.getByLabelText(/rule colour/i)).toHaveValue("ochre");
   });

@@ -56,8 +56,7 @@ export interface WorkflowGraph {
 }
 
 export const workflowApi = {
-  get: (pid: string) =>
-    apiGet<WorkflowGraph>(`/api/projects/${encodeURIComponent(pid)}/workflow`),
+  get: (pid: string) => apiGet<WorkflowGraph>(`/api/projects/${encodeURIComponent(pid)}/workflow`),
 };
 
 export function useWorkflow(pid: string) {

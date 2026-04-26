@@ -1,6 +1,6 @@
 import { MarkdownBody } from "@/components/MarkdownBody";
-import { Stamp } from "@/components/ui/stamp";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Stamp } from "@/components/ui/stamp";
 import { ApiError } from "@/lib/api/client";
 import { type ArtifactStatus, useArtifact } from "@/lib/api/endpoints/artifacts";
 import { ApprovalControls } from "./ApprovalControls";
