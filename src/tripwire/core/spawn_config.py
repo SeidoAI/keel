@@ -14,6 +14,7 @@ Popen argv list.
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,7 @@ import yaml
 
 from tripwire.core.store import load_project
 from tripwire.models.session import AgentSession
-from tripwire.models.spawn import SpawnDefaults
+from tripwire.models.spawn import SpawnConfigValues, SpawnDefaults
 
 
 def _shipped_path() -> Path:
@@ -74,7 +75,62 @@ def load_resolved_spawn_config(
         }
         base = _deep_merge(base, session_data)
 
-    return SpawnDefaults.model_validate(base)
+    resolved = SpawnDefaults.model_validate(base)
+    _apply_provider_validation(resolved)
+    return resolved
+
+
+# Field defaults used to detect "user-set non-default" values on codex
+# sessions. Computed once at module load so the comparison stays cheap.
+_CONFIG_DEFAULTS = SpawnConfigValues()
+
+
+def _apply_provider_validation(resolved: SpawnDefaults) -> None:
+    """Codex sessions don't honour Claude-only flags. Warn-and-drop the
+    ones that have no codex analogue (``disallowed_tools``,
+    ``fallback_model``); warn-and-keep the ones we adapt at the runtime
+    or monitor layer (``max_turns``, ``system_prompt_append``).
+
+    Mutates ``resolved`` in place. Claude sessions are left alone.
+    """
+    if resolved.config.provider != "codex":
+        return
+
+    cfg = resolved.config
+
+    if cfg.disallowed_tools:
+        warnings.warn(
+            "spawn_config: 'disallowed_tools' has no codex equivalent; "
+            "value will be ignored. Resetting to []. "
+            "(Provider-aware validation, KUI-94 §C3.)",
+            stacklevel=2,
+        )
+        cfg.disallowed_tools = []
+
+    if cfg.fallback_model:
+        warnings.warn(
+            "spawn_config: 'fallback_model' is claude-specific (auto-fallback "
+            "to a smaller Anthropic model on transient failure); codex has no "
+            "analogue. Clearing value. (KUI-94 §C3.)",
+            stacklevel=2,
+        )
+        cfg.fallback_model = ""
+
+    if cfg.max_turns != _CONFIG_DEFAULTS.max_turns:
+        warnings.warn(
+            "spawn_config: 'max_turns' is enforced by the in-flight monitor "
+            "for codex sessions (no flag analogue); value preserved. "
+            "(KUI-94 §C3.)",
+            stacklevel=2,
+        )
+
+    if resolved.system_prompt_append.strip():
+        warnings.warn(
+            "spawn_config: 'system_prompt_append' is prepended to the user "
+            "prompt for codex sessions (no --append-system-prompt flag); "
+            "value preserved. (KUI-94 §C3.)",
+            stacklevel=2,
+        )
 
 
 def render_prompt(defaults: SpawnDefaults, **ctx: Any) -> str:
