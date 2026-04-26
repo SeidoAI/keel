@@ -89,7 +89,11 @@ describe("TweaksPanel", () => {
     // Stored key uses camelCase; map label → key.
     const camel = label
       .split(" ")
-      .map((part, i) => (i === 0 ? part : part[0].toUpperCase() + part.slice(1)))
+      .map((part, i) => {
+        if (i === 0) return part;
+        const head = part[0] ?? "";
+        return head.toUpperCase() + part.slice(1);
+      })
       .join("");
     expect(stored[camel]).toBe(choice);
   });
