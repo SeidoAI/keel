@@ -107,9 +107,7 @@ class TestSuspendDetection:
 
     def test_suspend_carries_pr_number_from_gh_pr_view(self, tmp_path):
         monitor = RuntimeMonitor(_ctx(tmp_path))
-        actions = monitor.process_event(
-            _bash("gh pr view 99 --json statusCheckRollup")
-        )
+        actions = monitor.process_event(_bash("gh pr view 99 --json statusCheckRollup"))
         suspends = [a for a in actions if isinstance(a, SuspendProcess)]
         assert suspends[0].pr_number == 99
 

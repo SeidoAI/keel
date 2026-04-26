@@ -140,14 +140,25 @@ class InjectFollowUp:
 class SuspendProcess:
     """Freeze the agent process via SIGSTOP — used during CI-wait
     (v0.7.10 §B4) so token-burn drops to ~0 while the agent polls a
-    PR's CI status. The executor schedules a defensive 30-min
-    SIGCONT so a stuck monitor never leaves the agent frozen
-    indefinitely.
+    PR's CI status.
+
+    The executor SIGSTOPs the pid, schedules a defensive 30-min
+    SIGCONT timer, and (when ``pr_number`` is set) starts a daemon
+    poll thread that runs ``gh pr view <num> --json statusCheckRollup``
+    every 30s and SIGCONTs the moment all checks are completed. The
+    poll thread runs from ``code_worktree`` so ``gh`` inherits the
+    agent's git remote without needing a ``--repo`` flag.
+
+    ``pr_number=None`` means the bash command was a CI-poll but the
+    PR number couldn't be parsed (shell variable, unusual quoting);
+    in that case the defensive 30-min timer is the only resume path.
     """
 
     tripwire_id: str
     pid: int
     reason: str
+    pr_number: int | None = None
+    code_worktree: Path | None = None
 
 
 @dataclass
@@ -373,7 +384,7 @@ class RuntimeMonitor:
             self._check_code_pr_no_pt(actions)
         # B4 — CI-wait suspend
         if cmd and self._is_ci_poll(cmd):
-            self._maybe_fire_ci_wait_suspend(actions)
+            self._maybe_fire_ci_wait_suspend(cmd, actions)
 
     def _handle_user(self, event: dict[str, Any], actions: list[MonitorAction]) -> None:
         message = event.get("message") or {}
@@ -592,7 +603,28 @@ class RuntimeMonitor:
             return True
         return False
 
-    def _maybe_fire_ci_wait_suspend(self, actions: list[MonitorAction]) -> None:
+    @staticmethod
+    def _extract_pr_number(cmd: str) -> int | None:
+        """Pull the PR number out of a `gh pr checks|view <num> ...` command.
+
+        Returns the first all-digits token following ``checks`` or
+        ``view``. Returns ``None`` if the number is a shell variable
+        or otherwise unparseable — the executor falls back to the
+        defensive 30-min timer in that case.
+        """
+        tokens = cmd.split()
+        for keyword in ("checks", "view"):
+            try:
+                idx = tokens.index(keyword)
+            except ValueError:
+                continue
+            if idx + 1 < len(tokens) and tokens[idx + 1].isdigit():
+                return int(tokens[idx + 1])
+        return None
+
+    def _maybe_fire_ci_wait_suspend(
+        self, cmd: str, actions: list[MonitorAction]
+    ) -> None:
         if self._suspended_pending:
             return
         self._suspended_pending = True
@@ -602,9 +634,11 @@ class RuntimeMonitor:
                 pid=self.ctx.pid,
                 reason=(
                     "Agent entered CI-wait poll (§B1). SIGSTOP'ing to "
-                    "drop token-burn to ~0; defensive 30-min SIGCONT "
-                    "is scheduled by the executor."
+                    "drop token-burn to ~0; GH-polling resume + "
+                    "defensive 30-min SIGCONT scheduled by the executor."
                 ),
+                pr_number=self._extract_pr_number(cmd),
+                code_worktree=self.ctx.code_worktree,
             )
         )
 
