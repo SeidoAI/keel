@@ -41,7 +41,7 @@ import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +51,7 @@ from pydantic import ValidationError
 from tripwire.core import freshness as freshness_mod
 from tripwire.core import paths
 from tripwire.core.enum_loader import EnumRegistry, load_enums
+from tripwire.core.event_emitter import EventEmitter, NullEmitter
 from tripwire.core.id_generator import parse_key
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.parser import ParseError, parse_frontmatter_body
@@ -2483,11 +2484,57 @@ ALL_CHECKS = [
 ]
 
 
+_DEFAULT_VALIDATE_SESSION_ID = "_cli_validate"
+
+
+def _isoformat_z(dt: datetime) -> str:
+    """RFC-3339 / ISO-8601 with `Z` suffix — matches the events spec."""
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _emit_check_result(
+    *,
+    emitter: EventEmitter,
+    check_fn: Any,
+    results: list[CheckResult],
+    session_id: str,
+) -> None:
+    """Emit one `validator_pass` / `validator_fail` event for *check_fn*.
+
+    Aggregates the check's findings into a single event — a check that
+    returns ten findings emits one `validator_fail`, not ten. The
+    validator id mirrors `workflow_service`: `v_<slug>` where `<slug>` is
+    the function name with the `check_` prefix stripped.
+    """
+    if isinstance(emitter, NullEmitter):
+        return
+    slug = check_fn.__name__.removeprefix("check_")
+    has_error = any(r.severity == "error" for r in results)
+    fired_at = _isoformat_z(datetime.now(timezone.utc))
+    kind = "validator_fail" if has_error else "validator_pass"
+    event_id = f"evt-{fired_at}-{kind}-{slug}-{session_id}"
+    payload: dict[str, Any] = {
+        "id": event_id,
+        "kind": kind,
+        "fired_at": fired_at,
+        "session_id": session_id,
+        "validator_id": f"v_{slug}",
+        "findings": [r.to_json() for r in results],
+    }
+    try:
+        emitter.emit("validator_runs", payload)
+    except Exception:
+        # Emission must never sink the validator run — log and continue.
+        logger.exception("validator emission failed for %s", slug)
+
+
 def validate_project(
     project_dir: Path,
     *,
     strict: bool = False,
     fix: bool = False,
+    emitter: EventEmitter | None = None,
+    session_id: str | None = None,
 ) -> ValidationReport:
     """Run the full validation gate against a project.
 
@@ -2498,9 +2545,21 @@ def validate_project(
     Always rebuilds the graph cache (`graph/index.yaml`) as a side effect —
     incrementally if the cache is already up to date, as a full rebuild if
     the cache is missing or corrupt.
+
+    If *emitter* is supplied, one ``validator_runs`` event is emitted per
+    `check_*` invocation — `validator_pass` if the check returned no
+    findings, `validator_fail` otherwise. *session_id* is required when
+    callers want events grouped by session; an unspecified id falls back
+    to a CLI sentinel so events still aggregate cleanly. The default
+    ``NullEmitter()`` emits nothing, preserving today's batch / unit-test
+    behaviour. See `docs/specs/2026-04-26-v08-handoff.md` §1.2, §2.2.
     """
     # Import lazily to avoid a circular import at module load time.
     from tripwire.core import graph_cache
+
+    if emitter is None:
+        emitter = NullEmitter()
+    sid = session_id or _DEFAULT_VALIDATE_SESSION_ID
 
     started = time.monotonic()
     logger.info(
@@ -2542,6 +2601,12 @@ def validate_project(
             check.__name__,
             len(results),
             (time.monotonic() - check_started) * 1000,
+        )
+        _emit_check_result(
+            emitter=emitter,
+            check_fn=check,
+            results=results,
+            session_id=sid,
         )
 
     # Rebuild the graph cache as a side effect. Only attempt if the project
