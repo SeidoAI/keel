@@ -28,7 +28,9 @@ Anything else is silently dropped (debug-logged).
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -38,9 +40,19 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
 
-from tripwire.ui.events import FileChangedEvent
+from tripwire.ui.events import Event, FileChangedEvent, ProcessEvent
 
 logger = logging.getLogger("tripwire.ui.file_watcher")
+
+EVENTS_DIR_PARTS: tuple[str, str] = (".tripwire", "events")
+"""Project-relative path parts of the process-event channel root.
+
+Whitelisted past the dot-prefix filter so `FileEmitter` writes can be
+classified and broadcast. See `docs/specs/2026-04-26-v08-handoff.md`
+§2.4 and §4.16.
+"""
+
+PROCESS_EVENT_FILENAME_RE = re.compile(r"^(\d+)\.json$")
 
 DEFAULT_DEBOUNCE_MS = 200
 
@@ -97,6 +109,12 @@ def _should_ignore(path: Path, project_dir: Path | None = None) -> bool:
     # Self-written graph cache — must be skipped or we get infinite event loops.
     if rel_parts == ("graph", "index.yaml"):
         return True
+
+    # Whitelist `.tripwire/events/` so FileEmitter writes survive the
+    # dot-prefix filter below. Other `.tripwire/` siblings (locks, cache
+    # files) still get ignored — only the events channel is open.
+    if rel_parts[: len(EVENTS_DIR_PARTS)] == EVENTS_DIR_PARTS:
+        return False
 
     for part in rel_parts:
         if part in _IGNORED_DIR_COMPONENTS:
@@ -198,6 +216,63 @@ def _event(
         entity_id=entity_id,
         action=action,  # type: ignore[arg-type]
         path=rel_posix,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Process-event classification (KUI-100)
+# ---------------------------------------------------------------------------
+
+
+def classify_process_event(
+    project_id: str,
+    project_dir: Path,
+    path: Path,
+) -> ProcessEvent | None:
+    """Classify a `.tripwire/events/<kind>/<sid>/<n>.json` write.
+
+    Returns ``None`` if *path* isn't an event-channel file, isn't a
+    finalised JSON write (`.tmp` files are ignored), or fails to parse.
+    The producer-side `FileEmitter` uses an atomic temp-file rename, so
+    the file's content is always either complete JSON or absent — but a
+    crash mid-write or a hostile editor still has to be tolerated.
+
+    The returned event's ``event_id`` field uses the same encoding as
+    `event_aggregator.encode_event_id` so frontends can fetch
+    `/api/events/<event_id>` directly from the WS notification.
+    """
+    try:
+        rel = path.relative_to(project_dir)
+    except ValueError:
+        return None
+    parts = rel.parts
+    # Expect `.tripwire/events/<kind>/<sid>/<n>.json` — exactly 5 parts.
+    if len(parts) != 5 or parts[:2] != EVENTS_DIR_PARTS:
+        return None
+    kind, session_id, filename = parts[2], parts[3], parts[4]
+    m = PROCESS_EVENT_FILENAME_RE.match(filename)
+    if m is None:
+        return None
+    n = int(m.group(1))
+
+    try:
+        body = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        logger.debug("classify_process_event: unreadable %s", path)
+        return None
+    if not isinstance(body, dict):
+        return None
+    fired_at = body.get("fired_at")
+    body_kind = body.get("kind")
+    if not isinstance(fired_at, str) or not isinstance(body_kind, str):
+        return None
+
+    return ProcessEvent(
+        project_id=project_id,
+        event_id=f"{kind}/{session_id}/{n}",
+        kind=body_kind,  # type: ignore[arg-type]
+        session_id=session_id,
+        fired_at=fired_at,
     )
 
 
@@ -309,6 +384,19 @@ class ProjectFileHandler(FileSystemEventHandler):
         if _should_ignore(path, self.project_dir):
             return
 
+        # Process-event channel (KUI-100): emit as soon as a new file
+        # lands. Don't run through the debouncer — process events are
+        # already coalesced upstream by the per-(kind, sid) lock and we
+        # want WS clients to see them with minimum latency. Skip the
+        # `modified`/`deleted` actions: only the `created` rename is the
+        # finalised write that we should broadcast.
+        process_ev = classify_process_event(self.project_id, self.project_dir, path)
+        if process_ev is not None:
+            if action != "created":
+                return
+            self._dispatch_immediate(process_ev)
+            return
+
         classified = classify(self.project_id, self.project_dir, path, action)
         if classified is None:
             # Per KUI-36 execution constraint: unclassified paths log-and-skip,
@@ -318,6 +406,15 @@ class ProjectFileHandler(FileSystemEventHandler):
 
         key = (self.project_id, classified.entity_type, classified.entity_id)
         self.debouncer.schedule(key, classified, self._dispatch)
+
+    def _dispatch_immediate(self, event: Event) -> None:
+        """Forward *event* onto the asyncio queue without debouncing."""
+        if self.loop.is_closed():
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self.queue.put(event), self.loop)
+        except RuntimeError:
+            logger.debug("dropped immediate event: loop not running")
 
     def _dispatch(self, key: Any, event: FileChangedEvent) -> None:
         """Forward *event* onto the asyncio queue from a Timer thread."""
@@ -376,8 +473,10 @@ def start_watching(
 
 __all__ = [
     "DEFAULT_DEBOUNCE_MS",
+    "EVENTS_DIR_PARTS",
     "Debouncer",
     "ProjectFileHandler",
     "classify",
+    "classify_process_event",
     "start_watching",
 ]
