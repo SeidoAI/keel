@@ -32,6 +32,7 @@ from tripwire.cli.scaffold import brief_cmd, scaffold_cmd
 from tripwire.cli.session import session_cmd
 from tripwire.cli.status import status_cmd
 from tripwire.cli.templates import templates_cmd
+from tripwire.cli.tripwires import tripwires_cmd
 from tripwire.cli.ui import ui_cmd
 from tripwire.cli.uuid_cmd import uuid_cmd
 from tripwire.cli.validate import validate_cmd
@@ -113,6 +114,7 @@ cli.add_command(ui_cmd)
 cli.add_command(view_cmd)
 cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
+cli.add_command(tripwires_cmd)
 
 
 if __name__ == "__main__":

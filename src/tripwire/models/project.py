@@ -100,6 +100,43 @@ class ProjectWorkspacePointer(BaseModel):
         return self
 
 
+class ProjectTripwireExtra(BaseModel):
+    """One entry in ``project.yaml.tripwires.extra`` — a project-local
+    tripwire registered alongside the built-ins.
+
+    Either ``cls`` (a dotted Python path resolvable by ``import``) or
+    ``module`` (a path to a project-local Python file) must be set.
+    The loader resolves the class via :mod:`importlib`.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str
+    fires_on: str
+    cls: str | None = Field(default=None, alias="class")
+    module: str | None = None
+
+
+class ProjectTripwiresConfig(BaseModel):
+    """``project.yaml.tripwires`` — opt-out + extras for the tripwire
+    primitive (KUI-99).
+
+    ``enabled`` defaults to True; setting it False disables ALL
+    tripwires (including the built-in self-review) for the project AND
+    suppresses pre-push hook installation at session-spawn time.
+    ``opt_out`` is a list of session IDs that bypass tripwires; it
+    lives at the project level on purpose so the executing agent
+    can't see "no tripwires here" in their session.yaml.
+    ``extra`` lets a project register its own tripwires.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    opt_out: list[str] = Field(default_factory=list)
+    extra: list[ProjectTripwireExtra] = Field(default_factory=list)
+
+
 class ArtifactManifestRequirements(BaseModel):
     """`project.yaml.artifact_manifest` — the v0.7.9 correctness contract.
 
@@ -164,6 +201,12 @@ class ProjectConfig(BaseModel):
     artifact_manifest: ArtifactManifestRequirements = Field(
         default_factory=ArtifactManifestRequirements
     )
+
+    # v0.8.0 (KUI-99): tripwire primitive opt-out + project-local extras.
+    # Defaults match the spec: enabled, no opt-outs, no extras. Setting
+    # ``enabled: false`` disables ALL tripwires for this project (and
+    # the pre-push hook installation in runtimes/prep.py).
+    tripwires: ProjectTripwiresConfig = Field(default_factory=ProjectTripwiresConfig)
 
     # v0.7b: per-project artifact manifest overrides layered on top of
     # templates/artifacts/manifest.yaml. Useful for adding project-specific
