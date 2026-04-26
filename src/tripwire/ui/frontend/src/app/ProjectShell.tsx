@@ -1,11 +1,14 @@
 import { createContext, useContext } from "react";
 import { Navigate, Outlet, useParams } from "react-router-dom";
+
+import { ScreenShell } from "@/components/ui/screen-shell";
+import { TweaksPanel } from "@/components/tweaks/TweaksPanel";
+import { TweaksProvider } from "@/components/tweaks/TweaksContext";
 import {
   type UseProjectWebSocketStatus,
   useProjectWebSocket,
 } from "@/lib/realtime/useProjectWebSocket";
-import { Sidebar } from "./Sidebar";
-import { TopBar } from "./TopBar";
+import { ProjectStatusCluster } from "./ProjectStatusCluster";
 
 interface ProjectShellContextValue {
   projectId: string;
@@ -31,15 +34,12 @@ function ProjectShellInner({ projectId }: { projectId: string }) {
 
   return (
     <ProjectShellContext.Provider value={{ projectId, wsStatus: status }}>
-      <div className="flex h-screen flex-col">
-        <TopBar />
-        <div className="flex min-h-0 flex-1">
-          <Sidebar />
-          <main className="flex-1 overflow-auto">
-            <Outlet />
-          </main>
-        </div>
-      </div>
+      <TweaksProvider>
+        <ScreenShell projectId={projectId} topBarStatus={<ProjectStatusCluster wsStatus={status} />}>
+          <Outlet />
+        </ScreenShell>
+        <TweaksPanel />
+      </TweaksProvider>
     </ProjectShellContext.Provider>
   );
 }
