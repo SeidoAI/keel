@@ -25,6 +25,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -1541,6 +1542,140 @@ def session_cost_cmd(
     console.print(table)
     if breakdown.models_used:
         console.print(f"[dim]models seen: {', '.join(breakdown.models_used)}[/dim]")
+
+
+@session_cmd.command("analyze-routing")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    show_default=True,
+)
+def session_analyze_routing_cmd(project_dir: Path, output_format: str) -> None:
+    """Aggregate ``.routing_telemetry.jsonl`` rows by (provider, model, effort, task_kind).
+
+    Produces ``$/merged-PR`` per route plus sample size + total cost.
+    Manual interpretation today; auto-tuning the routing table is
+    v0.8 scope. Routes with zero merged sessions report
+    ``cost_per_merged_pr`` as ``null`` rather than infinity so the JSON
+    stays consumable by downstream tools.
+    """
+    from tripwire.core.routing_telemetry import read_telemetry
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    rows = read_telemetry(resolved)
+
+    @dataclass
+    class _RouteAgg:
+        provider: str
+        model: str
+        effort: str
+        task_kind: str | None
+        n: int = 0
+        merged: int = 0
+        total_cost_usd: float = 0.0
+        total_duration_min: int = 0
+        re_engages: int = 0
+        ci_failures: int = 0
+
+    agg: dict[tuple, _RouteAgg] = {}
+    for r in rows:
+        key = (
+            r.get("provider", "claude"),
+            r.get("model", "opus"),
+            r.get("effort", "xhigh"),
+            r.get("task_kind"),
+        )
+        if key not in agg:
+            agg[key] = _RouteAgg(
+                provider=key[0], model=key[1], effort=key[2], task_kind=key[3]
+            )
+        bucket = agg[key]
+        bucket.n += 1
+        if r.get("merged"):
+            bucket.merged += 1
+        bucket.total_cost_usd += float(r.get("cost_usd") or 0.0)
+        bucket.total_duration_min += int(r.get("duration_min") or 0)
+        bucket.re_engages += int(r.get("re_engages") or 0)
+        bucket.ci_failures += int(r.get("ci_failures") or 0)
+
+    routes_payload: list[dict[str, Any]] = []
+    for bucket in agg.values():
+        cost_per_merged = (
+            bucket.total_cost_usd / bucket.merged if bucket.merged else None
+        )
+        routes_payload.append(
+            {
+                "provider": bucket.provider,
+                "model": bucket.model,
+                "effort": bucket.effort,
+                "task_kind": bucket.task_kind,
+                "n": bucket.n,
+                "merged": bucket.merged,
+                "total_cost_usd": round(bucket.total_cost_usd, 4),
+                "cost_per_merged_pr": (
+                    round(cost_per_merged, 4) if cost_per_merged is not None else None
+                ),
+                "avg_duration_min": (
+                    round(bucket.total_duration_min / bucket.n, 1) if bucket.n else 0.0
+                ),
+                "total_re_engages": bucket.re_engages,
+                "total_ci_failures": bucket.ci_failures,
+            }
+        )
+
+    routes_payload.sort(
+        key=lambda x: (x["cost_per_merged_pr"] is None, x["cost_per_merged_pr"] or 0)
+    )
+
+    if output_format == "json":
+        click.echo(
+            json.dumps(
+                {"total_sessions": len(rows), "routes": routes_payload}, indent=2
+            )
+        )
+        return
+
+    if not routes_payload:
+        click.echo("No routing telemetry yet. Run a session through to completion.")
+        return
+
+    table = Table(title="Routing analysis", show_header=True)
+    table.add_column("provider")
+    table.add_column("model")
+    table.add_column("effort")
+    table.add_column("task_kind")
+    table.add_column("n", justify="right")
+    table.add_column("merged", justify="right")
+    table.add_column("$/merged", justify="right")
+    table.add_column("avg dur", justify="right")
+    table.add_column("re-eng", justify="right")
+    for r in routes_payload:
+        table.add_row(
+            r["provider"],
+            r["model"],
+            r["effort"],
+            r["task_kind"] or "—",
+            str(r["n"]),
+            str(r["merged"]),
+            (
+                f"${r['cost_per_merged_pr']:.2f}"
+                if r["cost_per_merged_pr"] is not None
+                else "—"
+            ),
+            f"{r['avg_duration_min']:.1f}m",
+            str(r["total_re_engages"]),
+        )
+    console.print(table)
 
 
 @session_cmd.command("agenda")
