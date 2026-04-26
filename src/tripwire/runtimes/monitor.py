@@ -37,67 +37,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
+from tripwire.core.session_cost import cost_for_usage as _cost_for_usage
 
 logger = logging.getLogger(__name__)
-
-
-# ---------- Pricing ------------------------------------------------------
-
-
-_PRICING_PATH = Path(__file__).parent.parent / "data" / "anthropic_pricing.yaml"
-
-
-@dataclass(frozen=True)
-class _ModelRates:
-    input: float
-    output: float
-    cache_read: float
-    cache_write: float
-
-
-_pricing_cache: dict[str, _ModelRates] | None = None
-_default_rates_cache: _ModelRates | None = None
-
-
-def _load_pricing() -> tuple[dict[str, _ModelRates], _ModelRates]:
-    """Read ``anthropic_pricing.yaml`` once and memoise."""
-    global _pricing_cache, _default_rates_cache
-    if _pricing_cache is not None and _default_rates_cache is not None:
-        return _pricing_cache, _default_rates_cache
-    raw = yaml.safe_load(_PRICING_PATH.read_text(encoding="utf-8"))
-    models = {
-        name: _ModelRates(**rates) for name, rates in (raw.get("models") or {}).items()
-    }
-    default = _ModelRates(**raw["default"])
-    _pricing_cache = models
-    _default_rates_cache = default
-    return models, default
-
-
-def _rate_for(model_name: str) -> _ModelRates:
-    """Pick the longest-key prefix match for ``model_name``, else default."""
-    models, default = _load_pricing()
-    matches = [k for k in models if k in model_name]
-    if not matches:
-        return default
-    best = max(matches, key=len)
-    return models[best]
-
-
-def _cost_for_usage(model_name: str, usage: dict[str, Any]) -> float:
-    """Compute USD cost for a single ``usage`` payload."""
-    rates = _rate_for(model_name)
-    inp = int(usage.get("input_tokens") or 0)
-    out = int(usage.get("output_tokens") or 0)
-    crd = int(usage.get("cache_read_input_tokens") or 0)
-    cwr = int(usage.get("cache_creation_input_tokens") or 0)
-    return (
-        inp * rates.input
-        + out * rates.output
-        + crd * rates.cache_read
-        + cwr * rates.cache_write
-    ) / 1_000_000
 
 
 # ---------- Action types --------------------------------------------------
