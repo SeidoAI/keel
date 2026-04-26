@@ -32,8 +32,11 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from tripwire.core import paths
+from tripwire.core.event_emitter import EventEmitter, NullEmitter
 from tripwire.models.manifest import ArtifactManifest as CoreManifest
 from tripwire.ui.services._atomic_write import atomic_write_yaml
+
+_FEEDBACK_EXCERPT_MAX = 280
 
 logger = logging.getLogger("tripwire.ui.services.artifact_service")
 
@@ -361,6 +364,8 @@ def reject_artifact(
     session_id: str,
     name: str,
     feedback: str,
+    *,
+    emitter: EventEmitter | None = None,
 ) -> ArtifactStatus:
     """Record a rejection for a gated artifact.
 
@@ -368,6 +373,10 @@ def reject_artifact(
     without reason is what happens by accident when the UI forgets to
     collect the textarea input, and the empty-string check here makes
     the omission a 400 instead of a silent decision.
+
+    *emitter*, if supplied, gets one ``rejections`` (kind
+    ``artifact_rejected``) event with a feedback excerpt. Default
+    `NullEmitter` keeps existing callers' behaviour unchanged.
 
     Raises:
         ValueError: if the artifact isn't gated or feedback is empty.
@@ -383,7 +392,43 @@ def reject_artifact(
         approved=False,
         feedback=feedback,
     )
+    _emit_rejection(
+        emitter or NullEmitter(),
+        session_id=session_id,
+        artifact=name,
+        feedback=feedback,
+    )
     return _fresh_status(project_dir, session_id, name)
+
+
+def _emit_rejection(
+    emitter: EventEmitter,
+    *,
+    session_id: str,
+    artifact: str,
+    feedback: str,
+) -> None:
+    """Emit one `artifact_rejected` event under `rejections/`."""
+    if isinstance(emitter, NullEmitter):
+        return
+    fired_at = (
+        datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    )
+    excerpt = feedback.strip()
+    if len(excerpt) > _FEEDBACK_EXCERPT_MAX:
+        excerpt = excerpt[: _FEEDBACK_EXCERPT_MAX - 1] + "…"
+    payload = {
+        "id": f"evt-{fired_at}-artifact-rejected-{session_id}-{artifact}",
+        "kind": "artifact_rejected",
+        "fired_at": fired_at,
+        "session_id": session_id,
+        "artifact": artifact,
+        "feedback_excerpt": excerpt,
+    }
+    try:
+        emitter.emit("rejections", payload)
+    except Exception:
+        logger.exception("artifact rejection emission failed")
 
 
 def _fresh_status(project_dir: Path, session_id: str, name: str) -> ArtifactStatus:

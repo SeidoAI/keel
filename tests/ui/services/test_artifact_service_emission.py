@@ -86,7 +86,6 @@ def test_reject_artifact_emits_event(
         "plan",
         feedback="scope too broad — split auth changes",
         emitter=emitter,
-        session_id=sid,
     )
     assert any(kind == "rejections" for kind, _ in emitter.calls)
     payload = next(p for k, p in emitter.calls if k == "rejections")
