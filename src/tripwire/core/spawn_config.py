@@ -76,8 +76,97 @@ def load_resolved_spawn_config(
         base = _deep_merge(base, session_data)
 
     resolved = SpawnDefaults.model_validate(base)
+    # KUI-94 §C4 — apply agent yaml's runtime field as a low-precedence
+    # default. _apply_agent_yaml_overrides is a no-op when a project/
+    # session layer already pinned invocation.runtime, so explicit user
+    # config still wins.
+    if session is not None and session.agent:
+        _apply_agent_yaml_overrides(
+            resolved, project_dir, agent_id=session.agent, session=session
+        )
     _apply_provider_validation(resolved)
     return resolved
+
+
+def _project_explicitly_pins_runtime(project_dir: Path) -> bool:
+    """True iff project.yaml / .tripwire/spawn/defaults.yaml explicitly
+    set ``invocation.runtime``. Used by ``_apply_agent_yaml_overrides``
+    to decide whether the agent yaml's declared runtime is allowed to
+    override (it is NOT — explicit project config wins)."""
+    file_override = project_dir / ".tripwire" / "spawn" / "defaults.yaml"
+    if file_override.is_file():
+        try:
+            data = yaml.safe_load(file_override.read_text(encoding="utf-8")) or {}
+            inv = data.get("invocation") if isinstance(data, dict) else None
+            if isinstance(inv, dict) and "runtime" in inv:
+                return True
+        except Exception:
+            # Malformed override file — let the main loader surface it.
+            pass
+    try:
+        proj = load_project(project_dir)
+    except Exception:
+        proj = None
+    if proj is not None and proj.spawn_defaults:
+        inv = proj.spawn_defaults.get("invocation") if isinstance(
+            proj.spawn_defaults, dict
+        ) else None
+        if isinstance(inv, dict) and "runtime" in inv:
+            return True
+    return False
+
+
+def _apply_agent_yaml_overrides(
+    resolved: SpawnDefaults,
+    project_dir: Path,
+    agent_id: str,
+    session: AgentSession | None = None,
+) -> None:
+    """Apply agent yaml's declared ``runtime`` field to a resolved spawn
+    config (KUI-94 §C4).
+
+    Precedence: session.spawn_config > project layers > agent yaml >
+    shipped default. The helper is a no-op when a higher layer has
+    explicitly pinned ``invocation.runtime``; in that case the agent's
+    declared runtime is silently shadowed.
+
+    Mutates ``resolved`` in place. Tolerant of missing / malformed
+    agent yamls — they're metadata, not load-bearing config.
+    """
+    agent_yaml = project_dir / "agents" / f"{agent_id}.yaml"
+    if not agent_yaml.is_file():
+        return
+    try:
+        data = yaml.safe_load(agent_yaml.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return
+    if not isinstance(data, dict):
+        return
+    declared = data.get("runtime")
+    # Defensive: legacy values like "claude-code" or typos are ignored.
+    # Validation is the registry's job at spawn time, not ours.
+    if declared not in ("claude", "codex"):
+        return
+
+    # Higher-precedence layers win: project file/inline OR an explicit
+    # session.spawn_config.invocation.runtime (the loader already
+    # applied that, but we can't tell from the resolved alone whether
+    # the value came from a user pin or the shipped default).
+    if _project_explicitly_pins_runtime(project_dir):
+        return
+    if (
+        session is not None
+        and session.spawn_config is not None
+        and session.spawn_config.invocation is not None
+        and "runtime" in session.spawn_config.invocation.model_fields_set
+    ):
+        return
+
+    resolved.invocation.runtime = declared
+    resolved.config.provider = declared
+    # NOTE: callers (the loader, prep) run _apply_provider_validation
+    # afterwards; we don't validate inline to avoid duplicate warnings
+    # when the helper is invoked from inside the loader.
 
 
 # Field defaults used to detect "user-set non-default" values on codex
