@@ -22,20 +22,22 @@ from tripwire.core.validator import (
 
 def _stub_main(monkeypatch, paths: set[str]) -> None:
     """Patch :func:`list_paths_on_main` to return a fixed set of paths."""
-    from tripwire.core import validator
+    from tripwire.core.validator.lint import done_implies_artifacts_on_main
 
     monkeypatch.setattr(
-        validator, "list_paths_on_main", lambda _project_dir: set(paths)
+        done_implies_artifacts_on_main,
+        "list_paths_on_main",
+        lambda _project_dir: set(paths),
     )
 
 
 def _stub_main_unavailable(monkeypatch, message: str = "no remote") -> None:
-    from tripwire.core import validator
+    from tripwire.core.validator.lint import done_implies_artifacts_on_main
 
     def _raise(_project_dir):
         raise git_helpers.MainTreeUnavailable(message)
 
-    monkeypatch.setattr(validator, "list_paths_on_main", _raise)
+    monkeypatch.setattr(done_implies_artifacts_on_main, "list_paths_on_main", _raise)
 
 
 def test_no_done_entities_returns_empty(
@@ -52,9 +54,9 @@ def test_no_done_entities_returns_empty(
         called["hit"] = True
         return set()
 
-    from tripwire.core import validator
+    from tripwire.core.validator.lint import done_implies_artifacts_on_main
 
-    monkeypatch.setattr(validator, "list_paths_on_main", _spy)
+    monkeypatch.setattr(done_implies_artifacts_on_main, "list_paths_on_main", _spy)
 
     ctx = load_context(tmp_path_project)
     results = check_done_implies_artifacts_on_main(ctx)
@@ -100,7 +102,7 @@ def test_done_session_missing_self_review_errors(
     tmp_path_project: Path, save_test_session, monkeypatch
 ):
     """The §A1 default `session_required` includes self-review.md and
-    pm-response.md. Missing either → error."""
+    pm-response.yaml. Missing either → error."""
     save_test_session(tmp_path_project, "s1", status="done")
     _stub_main(
         monkeypatch,
@@ -108,7 +110,7 @@ def test_done_session_missing_self_review_errors(
             "sessions/s1/task-checklist.md",
             "sessions/s1/verification-checklist.md",
             "sessions/s1/insights.yaml",
-            # self-review.md and pm-response.md absent
+            # self-review.md and pm-response.yaml absent
         },
     )
 
@@ -117,7 +119,7 @@ def test_done_session_missing_self_review_errors(
     files_mentioned = " ".join(r.message for r in results)
 
     assert "sessions/s1/self-review.md" in files_mentioned
-    assert "sessions/s1/pm-response.md" in files_mentioned
+    assert "sessions/s1/pm-response.yaml" in files_mentioned
     assert all(r.code == "done_implies_artifacts/missing_on_main" for r in results)
 
 
@@ -131,7 +133,7 @@ def test_done_session_with_all_artifacts_passes(
             "sessions/s1/task-checklist.md",
             "sessions/s1/verification-checklist.md",
             "sessions/s1/self-review.md",
-            "sessions/s1/pm-response.md",
+            "sessions/s1/pm-response.yaml",
             "sessions/s1/insights.yaml",
         },
     )

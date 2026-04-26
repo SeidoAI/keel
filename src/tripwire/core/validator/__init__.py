@@ -51,7 +51,6 @@ from pydantic import ValidationError
 from tripwire.core import freshness as freshness_mod
 from tripwire.core import paths
 from tripwire.core.enum_loader import EnumRegistry, load_enums
-from tripwire.core.git_helpers import MainTreeUnavailable, list_paths_on_main
 from tripwire.core.id_generator import parse_key
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.parser import ParseError, parse_frontmatter_body
@@ -2277,97 +2276,171 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
-def check_done_implies_artifacts_on_main(
+# v0.7.9 §A9 — project-state lint rules live in ``./lint/`` (one module
+# per rule, each exporting ``check``). ``LINT_CHECKS`` collects them so
+# they run alongside the in-file ``check_*`` functions.
+# Imported at the bottom of this module to avoid a circular dependency
+# (lint rules import ``CheckResult`` / ``ValidationContext`` from here).
+from tripwire.core.validator.lint import LINT_CHECKS  # noqa: E402
+from tripwire.core.validator.lint.done_implies_artifacts_on_main import (  # noqa: E402, F401
+    # Backwards-compat re-export so existing
+    # ``from tripwire.core.validator import check_done_implies_artifacts_on_main``
+    # imports still resolve.
+    check as check_done_implies_artifacts_on_main,
+)
+
+
+def check_pm_response_covers_self_review(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
-    """v0.7.9 §A1 — `status: done` ⇒ required artifacts exist on origin/main.
+    """v0.7.9 §A3 — every self-review.md bullet must have a matching
+    quote_excerpt in pm-response.yaml.
 
-    The correctness contract. For every session and issue with
-    ``status: done``, every file listed in
-    ``project.yaml.artifact_manifest`` must be present on the
-    merged-main snapshot of the project tracking repo (``origin/main``).
-    "On main" is the only state that counts; worktree files don't.
+    Substring match (case-insensitive, both directions). Strict
+    enough to catch "PM skipped read entirely," loose enough to not
+    be a transcription chore.
 
-    Online-first. We don't ``git fetch`` from inside validate (would
-    hit the network on every run). If ``origin/main`` is unreadable
-    (no remote, no fetch yet, repo isn't a git checkout), emit a
-    single ``done_implies_artifacts/main_unavailable`` warning and
-    skip the per-entity checks — the operator can re-run after a
-    fetch.
+    Codes:
+      - ``pm_response/missing_file`` — self-review present, pm-response absent
+      - ``pm_response/parse_error``  — pm-response.yaml unparseable
+      - ``pm_response/incomplete_coverage`` — bullet has no matching quote_excerpt
     """
-    if ctx.project_config is None:
-        return []
+    from tripwire.core.session_review_artifacts import (
+        parse_pm_response_items,
+        parse_self_review_items,
+    )
 
-    done_sessions = [e for e in ctx.sessions if e.model.status == "done"]
-    done_issues = [e for e in ctx.issues if e.model.status == "done"]
-    if not done_sessions and not done_issues:
-        return []
-
-    try:
-        on_main = list_paths_on_main(ctx.project_dir)
-    except MainTreeUnavailable as exc:
-        return [
-            CheckResult(
-                code="done_implies_artifacts/main_unavailable",
-                severity="warning",
-                file=PROJECT_CONFIG_FILENAME,
-                message=(
-                    f"Cannot read origin/main; `done` ⇒ artifact rule "
-                    f"unverified ({exc})."
-                ),
-                fix_hint=(
-                    "Run `git fetch origin` in the project tracking repo, "
-                    "then re-run validate. Network-isolated environments "
-                    "can ignore this warning."
-                ),
-            )
-        ]
-
-    manifest = ctx.project_config.artifact_manifest
     results: list[CheckResult] = []
 
-    for entity in done_sessions:
-        session = entity.model
-        for fname in manifest.session_required:
-            rel = f"sessions/{session.id}/{fname}"
-            if rel in on_main:
+    for entity in ctx.sessions:
+        sid = entity.model.id
+        sdir = ctx.project_dir / "sessions" / sid
+        sr_path = sdir / "self-review.md"
+        if not sr_path.is_file():
+            # Presence is enforced by done_implies_artifacts_on_main.
+            continue
+
+        try:
+            sr_items = parse_self_review_items(sr_path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            results.append(
+                CheckResult(
+                    code="pm_response/io_error",
+                    severity="error",
+                    file=f"sessions/{sid}/self-review.md",
+                    message=f"Could not read self-review.md: {exc}",
+                )
+            )
+            continue
+        if not sr_items:
+            continue
+
+        pr_path = sdir / "pm-response.yaml"
+        if not pr_path.is_file():
+            results.append(
+                CheckResult(
+                    code="pm_response/missing_file",
+                    severity="error",
+                    file=f"sessions/{sid}/pm-response.yaml",
+                    message=(
+                        f"Session {sid!r} has self-review.md but no "
+                        "pm-response.yaml; PM has not recorded a response."
+                    ),
+                    fix_hint=(
+                        "Author sessions/<sid>/pm-response.yaml from "
+                        "templates/artifacts/pm-response.yaml.j2 "
+                        "(`tripwire session scaffold <sid> "
+                        "--artifact pm-response.yaml`)."
+                    ),
+                )
+            )
+            continue
+
+        try:
+            pm_items = parse_pm_response_items(pr_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            results.append(
+                CheckResult(
+                    code="pm_response/parse_error",
+                    severity="error",
+                    file=f"sessions/{sid}/pm-response.yaml",
+                    message=f"pm-response.yaml could not be parsed: {exc}",
+                    fix_hint="Check YAML syntax against the template.",
+                )
+            )
+            continue
+
+        excerpts_lower = [(it.quote_excerpt or "").strip().lower() for it in pm_items]
+        for sr in sr_items:
+            sr_lower = sr.text.lower()
+            covered = any(
+                e and (e in sr_lower or sr_lower in e) for e in excerpts_lower
+            )
+            if covered:
                 continue
             results.append(
                 CheckResult(
-                    code="done_implies_artifacts/missing_on_main",
+                    code="pm_response/incomplete_coverage",
                     severity="error",
-                    file=entity.rel_path,
+                    file=f"sessions/{sid}/pm-response.yaml",
                     message=(
-                        f"Session {session.id!r} is `done` but required "
-                        f"artifact {rel!r} is not on origin/main."
+                        f"Self-review item under Lens {sr.lens} has no "
+                        f"matching quote_excerpt in pm-response.yaml: "
+                        f"{sr.text!r}"
                     ),
                     fix_hint=(
-                        f"Commit {rel} to the project tracking branch and "
-                        "merge to main, OR transition the session to "
-                        "`abandoned` if the work didn't actually complete."
+                        "Add an items[] entry to pm-response.yaml with a "
+                        "quote_excerpt that contains a substring of this "
+                        "self-review bullet."
                     ),
                 )
             )
 
-    for entity in done_issues:
-        issue = entity.model
-        for fname in manifest.issue_required:
-            rel = f"issues/{issue.id}/{fname}"
-            if rel in on_main:
+    return results
+
+
+def check_pm_response_followups_resolve(
+    ctx: ValidationContext,
+) -> list[CheckResult]:
+    """v0.7.9 §A3 — every ``items[].follow_up: KUI-XX`` in pm-response.yaml
+    must reference an existing issue.
+
+    Code: ``pm_response/missing_followup``.
+    """
+    from tripwire.core.session_review_artifacts import parse_pm_response_items
+
+    known_issue_ids = {entity.model.id for entity in ctx.issues}
+
+    results: list[CheckResult] = []
+    for entity in ctx.sessions:
+        sid = entity.model.id
+        pr_path = ctx.project_dir / "sessions" / sid / "pm-response.yaml"
+        if not pr_path.is_file():
+            continue
+        try:
+            pm_items = parse_pm_response_items(pr_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            # parse_error reported by check_pm_response_covers_self_review
+            continue
+
+        for item in pm_items:
+            if not item.follow_up:
+                continue
+            if item.follow_up in known_issue_ids:
                 continue
             results.append(
                 CheckResult(
-                    code="done_implies_artifacts/missing_on_main",
+                    code="pm_response/missing_followup",
                     severity="error",
-                    file=entity.rel_path,
+                    file=f"sessions/{sid}/pm-response.yaml",
                     message=(
-                        f"Issue {issue.id!r} is `done` but required "
-                        f"artifact {rel!r} is not on origin/main."
+                        f"pm-response.yaml references follow_up "
+                        f"{item.follow_up!r}, but no such issue exists."
                     ),
                     fix_hint=(
-                        f"Commit {rel} to the project tracking branch and "
-                        "merge to main, OR transition the issue back to "
-                        "an in-progress status."
+                        "Either create the follow-up issue (`tripwire "
+                        "next-key --type issue`) or change follow_up to "
+                        "an existing issue id."
                     ),
                 )
             )
@@ -2399,7 +2472,14 @@ ALL_CHECKS = [
     check_quality_consistency,
     check_session_issue_coherence,
     check_issue_artifact_presence,
-    check_done_implies_artifacts_on_main,
+    # KUI-86 (§A3) added these two as in-file functions; they need access
+    # to ``session_review_artifacts.parse_*`` helpers and the new
+    # pm-response.yaml format. Keep them here rather than splitting into
+    # the lint dir so the merge with main stays minimal.
+    check_pm_response_covers_self_review,
+    check_pm_response_followups_resolve,
+    # KUI-89 (§A9) — project-state lint rules under ``./lint/``.
+    *LINT_CHECKS,
 ]
 
 
