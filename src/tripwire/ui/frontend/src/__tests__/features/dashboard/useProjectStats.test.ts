@@ -45,8 +45,8 @@ function issue(id: string): IssueSummary {
 describe("bucketByStage", () => {
   it("counts a session under its canonical stage", () => {
     const buckets = bucketByStage([sess("s1", "executing")], []);
-    expect(buckets.executing.sessionCount).toBe(1);
-    expect(buckets.queued.sessionCount).toBe(0);
+    expect(buckets.executing?.sessionCount).toBe(1);
+    expect(buckets.queued?.sessionCount).toBe(0);
   });
 
   it("collapses richer backend states (active, waiting_for_*) onto executing", () => {
@@ -63,7 +63,7 @@ describe("bucketByStage", () => {
       ],
       [],
     );
-    expect(buckets.executing.sessionCount).toBe(4);
+    expect(buckets.executing?.sessionCount).toBe(4);
   });
 
   it("counts off-track sessions (failed/paused/abandoned) under off_track", () => {
@@ -75,7 +75,7 @@ describe("bucketByStage", () => {
       [sess("s1", "failed"), sess("s2", "paused"), sess("s3", "abandoned")],
       [],
     );
-    expect(buckets[OFF_TRACK_STAGE_ID].sessionCount).toBe(3);
+    expect(buckets[OFF_TRACK_STAGE_ID]?.sessionCount).toBe(3);
   });
 
   it("places issues in the same stage as their parent session", () => {
@@ -86,13 +86,13 @@ describe("bucketByStage", () => {
       [sess("s1", "in_review", ["I-1", "I-2"])],
       [issue("I-1"), issue("I-2")],
     );
-    expect(buckets.in_review.issueCount).toBe(2);
-    expect(buckets[UNASSIGNED_STAGE_ID].issueCount).toBe(0);
+    expect(buckets.in_review?.issueCount).toBe(2);
+    expect(buckets[UNASSIGNED_STAGE_ID]?.issueCount).toBe(0);
   });
 
   it("places issues with no session into the unassigned bucket", () => {
     const buckets = bucketByStage([], [issue("I-orphan")]);
-    expect(buckets[UNASSIGNED_STAGE_ID].issueCount).toBe(1);
+    expect(buckets[UNASSIGNED_STAGE_ID]?.issueCount).toBe(1);
   });
 
   it("skips sessions with an unknown/unmapped status (defensive)", () => {
@@ -106,6 +106,6 @@ describe("bucketByStage", () => {
     }
     // Issue lands in unassigned because the session's stage didn't
     // resolve.
-    expect(buckets[UNASSIGNED_STAGE_ID].issueCount).toBe(1);
+    expect(buckets[UNASSIGNED_STAGE_ID]?.issueCount).toBe(1);
   });
 });
