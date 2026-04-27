@@ -65,11 +65,11 @@ export function computeCriticalPath(sessions: SessionSummary[]): CriticalPathRes
   }
 
   // For each in-flight session, compute (a) longest chain starting
-  // from it and (b) total transitive fan-out behind it. Memoised
-  // by id to keep large graphs cheap.
+  // from it and (b) total transitive fan-out behind it. The longest
+  // chain is memoised; fan-out runs a per-call BFS so it can dedup
+  // converging branches without producing path-dependent caches.
   const longestChainCache = new Map<string, string[]>();
-  const fanoutCache = new Map<string, number>();
-  const stack = new Set<string>(); // cycle guard
+  const stack = new Set<string>(); // cycle guard for longestFrom
 
   function longestFrom(id: string): string[] {
     const cached = longestChainCache.get(id);
@@ -90,19 +90,30 @@ export function computeCriticalPath(sessions: SessionSummary[]): CriticalPathRes
     return result;
   }
 
+  // BFS over downstream descendants, counting each unique node
+  // exactly once. The recursive variant double-counted converging
+  // branches in diamond DAGs (A→B→D + A→C→D would charge D twice
+  // to A's score), inflating the spine subtitle and skewing
+  // tie-breaking between candidate roots. The visited-set is also
+  // a natural cycle guard, so the older `stack` mechanism isn't
+  // needed for this function (`longestFrom` still uses it).
+  // Per-id caching is dropped because the cached value would be
+  // incorrect when the set of already-visited nodes differs
+  // between callers.
   function fanoutFrom(id: string): number {
-    const cached = fanoutCache.get(id);
-    if (cached !== undefined) return cached;
-    if (stack.has(id)) return 0;
-    stack.add(id);
-    const downstream = forward.get(id) ?? [];
-    let total = downstream.length;
-    for (const next of downstream) {
-      total += fanoutFrom(next);
+    const visited = new Set<string>([id]);
+    const queue: string[] = [id];
+    while (queue.length > 0) {
+      const cur = queue.shift() as string;
+      for (const next of forward.get(cur) ?? []) {
+        if (!visited.has(next)) {
+          visited.add(next);
+          queue.push(next);
+        }
+      }
     }
-    stack.delete(id);
-    fanoutCache.set(id, total);
-    return total;
+    // -1 to exclude the root itself; we want "nodes downstream of id".
+    return visited.size - 1;
   }
 
   // Candidate chains start at "roots": in-flight sessions whose

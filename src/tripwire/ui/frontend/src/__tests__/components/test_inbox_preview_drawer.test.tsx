@@ -38,6 +38,7 @@ describe("InboxDrawerContents", () => {
         title: "session merged",
         body: "Cost: $42 · validator clean",
       }),
+      projectId: "test-pid",
       onClose: noop,
       onResolve: noop,
       resolving: false,
@@ -52,6 +53,7 @@ describe("InboxDrawerContents", () => {
   it("renders the demo badge when isDemo is true", () => {
     renderContents({
       item: makeItem({ title: "demo-only entry" }),
+      projectId: "test-pid",
       onClose: noop,
       onResolve: noop,
       resolving: false,
@@ -66,6 +68,7 @@ describe("InboxDrawerContents", () => {
     // would 404. The button is hidden so the user doesn't try.
     renderContents({
       item: makeItem(),
+      projectId: "test-pid",
       onClose: noop,
       onResolve: noop,
       resolving: false,
@@ -77,6 +80,7 @@ describe("InboxDrawerContents", () => {
   it("hides the resolve button when the item is already resolved", () => {
     renderContents({
       item: makeItem({ resolved: true, resolved_by: "alice" }),
+      projectId: "test-pid",
       onClose: noop,
       onResolve: noop,
       resolving: false,
@@ -90,6 +94,7 @@ describe("InboxDrawerContents", () => {
     const onClose = vi.fn();
     renderContents({
       item: makeItem(),
+      projectId: "test-pid",
       onClose,
       onResolve: noop,
       resolving: false,
@@ -103,6 +108,7 @@ describe("InboxDrawerContents", () => {
     const onResolve = vi.fn();
     renderContents({
       item: makeItem(),
+      projectId: "test-pid",
       onClose: noop,
       onResolve,
       resolving: false,
@@ -115,6 +121,7 @@ describe("InboxDrawerContents", () => {
   it("disables the resolve button while a resolve is in flight", () => {
     renderContents({
       item: makeItem(),
+      projectId: "test-pid",
       onClose: noop,
       onResolve: noop,
       resolving: true,
@@ -133,6 +140,7 @@ describe("InboxDrawerContents", () => {
           { pr: "SeidoAI/tripwire/88" },
         ],
       }),
+      projectId: "test-pid",
       onClose: noop,
       onResolve: noop,
       resolving: false,
@@ -145,11 +153,23 @@ describe("InboxDrawerContents", () => {
       "href",
       "https://github.com/SeidoAI/tripwire/88",
     );
+    // Project-scoped refs use /p/<projectId>/... — without the
+    // threaded id these would resolve to root paths and break in
+    // any project that's not at the URL root.
+    expect(screen.getByText("SEI-42").closest("a")).toHaveAttribute(
+      "href",
+      "/p/test-pid/issues/SEI-42",
+    );
+    expect(screen.getByText(/auth-token-endpoint @ v3/).closest("a")).toHaveAttribute(
+      "href",
+      "/p/test-pid/graph#auth-token-endpoint",
+    );
   });
 
   it("shows a placeholder when the body is empty", () => {
     renderContents({
       item: makeItem({ body: "" }),
+      projectId: "test-pid",
       onClose: noop,
       onResolve: noop,
       resolving: false,

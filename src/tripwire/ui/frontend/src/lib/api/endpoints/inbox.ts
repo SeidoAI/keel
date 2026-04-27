@@ -75,16 +75,20 @@ export function useInboxItem(pid: string, id: string) {
   });
 }
 
-/** Resolve an inbox entry. On success the per-item cache is updated
- *  in-place and the list query is invalidated so any open inbox
- *  panel re-fetches and removes the item. */
+/** Resolve an inbox entry. On success every inbox query under
+ *  ``["inbox", pid, ...]`` is invalidated — the list query refetches
+ *  and removes the item; any open per-item drawer refetches and
+ *  reflects the new ``resolved: true``. We deliberately do NOT
+ *  ``setQueryData`` for the item cache: TanStack's prefix-match
+ *  invalidation would mark our just-set value stale immediately,
+ *  defeating the optimistic write. One source of truth — the
+ *  invalidate alone — keeps the flow simple and correct. */
 export function useResolveInbox(pid: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, resolvedBy }: { id: string; resolvedBy?: string }) =>
       inboxApi.resolve(pid, id, resolvedBy),
-    onSuccess: (data) => {
-      qc.setQueryData(queryKeys.inboxItem(pid, data.id), data);
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.inbox(pid) });
     },
   });

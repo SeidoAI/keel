@@ -188,3 +188,25 @@ class TestReferences:
         item = get_inbox_entry(tmp_path_project, "inb-x")
         assert item is not None
         assert item.references == [{"node": "live-link-node"}]
+
+    def test_artifact_and_comment_refs_are_nested(self, tmp_path_project: Path):
+        # Per SCHEMA_INBOX.md: artifact and comment references nest
+        # their fields under a single discriminator key, mirroring how
+        # {issue: KEY}, {session: id}, etc. are also single-key shapes.
+        # Frontend `describeReferenceDeep` reads `ref.artifact.session`
+        # and `ref.comment.issue` — flat shapes would break that switch.
+        refs_yaml = (
+            "  - artifact:\n"
+            "      session: storage-impl\n"
+            "      file: plan.md\n"
+            "  - comment:\n"
+            "      issue: SEI-42\n"
+            "      id: cmt-2026-04-26-x9k\n"
+        )
+        _write_entry(tmp_path_project, "inb-nested", references=refs_yaml)
+        item = get_inbox_entry(tmp_path_project, "inb-nested")
+        assert item is not None
+        assert item.references == [
+            {"artifact": {"session": "storage-impl", "file": "plan.md"}},
+            {"comment": {"issue": "SEI-42", "id": "cmt-2026-04-26-x9k"}},
+        ]

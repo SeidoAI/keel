@@ -1,3 +1,4 @@
+import { sessionStageId } from "@/components/ui/session-stage-row";
 import { Stamp } from "@/components/ui/stamp";
 import { useSessionsList } from "@/features/dashboard/hooks/useProjectStats";
 import { useProject } from "@/lib/api/endpoints/project";
@@ -28,9 +29,15 @@ function SessionStatusCluster() {
   const { projectId } = useProjectShell();
   const { data: sessions } = useSessionsList(projectId);
   if (!sessions) return null;
+  // Map every session's raw status through `sessionStageId()` so
+  // multi-state backend values (`active`, `waiting_for_ci`,
+  // `waiting_for_review`, `waiting_for_deploy`, ...) collapse to the
+  // canonical `executing` stage before counting. Without this map
+  // those substates land in their own buckets and the top-bar
+  // "X exec" counter undercounts everything mid-flight.
   const counts = sessions.reduce<Record<string, number>>((acc, s) => {
-    const k = s.current_state ?? s.status ?? "unknown";
-    acc[k] = (acc[k] ?? 0) + 1;
+    const stageId = sessionStageId(s.current_state ?? s.status) ?? "unknown";
+    acc[stageId] = (acc[stageId] ?? 0) + 1;
     return acc;
   }, {});
   // Show the two states the PM cares about most at a glance — what's

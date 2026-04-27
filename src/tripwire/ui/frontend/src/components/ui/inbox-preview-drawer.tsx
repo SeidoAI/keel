@@ -84,6 +84,7 @@ export function InboxPreviewDrawer({
           {item ? (
             <InboxDrawerContents
               item={item}
+              projectId={projectId}
               onClose={onClose}
               onResolve={handleResolve}
               resolving={resolveMutation.isPending}
@@ -105,12 +106,19 @@ export function InboxPreviewDrawer({
  *  portal (which jsdom + animations don't render reliably). */
 export function InboxDrawerContents({
   item,
+  projectId,
   onClose,
   onResolve,
   resolving,
   isDemo,
 }: {
   item: InboxItem;
+  /** Threaded through so MarkdownBody and ReferenceRow build
+   *  project-scoped hrefs (`/p/<projectId>/issues/...`). Empty
+   *  string is allowed for previews outside a project context but
+   *  produces root-relative links — pass the real id whenever
+   *  available. */
+  projectId: string;
   onClose: () => void;
   onResolve: () => void;
   resolving: boolean;
@@ -150,7 +158,7 @@ export function InboxDrawerContents({
       </header>
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {item.body.trim() ? (
-          <MarkdownBody content={item.body} projectId="" compact={false} />
+          <MarkdownBody content={item.body} projectId={projectId} compact={false} />
         ) : (
           <p className="font-serif text-[14px] italic text-(--color-ink-3)">
             (no body — title-only entry)
@@ -165,7 +173,7 @@ export function InboxDrawerContents({
               {item.references.map((ref, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: refs have no stable id
                 <li key={i}>
-                  <ReferenceRow reference={ref} projectId="" />
+                  <ReferenceRow reference={ref} projectId={projectId} />
                 </li>
               ))}
             </ul>
@@ -205,39 +213,35 @@ export function InboxDrawerContents({
 
 function DrawerLoading({ onClose }: { onClose: () => void }) {
   return (
-    <>
-      <header className="flex items-center justify-between border-(--color-edge) border-b px-5 py-3">
-        <span className="font-serif text-[13px] italic text-(--color-ink-3)">loading…</span>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close preview"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-(--radius-stamp) text-(--color-ink-3) hover:bg-(--color-paper-3) hover:text-(--color-ink)"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </button>
-      </header>
-    </>
+    <header className="flex items-center justify-between border-(--color-edge) border-b px-5 py-3">
+      <span className="font-serif text-[13px] italic text-(--color-ink-3)">loading…</span>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close preview"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-(--radius-stamp) text-(--color-ink-3) hover:bg-(--color-paper-3) hover:text-(--color-ink)"
+      >
+        <X className="h-4 w-4" aria-hidden />
+      </button>
+    </header>
   );
 }
 
 function DrawerError({ onClose }: { onClose: () => void }) {
   return (
-    <>
-      <header className="flex items-center justify-between border-(--color-edge) border-b px-5 py-3">
-        <span className="font-mono text-[11px] text-(--color-rule) uppercase tracking-[0.18em]">
-          entry not found
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close preview"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-(--radius-stamp) text-(--color-ink-3) hover:bg-(--color-paper-3) hover:text-(--color-ink)"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </button>
-      </header>
-    </>
+    <header className="flex items-center justify-between border-(--color-edge) border-b px-5 py-3">
+      <span className="font-mono text-[11px] text-(--color-rule) uppercase tracking-[0.18em]">
+        entry not found
+      </span>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close preview"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-(--radius-stamp) text-(--color-ink-3) hover:bg-(--color-paper-3) hover:text-(--color-ink)"
+      >
+        <X className="h-4 w-4" aria-hidden />
+      </button>
+    </header>
   );
 }
 

@@ -145,6 +145,28 @@ describe("computeCriticalPath", () => {
     expect(result.directUnlocks).toEqual({});
   });
 
+  it("deduplicates fan-out across diamond dependencies", () => {
+    // Diamond: a → b, a → c, b → d, c → d.
+    // d is reachable through both branches. The fanout score for
+    // a should count d once (unique downstream nodes = {b, c, d}),
+    // not twice (which a naive recursive sum would produce —
+    // counting d via b AND via c). Without dedup the spine
+    // subtitle would over-state how much the chain unblocks and
+    // ties between candidate roots could resolve incorrectly.
+    const result = computeCriticalPath([
+      sess("a", "planned"),
+      sess("b", "queued", ["a"]),
+      sess("c", "queued", ["a"]),
+      sess("d", "executing", ["b", "c"]),
+    ]);
+    // a is the only root. Longest chain is a → b → d (or a → c → d),
+    // length 3. Fan-out is unique downstream count = 3 (b, c, d),
+    // not 4 (which would be the naive double-counted total).
+    expect(result.chain[0]?.id).toBe("a");
+    expect(result.chain.length).toBe(3);
+    expect(result.fanout).toBe(3);
+  });
+
   it("doesn't loop forever on a dependency cycle", () => {
     // Corrupt-data defence: a → b → a. The algorithm breaks the
     // cycle and returns a finite chain rather than hanging.

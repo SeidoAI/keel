@@ -72,8 +72,8 @@ class InboxNodeRef(BaseModel):
     version: str | None = None
 
 
-class InboxArtifactRef(BaseModel):
-    """Reference to a per-session artifact (plan.md, self-review.md, etc.)."""
+class InboxArtifactRefInner(BaseModel):
+    """Inner shape for an artifact reference (the value under ``artifact:``)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -81,13 +81,38 @@ class InboxArtifactRef(BaseModel):
     file: str
 
 
-class InboxCommentRef(BaseModel):
-    """Reference to a comment on an issue."""
+class InboxArtifactRef(BaseModel):
+    """Reference to a per-session artifact (plan.md, self-review.md, etc.).
+
+    Wire shape is nested under a single ``artifact`` key — mirrors how
+    issue/session/node/pr refs are also single-key. Documented in
+    ``templates/skills/project-manager/references/SCHEMA_INBOX.md``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    artifact: InboxArtifactRefInner
+
+
+class InboxCommentRefInner(BaseModel):
+    """Inner shape for a comment reference (the value under ``comment:``)."""
 
     model_config = ConfigDict(extra="forbid")
 
     issue: str
     id: str
+
+
+class InboxCommentRef(BaseModel):
+    """Reference to a comment on an issue.
+
+    Wire shape is nested under a single ``comment`` key — see
+    :class:`InboxArtifactRef` for the same convention.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    comment: InboxCommentRefInner
 
 
 class InboxPRRef(BaseModel):
@@ -98,16 +123,17 @@ class InboxPRRef(BaseModel):
     pr: str
 
 
-# Order matters for Pydantic discriminated-union resolution: the most
-# specific shapes (with two fields) should appear before single-field
-# shapes so disambiguation is unambiguous.
+# Every shape is now a single-key dict with a unique discriminator
+# (issue / epic / session / node / artifact / comment / pr) — order
+# is no longer load-bearing. Listed roughly in expected-frequency
+# order for slight performance.
 InboxReference = (
-    InboxArtifactRef
-    | InboxCommentRef
-    | InboxIssueRef
+    InboxIssueRef
     | InboxEpicRef
     | InboxSessionRef
     | InboxNodeRef
+    | InboxArtifactRef
+    | InboxCommentRef
     | InboxPRRef
 )
 

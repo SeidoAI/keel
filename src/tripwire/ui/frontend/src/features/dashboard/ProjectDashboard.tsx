@@ -93,8 +93,12 @@ export function ProjectDashboard() {
   // session list so the spine click → blocker filter actually
   // resolves to visible rows; ?demo=off_track inflates the
   // off-track stage card so the alert treatment can be previewed
-  // against an empty project. Both are dev conveniences — remove
-  // these hooks before shipping.
+  // against an empty project. Both hooks short-circuit to a no-op
+  // when the corresponding `?demo=<flag>` URL param is absent
+  // (see `hasDemoFlag` and the per-hook gate inside each useDemo*
+  // wrapper) — they are safe in production and deliberately stay
+  // shipped so a screenshare or design review can pull up the
+  // mock content without spinning up fixture sessions.
   const sessions = sortSessionsByStageFlow(
     useDemoOffTrackSessions(useDemoSessions(stats.sessions)),
   );
