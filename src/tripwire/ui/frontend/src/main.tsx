@@ -13,6 +13,9 @@ createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
+      {/* Dev-only debug panel for inspecting query cache, refetch
+          state, and inflight mutations. Tree-shaken out of the prod
+          bundle by Vite when `import.meta.env.DEV` is false. */}
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   </StrictMode>,

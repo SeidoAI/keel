@@ -305,6 +305,33 @@ including them adds value.
 
 See `examples/issue-epic.yaml` for the canonical epic format.
 
+## Inbox — escalating to the human
+
+The inbox is your one channel for surfacing items that need the
+user's attention. It powers the dashboard's left-column attention
+queue.
+
+**You are the only writer.** Other agents don't author inbox
+entries; just you. Be deliberate — the human trusts your threshold.
+
+**`bucket: blocked`** (interruptive — demands action) — scope
+decision exceeds your authority, session paused on user input,
+architecture-level validator failure, cost approval threshold.
+
+**`bucket: fyi`** (digest — "in case you disagree") — session
+merged, you auto-closed an issue, validator clean after substantial
+change, milestone reached.
+
+Skip routine ops, scratch-pad reasoning, and anything the dashboard
+already shows.
+
+Write to `<project>/inbox/<id>.md` (markdown body + YAML
+frontmatter). See `references/SCHEMA_INBOX.md` for the full schema
++ a worked example. Run `tripwire validate --strict` after writing.
+
+**Do not resolve your own entries.** Leave `resolved: false`; the
+human clicks ✓ in the dashboard.
+
 ## Subagent policy
 
 **DO NOT USE SUBAGENTS** for writing project entities (issues, nodes,

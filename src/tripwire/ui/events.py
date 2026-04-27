@@ -70,6 +70,7 @@ EntityType = Literal[
     "enum",
     "artifact",
     "scoping-artifact",
+    "inbox",
 ]
 FileAction = Literal["created", "modified", "deleted"]
 

@@ -39,21 +39,23 @@ describe("LifecycleWire", () => {
     expect(circles.length).toBeGreaterThanOrEqual(STATIONS.length);
   });
 
-  it("renders count badges when counts are supplied", () => {
+  it("renders count under each station label as 'NN · count'", () => {
     render(
       <LifecycleWire stations={STATIONS} counts={{ planned: 2, executing: 5, completed: 1 }} />,
     );
-    // Each station with a non-zero count surfaces the digit so the user
-    // can see the load on the wire at a glance.
-    expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getByText("1")).toBeInTheDocument();
+    // Format is the station ordinal (zero-padded) + " · " + the count.
+    // "01 · 2" for planned (idx 0, count 2), etc.
+    expect(screen.getByText("01 · 2")).toBeInTheDocument();
+    expect(screen.getByText("03 · 5")).toBeInTheDocument();
+    expect(screen.getByText("06 · 1")).toBeInTheDocument();
   });
 
-  it("does not render a count for stations with zero", () => {
+  it("renders zero counts (rather than hiding) so the wire reads cleanly", () => {
     render(<LifecycleWire stations={STATIONS} counts={{ planned: 0, executing: 3 }} />);
-    expect(screen.queryByText("0")).not.toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
+    // Zero is informative — it tells the PM "nothing is at this stage
+    // right now." Hiding it would leave a visual gap.
+    expect(screen.getByText("01 · 0")).toBeInTheDocument();
+    expect(screen.getByText("03 · 3")).toBeInTheDocument();
   });
 
   it("marks the active station with aria-current", () => {

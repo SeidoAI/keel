@@ -1,11 +1,33 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
+import fs from "node:fs";
 import path from "node:path";
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+// Read the tripwire framework version from the repo's pyproject.toml
+// so the UI sidebar's VersionStamp shows the running build's
+// version. Build-time injection avoids a network round-trip and a
+// backend-restart dependency. Falls back to "dev" if the file isn't
+// readable (e.g. when the frontend is built outside the monorepo).
+function readTripwireVersion(): string {
+  try {
+    const pyproject = fs.readFileSync(
+      path.resolve(__dirname, "../../../../pyproject.toml"),
+      "utf-8",
+    );
+    const match = pyproject.match(/^version\s*=\s*"([^"]+)"/m);
+    return match?.[1] ?? "dev";
+  } catch {
+    return "dev";
+  }
+}
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  define: {
+    __TRIPWIRE_VERSION__: JSON.stringify(readTripwireVersion()),
+  },
   test: {
     environment: "jsdom",
     passWithNoTests: true,

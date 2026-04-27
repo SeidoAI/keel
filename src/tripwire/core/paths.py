@@ -37,6 +37,7 @@ ISSUES_DIR = "issues"
 # The derived graph cache lives separately at `graph/index.yaml`.
 NODES_DIR = "nodes"
 
+INBOX_DIR = "inbox"
 SESSIONS_DIR = "sessions"
 AGENTS_DIR = "agents"
 ENUMS_DIR = "enums"
@@ -179,6 +180,14 @@ def session_artifacts_dir(project_dir: Path, session_id: str) -> Path:
 def handoff_path(project_dir: Path, session_id: str) -> Path:
     """Path to sessions/<session_id>/handoff.yaml (v0.6a)."""
     return session_dir(project_dir, session_id) / HANDOFF_FILENAME
+
+
+def inbox_dir(project_dir: Path) -> Path:
+    return project_dir / INBOX_DIR
+
+
+def inbox_entry_path(project_dir: Path, entry_id: str) -> Path:
+    return project_dir / INBOX_DIR / f"{entry_id}.md"
 
 
 def graph_cache_path(project_dir: Path) -> Path:

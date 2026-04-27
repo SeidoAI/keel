@@ -1,8 +1,12 @@
-import { Settings } from "lucide-react";
+import { ChevronDown, Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { NavLink, useParams } from "react-router-dom";
 
+import { useProject } from "@/lib/api/endpoints/project";
 import { cn } from "@/lib/utils";
+
+// Build-time constant injected by vite.config.ts from pyproject.toml.
+declare const __TRIPWIRE_VERSION__: string;
 
 /**
  * App chrome per spec §3.1 C0.3 — replaces the legacy
@@ -56,10 +60,12 @@ export function ScreenShell({ projectId, topBarStatus, children }: ScreenShellPr
 function SideRail({ projectId }: { projectId: string }) {
   return (
     <aside className="flex w-52 shrink-0 flex-col border-(--color-edge) border-r bg-(--color-paper-2)">
-      <div className="px-5 pt-5 pb-4">
-        <span className="font-sans text-[20px] font-semibold tracking-tight text-(--color-ink)">
-          tri<span className="text-(--color-rule)">p</span>wire
-        </span>
+      <div className="px-5 pt-6 pb-5">
+        {/* The brand mark from the canonical tripwire logo set
+            (img/mark-accent.svg in the repo). The SVG ships with its
+            own colours (cream paper inside the letterforms + accent
+            ink); larger height for visual weight. */}
+        <img src="/img/mark-accent.svg" alt="tripwire" className="block h-[44px] w-auto" />
       </div>
       <ProjectChip projectId={projectId} />
       <nav className="relative mt-2 flex flex-1 flex-col">
@@ -98,15 +104,43 @@ function SideRail({ projectId }: { projectId: string }) {
           </NavLink>
         ))}
       </nav>
+      <VersionStamp />
     </aside>
   );
 }
 
-function ProjectChip({ projectId }: { projectId: string }) {
+function VersionStamp() {
+  // Subtle build identity at the bottom of the rail. Version comes
+  // from `__TRIPWIRE_VERSION__` — Vite reads it from the repo's
+  // pyproject.toml at build time, so wheel + dev both surface the
+  // same value as the running framework.
+  const version = typeof __TRIPWIRE_VERSION__ !== "undefined" ? __TRIPWIRE_VERSION__ : "dev";
   return (
-    <div className="mx-4 mb-2 flex items-center gap-2 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-2 py-1.5 font-mono text-[11px] text-(--color-ink-2)">
-      <span className="font-semibold text-(--color-ink)">{projectId}</span>
+    <div className="border-(--color-edge) border-t px-5 py-3 font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]">
+      tripwire v{version}
     </div>
+  );
+}
+
+function ProjectChip({ projectId }: { projectId: string }) {
+  // Friendly label: project.name with the conventional "project-"
+  // prefix stripped (e.g. "project-tripwire-v0" → "tripwire-v0").
+  // Falls back to the id while the project query is in flight.
+  const project = useProject(projectId);
+  const rawName = project.data?.name?.trim();
+  const label = rawName ? rawName.replace(/^project-/, "") : projectId;
+  // Render as a button so the chevron reads as "this opens
+  // something." Clicking is a no-op today — the project switcher
+  // dropdown is a future enhancement (cross-workspace selection).
+  return (
+    <button
+      type="button"
+      title="Project switcher (coming soon)"
+      className="mx-4 mb-2 flex items-center gap-2 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-2 py-1.5 font-mono text-[11px] text-(--color-ink-2) transition-colors hover:border-(--color-ink-3)"
+    >
+      <span className="flex-1 truncate text-left font-semibold text-(--color-ink)">{label}</span>
+      <ChevronDown className="h-3 w-3 shrink-0 text-(--color-ink-3)" aria-hidden />
+    </button>
   );
 }
 
@@ -136,6 +170,12 @@ function TopBar({ status, onTweaksClick }: TopBarProps) {
 }
 
 function Breadcrumbs({ projectId }: { projectId: string }) {
+  // Same friendly-label rule as the sidebar ProjectChip: show
+  // project.name with the "project-" prefix stripped, falling back
+  // to the id while the project query is in flight.
+  const project = useProject(projectId);
+  const rawName = project.data?.name?.trim();
+  const label = rawName ? rawName.replace(/^project-/, "") : projectId;
   return (
     <nav
       aria-label="Breadcrumb"
@@ -145,7 +185,7 @@ function Breadcrumbs({ projectId }: { projectId: string }) {
       <span aria-hidden className="text-(--color-edge)">
         /
       </span>
-      <span className="font-medium text-(--color-ink)">{projectId}</span>
+      <span className="font-medium text-(--color-ink)">{label}</span>
     </nav>
   );
 }

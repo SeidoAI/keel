@@ -25,6 +25,12 @@ export const queryKeys = {
   // Graphs
   graph: (pid: string, type: "deps" | "concept") => ["graph", pid, type] as const,
 
+  // Inbox (PM-agent attention queue)
+  inbox: (pid: string) => ["inbox", pid] as const,
+  inboxFiltered: (pid: string, filters: { bucket?: string; resolved?: boolean }) =>
+    ["inbox", pid, filters] as const,
+  inboxItem: (pid: string, id: string) => ["inbox", pid, id] as const,
+
   // Sessions
   sessions: (pid: string) => ["sessions", pid] as const,
   session: (pid: string, sid: string) => ["sessions", pid, sid] as const,

@@ -164,6 +164,12 @@ def classify(
     if len(parts) == 2 and parts[0] == "nodes" and suffix == ".yaml":
         return _event(project_id, "node", stem, action, rel_posix)
 
+    # inbox/<id>.md — PM-agent escalation entries (KUI-? phase D).
+    # entity_id is the bare entry id so the frontend can invalidate
+    # both the list query and the single-entry query in one shot.
+    if len(parts) == 2 and parts[0] == "inbox" and suffix == ".md":
+        return _event(project_id, "inbox", stem, action, rel_posix)
+
     # sessions/<id>/session.yaml
     if len(parts) == 3 and parts[0] == "sessions" and parts[2] == "session.yaml":
         return _event(project_id, "session", parts[1], action, rel_posix)
