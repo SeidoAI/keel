@@ -109,6 +109,14 @@ function dispatchFileChanged(event: FileChangedEvent, queryClient: QueryClient):
       queryClient.invalidateQueries({ queryKey: ["sessions", pid] });
       return;
 
+    case "inbox":
+      // PM agent wrote / resolved an inbox entry. Bust both the list
+      // (so the dashboard panels pick up the new state) and the
+      // single-entry key (so any open preview drawer refreshes).
+      queryClient.invalidateQueries({ queryKey: queryKeys.inbox(pid) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.inboxItem(pid, entity_id) });
+      return;
+
     default: {
       const unknownType: string = entity_type;
       console.warn("[tripwire-ui] unhandled file_changed entity_type", unknownType);

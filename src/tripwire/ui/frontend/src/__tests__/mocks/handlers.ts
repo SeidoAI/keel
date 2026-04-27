@@ -56,6 +56,10 @@ export const defaultHandlers = [
 
   // Sessions
   http.get("/api/projects/:pid/sessions", () => HttpResponse.json([])),
+
+  // Inbox (PM-agent attention queue) — empty by default so tests
+  // that don't seed it skip cleanly.
+  http.get("/api/projects/:pid/inbox", () => HttpResponse.json([])),
   http.get("/api/projects/:pid/sessions/:sid", ({ params }) =>
     HttpResponse.json(makeSessionDetail({ id: String(params.sid) })),
   ),

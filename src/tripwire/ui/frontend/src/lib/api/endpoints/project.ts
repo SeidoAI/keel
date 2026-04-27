@@ -21,6 +21,7 @@ export interface ProjectDetail {
   status_transitions?: Record<string, string[]>;
   repos?: Record<string, { local?: string | null; github?: string | null }>;
   base_branch?: string;
+  description?: string | null;
 }
 
 export const projectApi = {

@@ -29,6 +29,7 @@ from tripwire.cli.readme import readme_cmd
 from tripwire.cli.refresh import refresh_cmd
 from tripwire.cli.refs import refs_cmd
 from tripwire.cli.scaffold import brief_cmd, scaffold_cmd
+from tripwire.cli.inbox import inbox_cmd
 from tripwire.cli.session import session_cmd
 from tripwire.cli.status import status_cmd
 from tripwire.cli.templates import templates_cmd
@@ -105,6 +106,7 @@ cli.add_command(refresh_cmd)
 cli.add_command(refs_cmd)
 cli.add_command(node_cmd)
 cli.add_command(session_cmd)
+cli.add_command(inbox_cmd)
 cli.add_command(queue_cmd)
 cli.add_command(templates_cmd)
 cli.add_command(enums_cmd)

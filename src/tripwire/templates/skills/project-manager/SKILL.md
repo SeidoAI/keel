@@ -305,6 +305,110 @@ including them adds value.
 
 See `examples/issue-epic.yaml` for the canonical epic format.
 
+## Inbox — escalating to the human
+
+The inbox is your one channel for surfacing items that need the
+human user's attention or knowledge. It powers the dashboard's
+left-column attention queue.
+
+**You are the only writer.** Coding agents don't write inbox
+entries. Workspace tooling doesn't. Just you. The dashboard
+trusts your judgement on what crosses the threshold for
+escalation, so be deliberate.
+
+### Two buckets, two cognitive modes
+
+**`bucket: blocked`** — interruptive. Something is paused or
+about to drift without a human decision. Demands action. Write
+when:
+- A scope/quality decision exceeds your authority (split this
+  issue? extend this session? approve this $X spend?)
+- A session is paused waiting on external input (PR review
+  comment that needs the user's call, ambiguity in plan.md the
+  user has to resolve)
+- A validator failure that requires architecture intervention
+  (not just a fix you can dispatch)
+- A cost crosses a configured approval threshold
+
+**`bucket: fyi`** — digest. A decision was made or work
+completed; the human should know in case they disagree. Write
+when:
+- A session merges (with cost + re-engagement summary)
+- You auto-close an issue (superseded, deduped) where the user
+  might disagree
+- Validator clean after substantial change (positive signal)
+- Throughput milestones (e.g. "5 sessions completed this week")
+- Any decision YOU made that's worth reversing if the user
+  disagrees
+
+### When NOT to write an entry
+
+- Routine operations (creating issues, normal status transitions,
+  spawning sessions)
+- Things the validator already surfaces
+- Things visible on the dashboard via other means (e.g. "session
+  X is in_review" is already shown in the right column)
+- Self-talk / scratchpad reasoning — the inbox is for the human,
+  not your working memory
+
+### File format
+
+Write directly to `<project>/inbox/<id>.md` via your Write tool.
+Markdown body + YAML frontmatter:
+
+```markdown
+---
+id: inb-2026-04-27-a3f2
+uuid: <generate via tripwire uuid>
+created_at: 2026-04-27T15:42:00Z
+author: pm-agent
+bucket: blocked
+title: Should SEI-42 be split into 3 issues?
+references:
+  - issue: SEI-42
+  - session: storage-impl
+  - node: auth-token-endpoint
+    version: v3
+escalation_reason: scope-creep
+resolved: false
+resolved_at: null
+resolved_by: null
+---
+
+Scope crept during execution; spans auth + storage + api.
+Recommendation: split before re-engagement.
+
+Options:
+- Split into SEI-42a/b/c
+- Extend the existing session
+```
+
+**ID format**: `inb-YYYY-MM-DD-<short>` — chronological by file
+name, same-day collisions prevented by the short suffix.
+**UUID**: allocate via `tripwire uuid` (RFC 4122 v4 — same as
+issues / nodes / sessions).
+**`references`**: typed list of first-class entities. Supported
+shapes: `{issue: KEY}`, `{epic: KEY}`, `{session: id}`,
+`{node: id, version: v3}`, `{artifact: {session, file}}`,
+`{comment: {issue, id}}`, `{pr: owner/repo/N}`. Pin node
+versions when the entry's reasoning depends on a specific
+snapshot — the dashboard warns when the node has drifted past
+that version.
+**`escalation_reason`**: short slug — seed for future
+meta-learning (we'll mine which reasons earn fast resolution
+vs ignored-then-archived to refine when to escalate).
+
+### After writing
+
+Run `tripwire validate --strict` as usual. The validator checks
+schema + that each reference resolves to a real entity. The file
+watcher emits a `FileChangedEvent`; the dashboard re-renders
+within ~1s.
+
+**Do not resolve your own entries.** Leave `resolved: false` and
+let the human click ✓ in the dashboard. Auto-resolving defeats
+the purpose.
+
 ## Subagent policy
 
 **DO NOT USE SUBAGENTS** for writing project entities (issues, nodes,

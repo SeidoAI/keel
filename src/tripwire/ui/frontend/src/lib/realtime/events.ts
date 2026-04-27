@@ -12,7 +12,8 @@ export type EntityType =
   | "project"
   | "enum"
   | "artifact"
-  | "scoping-artifact";
+  | "scoping-artifact"
+  | "inbox";
 
 export type FileAction = "created" | "modified" | "deleted";
 
