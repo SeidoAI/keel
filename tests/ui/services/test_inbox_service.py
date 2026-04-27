@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
-
-import pytest
 
 from tripwire.core import paths
 from tripwire.ui.services.inbox_service import (
@@ -62,10 +59,16 @@ class TestListInbox:
 
     def test_returns_all_entries_newest_first(self, tmp_path_project: Path):
         _write_entry(
-            tmp_path_project, "inb-old", title="older", created_at="2026-04-25T10:00:00Z"
+            tmp_path_project,
+            "inb-old",
+            title="older",
+            created_at="2026-04-25T10:00:00Z",
         )
         _write_entry(
-            tmp_path_project, "inb-new", title="newer", created_at="2026-04-27T10:00:00Z"
+            tmp_path_project,
+            "inb-new",
+            title="newer",
+            created_at="2026-04-27T10:00:00Z",
         )
         result = list_inbox(tmp_path_project)
         assert [i.id for i in result] == ["inb-new", "inb-old"]
@@ -74,20 +77,28 @@ class TestListInbox:
     def test_filter_by_bucket(self, tmp_path_project: Path):
         _write_entry(tmp_path_project, "inb-a", bucket="blocked")
         _write_entry(tmp_path_project, "inb-b", bucket="fyi")
-        assert [i.id for i in list_inbox(tmp_path_project, bucket="blocked")] == ["inb-a"]
+        assert [i.id for i in list_inbox(tmp_path_project, bucket="blocked")] == [
+            "inb-a"
+        ]
         assert [i.id for i in list_inbox(tmp_path_project, bucket="fyi")] == ["inb-b"]
 
     def test_filter_by_resolved(self, tmp_path_project: Path):
         _write_entry(tmp_path_project, "inb-open", resolved=False)
         _write_entry(tmp_path_project, "inb-done", resolved=True)
-        assert [i.id for i in list_inbox(tmp_path_project, resolved=False)] == ["inb-open"]
-        assert [i.id for i in list_inbox(tmp_path_project, resolved=True)] == ["inb-done"]
+        assert [i.id for i in list_inbox(tmp_path_project, resolved=False)] == [
+            "inb-open"
+        ]
+        assert [i.id for i in list_inbox(tmp_path_project, resolved=True)] == [
+            "inb-done"
+        ]
 
     def test_skips_unparseable_files(self, tmp_path_project: Path):
         # One bad file shouldn't take down the whole list.
         _write_entry(tmp_path_project, "inb-good")
         inbox = paths.inbox_dir(tmp_path_project)
-        (inbox / "inb-bad.md").write_text("not even close to valid yaml", encoding="utf-8")
+        (inbox / "inb-bad.md").write_text(
+            "not even close to valid yaml", encoding="utf-8"
+        )
         result = list_inbox(tmp_path_project)
         assert [i.id for i in result] == ["inb-good"]
 

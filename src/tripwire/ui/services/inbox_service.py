@@ -181,5 +181,7 @@ def _serialise_entry(frontmatter: dict, body: str) -> str:
     shape produced by the PM agent's writes."""
     import yaml
 
-    yaml_text = yaml.safe_dump(frontmatter, sort_keys=False, default_flow_style=False).strip()
+    yaml_text = yaml.safe_dump(
+        frontmatter, sort_keys=False, default_flow_style=False
+    ).strip()
     return f"---\n{yaml_text}\n---\n{body}"

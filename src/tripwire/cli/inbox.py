@@ -123,7 +123,9 @@ def inbox_show_cmd(entry_id: str, project_dir: Path, fmt: str) -> None:
                     "references": item.references,
                     "escalation_reason": item.escalation_reason,
                     "resolved": item.resolved,
-                    "resolved_at": item.resolved_at.isoformat() if item.resolved_at else None,
+                    "resolved_at": item.resolved_at.isoformat()
+                    if item.resolved_at
+                    else None,
                     "resolved_by": item.resolved_by,
                 },
                 indent=2,
