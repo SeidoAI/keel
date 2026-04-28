@@ -63,16 +63,24 @@ export function useGraphLayout({
   const [newLayouts, setNewLayouts] = useState<Record<string, Vec2>>({});
 
   // Identity of the input that triggers a re-seed. Includes EVERY
-  // node id (saved + unsaved) so a same-length / same-topology
-  // swap of saved nodes still triggers a refresh — PM #25 round 3
-  // P2: two all-saved fixtures with different ids previously hit
-  // the all-saved short-circuit and left `positions` stale. Edge
-  // topology + canvas size are still part of the key so the
-  // simulation re-runs when anything that affects the layout
-  // changes.
+  // node id (saved + unsaved), each saved node's (x, y), and the
+  // edge topology — so a refresh fires whenever any of those
+  // change. PM #25 round 3 P2 added the id list (caught
+  // same-length / same-topology id swaps); PM #25 round 4 P2 adds
+  // the coordinate component (catches the case where a refetch
+  // returns the same ids/topology with different saved positions,
+  // e.g. another user dragged a node).
   const seedKey = useMemo(() => {
     const allIds = nodes
-      .map((n) => `${n.id}:${n.data?.has_saved_layout ? "s" : "u"}`)
+      .map((n) => {
+        const tag = n.data?.has_saved_layout ? "s" : "u";
+        // Include saved coordinates so coord-only changes still
+        // trigger a re-seed. Coordinates for unsaved nodes are
+        // re-derived by the seed effect itself, so they don't
+        // need to participate in the key.
+        const coords = n.data?.has_saved_layout ? `@${n.position.x},${n.position.y}` : "";
+        return `${n.id}:${tag}${coords}`;
+      })
       .sort()
       .join(",");
     const topology = edges
