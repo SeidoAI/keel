@@ -70,10 +70,7 @@ export function ConceptGraph() {
   // here at the call site so the layout hook stays pure.
   const conceptIds = useMemo(() => new Set(concepts.map((n) => n.id)), [concepts]);
   const conceptEdges = useMemo(
-    () =>
-      (data?.edges ?? []).filter(
-        (e) => conceptIds.has(e.source) && conceptIds.has(e.target),
-      ),
+    () => (data?.edges ?? []).filter((e) => conceptIds.has(e.source) && conceptIds.has(e.target)),
     [data?.edges, conceptIds],
   );
 

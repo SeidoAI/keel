@@ -85,6 +85,10 @@ export function useNode(pid: string, nid: string) {
     queryKey: queryKeys.node(pid, nid),
     queryFn: () => nodesApi.get(pid, nid),
     staleTime: staleTime.default,
+    // Skip the fetch when no node is selected — callers like
+    // GraphRail render a "no concept selected" placeholder and
+    // pass `nid=""`, which would otherwise round-trip a 404.
+    enabled: Boolean(nid),
   });
 }
 

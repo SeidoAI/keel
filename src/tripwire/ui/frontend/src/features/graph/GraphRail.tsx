@@ -65,10 +65,9 @@ export function GraphRail({
   const label = String(node.data?.label ?? node.id);
   const kind = String(node.data?.type ?? "concept");
   const stale = detail?.is_stale ?? node.data?.status === "stale";
-  const version =
-    detail?.source?.content_hash && detail.source.content_hash.startsWith(VERSION_PREFIX)
-      ? detail.source.content_hash.slice(VERSION_PREFIX.length, VERSION_PREFIX.length + 7)
-      : null;
+  const version = detail?.source?.content_hash?.startsWith(VERSION_PREFIX)
+    ? detail.source.content_hash.slice(VERSION_PREFIX.length, VERSION_PREFIX.length + 7)
+    : null;
   const lastTouched = detail ? null : null; // TODO(v0.8.x): wire reverse-refs/last-session-id when service exposes it
 
   const neighbours = incident
@@ -116,7 +115,7 @@ export function GraphRail({
         ) : null}
       </header>
 
-      {detail?.body && detail.body.trim() ? (
+      {detail?.body?.trim() ? (
         <div className="border-(--color-edge) border-t pt-3">
           <MarkdownBody content={detail.body} projectId={projectId} compact />
         </div>

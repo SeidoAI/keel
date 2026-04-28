@@ -17,9 +17,10 @@ vi.mock("@/lib/api/endpoints/inbox", () => ({
   useInbox: () => ({ data: [] }),
 }));
 
-const useNodeMock = vi.fn<() => { data: NodeDetail | undefined; isLoading: boolean }>(
-  () => ({ data: undefined, isLoading: false }),
-);
+const useNodeMock = vi.fn<() => { data: NodeDetail | undefined; isLoading: boolean }>(() => ({
+  data: undefined,
+  isLoading: false,
+}));
 
 vi.mock("@/lib/api/endpoints/nodes", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
