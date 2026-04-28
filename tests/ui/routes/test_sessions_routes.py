@@ -122,9 +122,83 @@ class TestGetSession:
         assert r.status_code == 400
 
 
+class TestPauseSession:
+    """`POST /api/projects/{pid}/sessions/{sid}/pause` — KUI-107 INTERVENE.
+
+    Mirrors the CLI ``tripwire session pause`` semantics: only an
+    ``executing`` session can be paused; a dead PID flips status to
+    ``failed`` rather than ``paused`` (matches the live state); a
+    runtime-pause failure leaves status as ``executing`` and surfaces
+    a 409 envelope.
+    """
+
+    @pytest.fixture
+    def executing_session_client(
+        self, sess_project: Path, save_test_session
+    ) -> TestClient:
+        _project_svc.seed_project_index([sess_project])
+        summary = _project_svc._try_load_summary(sess_project.resolve())
+        if summary is not None:
+            _project_svc._discovery_cache = (time.monotonic(), [summary])
+        save_test_session(
+            sess_project,
+            "live-session",
+            plan=True,
+            status="executing",
+        )
+        return TestClient(create_app(dev_mode=True))
+
+    def test_executing_session_pauses(
+        self, executing_session_client, sess_project_id, sess_project
+    ):
+        r = executing_session_client.post(
+            f"/api/projects/{sess_project_id}/sessions/live-session/pause"
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["session_id"] == "live-session"
+        assert body["status"] == "paused"
+        assert "changed_at" in body
+
+        # Verify on disk too — the route must persist the new status.
+        from tripwire.core.session_store import load_session
+
+        sess = load_session(sess_project, "live-session")
+        assert sess.status == "paused"
+
+    def test_non_executing_session_returns_409(
+        self, session_client, sess_project_id
+    ):
+        # session-a is `planned` per the session_client fixture.
+        r = session_client.post(
+            f"/api/projects/{sess_project_id}/sessions/session-a/pause"
+        )
+        assert r.status_code == 409
+        body = r.json()
+        assert body["code"] == "session/bad_status"
+        assert "executing" in body["detail"]
+
+    def test_unknown_session_returns_404(
+        self, executing_session_client, sess_project_id
+    ):
+        r = executing_session_client.post(
+            f"/api/projects/{sess_project_id}/sessions/missing-session/pause"
+        )
+        assert r.status_code == 404
+        assert r.json()["code"] == "session/not_found"
+
+    def test_bad_slug_returns_400(self, executing_session_client, sess_project_id):
+        r = executing_session_client.post(
+            f"/api/projects/{sess_project_id}/sessions/UpperCase/pause"
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
+
+
 class TestOpenAPI:
     def test_registers_paths(self, session_client):
         schema = session_client.get("/openapi.json").json()
         paths = schema["paths"]
         assert "/api/projects/{project_id}/sessions" in paths
         assert "/api/projects/{project_id}/sessions/{sid}" in paths
+        assert "/api/projects/{project_id}/sessions/{sid}/pause" in paths
