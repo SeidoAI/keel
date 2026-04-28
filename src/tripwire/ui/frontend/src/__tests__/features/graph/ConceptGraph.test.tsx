@@ -106,6 +106,140 @@ function makeGraph(): ReactFlowGraph {
   };
 }
 
+describe("ConceptGraph layout (PM #25 round 2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("viewBox covers every node's position so a tall layout isn't clipped (P1)", () => {
+    // Regression: with ~200 layered-BFS nodes, positions span
+    // y ≈ -2000..+2000. Previous viewBox `0 0 W H` clipped
+    // negative-y content and centred the viewport in dead space.
+    // After the fix, the SVG's viewBox covers the bbox of all
+    // node positions (with padding), so every circle's cy falls
+    // within [vbY, vbY + vbHeight].
+    const tallNodes = Array.from({ length: 50 }, (_, i) => ({
+      id: `n-${i}`,
+      type: "concept" as const,
+      position: { x: 100 + (i % 5) * 200, y: -2000 + i * 80 },
+      data: { label: `Node ${i}`, type: "model", has_saved_layout: true },
+    }));
+    const wrapper = withSeed({
+      nodes: tallNodes,
+      edges: [],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: tallNodes.length,
+        edge_count: 0,
+        orphans: [],
+      },
+    });
+    const { container } = render(<ConceptGraph />, { wrapper });
+    const svg = container.querySelector(
+      "[data-testid='concept-graph-canvas'] svg",
+    ) as SVGSVGElement | null;
+    expect(svg).not.toBeNull();
+    const viewBox = svg?.getAttribute("viewBox") ?? "0 0 0 0";
+    const [vbX, vbY, vbW, vbH] = viewBox.split(" ").map(Number);
+    // All node circles sit inside the viewBox.
+    const circles = container.querySelectorAll("[data-testid^='node-circle-']");
+    expect(circles.length).toBe(tallNodes.length);
+    for (const circle of Array.from(circles)) {
+      const cx = Number(circle.getAttribute("cx"));
+      const cy = Number(circle.getAttribute("cy"));
+      expect(cx).toBeGreaterThanOrEqual(vbX - 1);
+      expect(cx).toBeLessThanOrEqual(vbX + vbW + 1);
+      expect(cy).toBeGreaterThanOrEqual(vbY - 1);
+      expect(cy).toBeLessThanOrEqual(vbY + vbH + 1);
+    }
+  });
+
+  it("scrolls sidebar and canvas independently (P1)", () => {
+    // The sidebar concept tree must scroll on its own — sharing a
+    // scroll container with the canvas means scrolling through
+    // nodes loses the sidebar context.
+    const wrapper = withSeed({
+      nodes: Array.from({ length: 20 }, (_, i) => ({
+        id: `concept-${i}`,
+        type: "concept" as const,
+        position: { x: i * 50, y: i * 50 },
+        data: {
+          label: `Concept ${i}`,
+          type: i % 3 === 0 ? "model" : "decision",
+          has_saved_layout: true,
+        },
+      })),
+      edges: [],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 20,
+        edge_count: 0,
+        orphans: [],
+      },
+    });
+    const { container } = render(<ConceptGraph />, { wrapper });
+    const sidebar = container.querySelector(
+      "[data-testid='graph-sidebar']",
+    ) as HTMLElement | null;
+    const canvas = container.querySelector(
+      "[data-testid='concept-graph-canvas']",
+    ) as HTMLElement | null;
+    expect(sidebar).not.toBeNull();
+    expect(canvas).not.toBeNull();
+    // Both must own their overflow — neither delegates to the
+    // outer grid container.
+    expect(getComputedStyle(sidebar as HTMLElement).overflowY).toBe("auto");
+    expect(getComputedStyle(canvas as HTMLElement).overflowY).toBe("auto");
+    // They are NOT the same node and not nested inside a shared
+    // single scroll container.
+    expect(sidebar).not.toBe(canvas);
+    expect(sidebar?.contains(canvas as Node)).toBe(false);
+    expect(canvas?.contains(sidebar as Node)).toBe(false);
+  });
+
+  it("truncates long node labels on the canvas to keep dense layouts readable (P1)", () => {
+    const longLabel = "this is an extremely long concept node label";
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "verbose",
+          type: "concept",
+          position: { x: 100, y: 100 },
+          data: { label: longLabel, type: "model", has_saved_layout: true },
+        },
+      ],
+      edges: [],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 1,
+        edge_count: 0,
+        orphans: [],
+      },
+    });
+    const { container } = render(<ConceptGraph />, { wrapper });
+    const labelText = container
+      .querySelector("[data-testid='node-label-verbose']")
+      ?.textContent?.trim();
+    expect(labelText).toBeDefined();
+    // Truncated form should not contain the full label.
+    expect(labelText?.length ?? 0).toBeLessThan(longLabel.length);
+    expect(labelText).toMatch(/…|\.\.\./);
+  });
+});
+
 describe("ConceptGraph", () => {
   afterEach(() => {
     cleanup();
