@@ -9,33 +9,51 @@ import type {
 } from "@/lib/api/endpoints/workflow";
 
 /**
- * Fixed canvas constants for the workflow map.
+ * Canvas geometry for the workflow map.
  *
- * The 1380×820 SVG body sits inside a 1440×1180 page artboard per
- * spec §3.6. Stations evenly spaced on a horizontal wire at
- * `wireY`; sources stacked in the LEFT gutter; sinks in the RIGHT
- * gutter; validators + tripwires above the wire above their
- * `fires_on_station`; artifacts below the wire under
- * `produced_by`.
+ * Stations evenly spaced on a horizontal wire at `wireY`; sources
+ * stacked in the LEFT gutter; sinks in the RIGHT gutter;
+ * validators + tripwires above the wire above their
+ * `fires_on_station`; artifacts below the wire under `produced_by`.
  *
  * Layout is deterministic by entity-kind and by position in the
  * input array — keeps the rendered output stable when the API
  * registers a new entity (the diff is "one row added," not "the
  * whole graph relays out").
+ *
+ * The canvas is NOT space-constrained: viewBox bounds are computed
+ * dynamically by `computeWorkflowLayout` from actual content so
+ * tall validator stacks don't clip and the container scrolls.
  */
 export const WORKFLOW_CANVAS = {
   width: 1380,
+  /** Default minimum SVG height. Real height is `viewBox.height`
+   *  computed dynamically from content; this is the fall-back when
+   *  every entity fits inside the canonical band. */
   height: 820,
   wireY: 420,
   gutterLeft: 200,
   gutterRight: 200,
-  validatorRowHeight: 86,
+  validatorRowHeight: 96,
   validatorRowGap: 60,
-  tripwireRowGap: 36,
+  tripwireRowGap: 40,
   artifactRowGap: 60,
   artifactRowHeight: 86,
   connectorRowGap: 70,
   connectorRowOffset: 40,
+  /** Padding added around the bounding box of all entities when
+   *  computing the viewBox so cards never touch the canvas edge. */
+  paddingY: 40,
+} as const;
+
+/** Card / endpoint dimensions. Kept here so the layout maths can
+ *  compute bounding boxes for overlap detection — the cards
+ *  themselves render at these dimensions. */
+export const WORKFLOW_CARD_DIMS = {
+  validator: { w: 168, h: 84 },
+  tripwire: { w: 184, h: 84 },
+  artifact: { w: 156, h: 60 },
+  endpoint: { w: 132, h: 32 },
 } as const;
 
 export interface PositionedStation extends WorkflowStation {
@@ -69,6 +87,10 @@ export interface WorkflowLayout {
   artifacts: PositionedArtifact[];
   sources: PositionedConnector[];
   sinks: PositionedConnector[];
+  /** Dynamic SVG viewBox covering every positioned entity plus
+   *  `paddingY`. The container scrolls when the viewBox height
+   *  exceeds the visible viewport. */
+  viewBox: { x: number; y: number; width: number; height: number };
 }
 
 /**
@@ -145,7 +167,41 @@ export function computeWorkflowLayout(graph: WorkflowGraph): WorkflowLayout {
       i * WORKFLOW_CANVAS.connectorRowGap,
   }));
 
-  return { stations, validators, tripwires, artifacts, sources, sinks };
+  const viewBox = computeViewBox({ validators, tripwires, artifacts, sources, sinks });
+  return { stations, validators, tripwires, artifacts, sources, sinks, viewBox };
+}
+
+/** Compute the dynamic SVG viewBox so every entity (plus
+ *  `paddingY`) is inside it. Validator stacks 4+ deep at one
+ *  station push card y values negative; this expands the viewBox
+ *  upward to keep them visible instead of clipping. */
+function computeViewBox(layout: {
+  validators: PositionedValidator[];
+  tripwires: PositionedValidator[];
+  artifacts: PositionedArtifact[];
+  sources: PositionedConnector[];
+  sinks: PositionedConnector[];
+}): { x: number; y: number; width: number; height: number } {
+  let minY: number = 0;
+  let maxY: number = WORKFLOW_CANVAS.height;
+  for (const v of layout.validators) {
+    minY = Math.min(minY, v.y - WORKFLOW_CARD_DIMS.validator.h / 2);
+    maxY = Math.max(maxY, v.y + WORKFLOW_CARD_DIMS.validator.h / 2);
+  }
+  for (const t of layout.tripwires) {
+    minY = Math.min(minY, t.y - WORKFLOW_CARD_DIMS.tripwire.h / 2);
+    maxY = Math.max(maxY, t.y + WORKFLOW_CARD_DIMS.tripwire.h / 2);
+  }
+  for (const a of layout.artifacts) {
+    maxY = Math.max(maxY, a.y + WORKFLOW_CARD_DIMS.artifact.h / 2);
+  }
+  for (const c of [...layout.sources, ...layout.sinks]) {
+    minY = Math.min(minY, c.y - WORKFLOW_CARD_DIMS.endpoint.h / 2);
+    maxY = Math.max(maxY, c.y + WORKFLOW_CARD_DIMS.endpoint.h / 2);
+  }
+  const top = minY - WORKFLOW_CANVAS.paddingY;
+  const bottom = maxY + WORKFLOW_CANVAS.paddingY;
+  return { x: 0, y: top, width: WORKFLOW_CANVAS.width, height: bottom - top };
 }
 
 function layoutStations(stations: WorkflowStation[]): PositionedStation[] {

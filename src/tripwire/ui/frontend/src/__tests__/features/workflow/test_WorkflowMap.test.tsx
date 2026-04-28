@@ -81,7 +81,7 @@ function withProviders(graph: WorkflowGraph | null, opts?: { pmMode?: boolean })
 afterEach(cleanup);
 
 describe("WorkflowMap", () => {
-  it("renders the legend strip explaining validator vs tripwire", () => {
+  it("renders the legend as 6 pill chips using the Stamp primitive (no parallel chip variant)", () => {
     const Wrapper = withProviders(makeGraph());
     render(
       <Wrapper>
@@ -89,14 +89,21 @@ describe("WorkflowMap", () => {
       </Wrapper>,
     );
     const legend = screen.getByLabelText(/legend/i);
-    // Each of the legend swatches has identifying copy.
-    expect(within(legend).getByText(/^source$/i)).toBeTruthy();
-    expect(within(legend).getByText(/^station$/i)).toBeTruthy();
-    expect(within(legend).getByText(/^sink$/i)).toBeTruthy();
-    expect(within(legend).getAllByText(/^artifact$/i).length).toBeGreaterThan(0);
-    // Validator vs tripwire distinction must be explicit in the legend.
+    // Each chip carries `data-tone` written by `Stamp` itself —
+    // asserts the legend uses the canonical Stamp primitive rather
+    // than a hand-rolled "legend version" of the chip.
+    const chips = legend.querySelectorAll("[data-tone]");
+    expect(chips.length).toBe(6);
+    // Validator vs tripwire distinction is the cognitive teaching
+    // surface — both chips + their explanatory copy must be present.
+    expect(within(legend).getByText("GATE")).toBeTruthy();
+    expect(within(legend).getByText("TRIPWIRE")).toBeTruthy();
     expect(within(legend).getByText(/blocks/i)).toBeTruthy();
     expect(within(legend).getByText(/agent must ack/i)).toBeTruthy();
+    // All 6 categories represented.
+    for (const label of ["SOURCE", "STATION", "SINK", "GATE", "TRIPWIRE", "ARTIFACT"]) {
+      expect(within(legend).getByText(label)).toBeTruthy();
+    }
   });
 
   it("renders all 6 stations from the API graph", () => {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { computeWorkflowLayout, WORKFLOW_CANVAS } from "@/features/workflow/useWorkflowLayout";
+import {
+  computeWorkflowLayout,
+  WORKFLOW_CANVAS,
+  WORKFLOW_CARD_DIMS,
+} from "@/features/workflow/useWorkflowLayout";
 import type { WorkflowGraph } from "@/lib/api/endpoints/workflow";
 
 const STATIONS: WorkflowGraph["lifecycle"]["stations"] = [
@@ -174,5 +178,91 @@ describe("computeWorkflowLayout", () => {
     expect(layout.artifacts).toEqual([]);
     expect(layout.sources).toEqual([]);
     expect(layout.sinks).toEqual([]);
+  });
+
+  it("returns a viewBox that expands to fit deep validator + tripwire stacks", () => {
+    // 4 validators + 3 tripwires at the same station produce a stack
+    // that pushes the top-most card y above the default 0 origin.
+    // The viewBox must grow upward (negative y) so cards render
+    // inside it; without this the top of the stack is clipped.
+    const layout = computeWorkflowLayout(
+      buildGraph({
+        validators: Array.from({ length: 4 }, (_, i) => ({
+          id: `v${i + 1}`,
+          kind: "gate" as const,
+          name: `validator-${i + 1}`,
+          fires_on_station: "in_review",
+        })),
+        tripwires: Array.from({ length: 3 }, (_, i) => ({
+          id: `t${i + 1}`,
+          kind: "tripwire" as const,
+          name: `tripwire-${i + 1}`,
+          fires_on_station: "in_review",
+        })),
+      }),
+    );
+    const allTops = [
+      ...layout.validators.map((v) => v.y - WORKFLOW_CARD_DIMS.validator.h / 2),
+      ...layout.tripwires.map((t) => t.y - WORKFLOW_CARD_DIMS.tripwire.h / 2),
+    ];
+    const minTop = Math.min(...allTops);
+    expect(minTop).toBeLessThan(0);
+    expect(layout.viewBox.y).toBeLessThanOrEqual(minTop);
+    expect(layout.viewBox.height).toBeGreaterThan(WORKFLOW_CANVAS.height);
+  });
+
+  it("produces non-overlapping bounding boxes for a dense same-station stack", () => {
+    // Per round-3 PM follow-up: 4 validators + 3 tripwires at one
+    // station must not overlap. Each card's bbox is centred on
+    // (x, y) with the canonical width/height; assert no two
+    // bounding boxes intersect.
+    const layout = computeWorkflowLayout(
+      buildGraph({
+        validators: Array.from({ length: 4 }, (_, i) => ({
+          id: `v${i + 1}`,
+          kind: "gate" as const,
+          name: `validator-${i + 1}`,
+          fires_on_station: "in_review",
+        })),
+        tripwires: Array.from({ length: 3 }, (_, i) => ({
+          id: `t${i + 1}`,
+          kind: "tripwire" as const,
+          name: `tripwire-${i + 1}`,
+          fires_on_station: "in_review",
+        })),
+      }),
+    );
+    interface Bbox {
+      id: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }
+    const boxes: Bbox[] = [
+      ...layout.validators.map((v) => ({
+        id: v.id,
+        x: v.x - WORKFLOW_CARD_DIMS.validator.w / 2,
+        y: v.y - WORKFLOW_CARD_DIMS.validator.h / 2,
+        w: WORKFLOW_CARD_DIMS.validator.w,
+        h: WORKFLOW_CARD_DIMS.validator.h,
+      })),
+      ...layout.tripwires.map((t) => ({
+        id: t.id,
+        x: t.x - WORKFLOW_CARD_DIMS.tripwire.w / 2,
+        y: t.y - WORKFLOW_CARD_DIMS.tripwire.h / 2,
+        w: WORKFLOW_CARD_DIMS.tripwire.w,
+        h: WORKFLOW_CARD_DIMS.tripwire.h,
+      })),
+    ];
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i];
+        const b = boxes[j];
+        if (!a || !b) continue;
+        const overlaps = a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+        expect(overlaps, `${a.id} overlaps ${b.id}`).toBe(false);
+      }
+    }
   });
 });

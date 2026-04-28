@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { useProjectShell } from "@/app/ProjectShell";
-import { sessionStageColor } from "@/components/ui/session-stage-row";
 import { Stamp } from "@/components/ui/stamp";
 import { useWorkflow } from "@/lib/api/endpoints/workflow";
 import { isPmMode } from "@/lib/role";
@@ -82,20 +81,26 @@ interface CanvasProps {
 }
 
 function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
-  const { stations, validators, tripwires, artifacts, sources, sinks } = layout;
+  const { stations, validators, tripwires, artifacts, sources, sinks, viewBox } = layout;
   const stationsById = new Map(stations.map((s) => [s.id, s] as const));
   const hl = useMemo(() => computeHighlight(hovered), [hovered]);
 
   return (
     <section
-      className="relative w-full overflow-auto rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2)"
+      // Vertical scroll: per round-3 PM follow-up the canvas is
+      // not space-constrained — at high entity density the dynamic
+      // viewBox grows beyond the visible viewport and the user
+      // scrolls. `flex-1 min-h-0` lets the section take whatever
+      // height is left after the page header + legend strip.
+      className="relative flex-1 w-full min-h-0 overflow-auto rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2)"
       aria-label="Workflow map canvas"
     >
       <svg
-        viewBox={`0 0 ${WORKFLOW_CANVAS.width} ${WORKFLOW_CANVAS.height}`}
-        width="100%"
-        preserveAspectRatio="xMidYMid meet"
-        style={{ minHeight: 600 }}
+        viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+        width={viewBox.width}
+        height={viewBox.height}
+        preserveAspectRatio="xMinYMin meet"
+        style={{ display: "block" }}
       >
         <title>Workflow orchestration graph</title>
         <line
@@ -303,85 +308,41 @@ function computeHighlight(hovered: HoverKey | null): Highlight {
   };
 }
 
+/**
+ * Legend strip — one `<Stamp>` pill chip per category, the chip
+ * IS the label (no parallel "legend version" of the chip per
+ * round-3 PM follow-up). The data-stamp-tone attribute on each
+ * chip is what tests assert against to check we're using the
+ * shared `Stamp` primitive.
+ */
+const LEGEND_CHIPS: {
+  label: string;
+  tone: React.ComponentProps<typeof Stamp>["tone"];
+  copy: string;
+}[] = [
+  { label: "SOURCE", tone: "default", copy: "external input wired in" },
+  { label: "STATION", tone: "rule", copy: "lifecycle stage on the wire" },
+  { label: "SINK", tone: "default", copy: "external output wired out" },
+  { label: "GATE", tone: "gate", copy: "validator blocks until rule passes" },
+  { label: "TRIPWIRE", tone: "tripwire", copy: "fires on event — agent must ack" },
+  { label: "ARTIFACT", tone: "info", copy: "typed document the workflow produces" },
+];
+
 function Legend() {
   return (
     <section
       aria-label="Legend"
-      className="flex flex-wrap items-stretch gap-4 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-4 py-3"
+      className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-4 py-3"
     >
-      <LegendItem
-        swatch={
-          <span
-            aria-hidden
-            className="h-3 w-3 rounded-full"
-            style={{ background: sessionStageColor("executing") }}
-          />
-        }
-        label="station"
-        copy="lifecycle stage on the wire"
-      />
-      <LegendItem
-        swatch={
-          <span
-            aria-hidden
-            className="h-3 w-8 rounded-full border border-(--color-edge)"
-            style={{ background: "var(--color-paper)" }}
-          />
-        }
-        label="source"
-        copy="external input wired in"
-      />
-      <LegendItem
-        swatch={
-          <span
-            aria-hidden
-            className="h-3 w-8 rounded-full border border-(--color-edge)"
-            style={{ background: "var(--color-paper)" }}
-          />
-        }
-        label="sink"
-        copy="external output wired out"
-      />
-      <LegendItem
-        swatch={<Stamp tone="gate">GATE</Stamp>}
-        label="validator"
-        copy="blocks until rule passes"
-      />
-      <LegendItem
-        swatch={<Stamp tone="tripwire">TRIPWIRE</Stamp>}
-        label="tripwire"
-        copy="fires on event — agent must ack"
-      />
-      <LegendItem
-        swatch={<Stamp tone="info">ARTIFACT</Stamp>}
-        label="artifact"
-        copy="typed document the workflow produces"
-      />
+      {LEGEND_CHIPS.map((c) => (
+        <div key={c.label} className="flex items-center gap-2">
+          <Stamp tone={c.tone}>{c.label}</Stamp>
+          <span className="font-serif text-[12px] italic text-(--color-ink-3) leading-snug">
+            {c.copy}
+          </span>
+        </div>
+      ))}
     </section>
-  );
-}
-
-function LegendItem({
-  swatch,
-  label,
-  copy,
-}: {
-  swatch: React.ReactNode;
-  label: string;
-  copy: string;
-}) {
-  return (
-    <div className="flex min-w-[160px] flex-1 items-center gap-2.5">
-      <div className="flex h-6 w-12 items-center justify-center">{swatch}</div>
-      <div className="flex flex-col gap-0.5">
-        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-(--color-ink-2)">
-          {label}
-        </span>
-        <span className="font-serif text-[12px] italic text-(--color-ink-3) leading-snug">
-          {copy}
-        </span>
-      </div>
-    </div>
   );
 }
 
