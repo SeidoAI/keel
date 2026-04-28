@@ -99,6 +99,42 @@ describe("useLayoutPersistence", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ x: 7, y: 8 });
   });
 
+  it("flushes the buffered batch to the OLD project when projectId changes (PM #25 round 3 P1)", async () => {
+    // Regression: React Router keeps the same component instance
+    // for `/p/:projectId/graph` across project changes. A pending
+    // batch buffered while on Project A must not be dispatched
+    // against Project B if the user navigates inside the debounce
+    // window. Approach: flush on projectId change so the OLD
+    // project receives its own buffered positions, then clear.
+    const fetchSpy = mockFetch();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, rerender } = renderHook(
+      ({ pid }: { pid: string }) => useLayoutPersistence(pid),
+      { wrapper: wrapperWith(qc), initialProps: { pid: "proj-a" } },
+    );
+
+    act(() => {
+      result.current.persist({ "user-model": { x: 1, y: 2 } });
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // Navigate to project B before the debounce window expires.
+    await act(async () => {
+      rerender({ pid: "proj-b" });
+      await Promise.resolve();
+    });
+
+    // The buffered position should have been flushed to proj-a.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const url = String(fetchSpy.mock.calls[0]?.[0] ?? "");
+    expect(url).toBe("/api/projects/proj-a/nodes/user-model/layout");
+    // No call against proj-b for that buffered node.
+    const proj_b_calls = fetchSpy.mock.calls.filter((c) =>
+      String(c[0]).startsWith("/api/projects/proj-b/"),
+    );
+    expect(proj_b_calls).toHaveLength(0);
+  });
+
   it("debounces auto-flush — repeated persists collapse into one PATCH per node", async () => {
     vi.useFakeTimers();
     try {
