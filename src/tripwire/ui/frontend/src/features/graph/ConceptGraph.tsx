@@ -62,9 +62,24 @@ export function ConceptGraph() {
     [data?.nodes],
   );
 
+  // Restrict edges to concept↔concept before handing them to
+  // d3-force: the simulation only sees concept nodes, and any link
+  // whose endpoint is missing from the node set crashes
+  // forceLink's initialiser ("node not found: <id>"). The backend
+  // returns a mix of concept and issue edges; that filter belongs
+  // here at the call site so the layout hook stays pure.
+  const conceptIds = useMemo(() => new Set(concepts.map((n) => n.id)), [concepts]);
+  const conceptEdges = useMemo(
+    () =>
+      (data?.edges ?? []).filter(
+        (e) => conceptIds.has(e.source) && conceptIds.has(e.target),
+      ),
+    [data?.edges, conceptIds],
+  );
+
   const layout = useGraphLayout({
     nodes: concepts,
-    edges: data?.edges ?? [],
+    edges: conceptEdges,
     width: size.width,
     height: size.height,
   });
