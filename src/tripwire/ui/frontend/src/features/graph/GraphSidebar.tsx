@@ -65,8 +65,7 @@ export function GraphSidebar({ graph, selectedId, onSelect }: GraphSidebarProps)
     return initial;
   });
 
-  const toggle = (type: string) =>
-    setCollapsed((prev) => ({ ...prev, [type]: !prev[type] }));
+  const toggle = (type: string) => setCollapsed((prev) => ({ ...prev, [type]: !prev[type] }));
 
   return (
     <aside
@@ -95,10 +94,7 @@ export function GraphSidebar({ graph, selectedId, onSelect }: GraphSidebarProps)
                   aria-expanded={!isCollapsed}
                   className="flex w-full items-center gap-2 rounded-(--radius-stamp) px-1 py-0.5 text-left transition-colors hover:bg-(--color-paper-3)"
                 >
-                  <Caret
-                    className="h-3 w-3 shrink-0 text-(--color-ink-3)"
-                    aria-hidden
-                  />
+                  <Caret className="h-3 w-3 shrink-0 text-(--color-ink-3)" aria-hidden />
                   <span
                     aria-hidden
                     data-testid={`graph-sidebar-color-${type}`}

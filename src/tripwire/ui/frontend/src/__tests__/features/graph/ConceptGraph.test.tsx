@@ -145,7 +145,11 @@ describe("ConceptGraph layout (PM #25 round 2)", () => {
     ) as SVGSVGElement | null;
     expect(svg).not.toBeNull();
     const viewBox = svg?.getAttribute("viewBox") ?? "0 0 0 0";
-    const [vbX, vbY, vbW, vbH] = viewBox.split(" ").map(Number);
+    const parts = viewBox.split(" ").map(Number);
+    const vbX = parts[0] ?? 0;
+    const vbY = parts[1] ?? 0;
+    const vbW = parts[2] ?? 0;
+    const vbH = parts[3] ?? 0;
     // All node circles sit inside the viewBox.
     const circles = container.querySelectorAll("[data-testid^='node-circle-']");
     expect(circles.length).toBe(tallNodes.length);
@@ -187,9 +191,7 @@ describe("ConceptGraph layout (PM #25 round 2)", () => {
       },
     });
     const { container } = render(<ConceptGraph />, { wrapper });
-    const sidebar = container.querySelector(
-      "[data-testid='graph-sidebar']",
-    ) as HTMLElement | null;
+    const sidebar = container.querySelector("[data-testid='graph-sidebar']") as HTMLElement | null;
     const canvas = container.querySelector(
       "[data-testid='concept-graph-canvas']",
     ) as HTMLElement | null;

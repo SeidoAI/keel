@@ -72,7 +72,18 @@ export function MarkdownBody({ content, projectId, compact, refs }: MarkdownBody
   );
 
   return (
-    <div className={cn("prose prose-invert max-w-none", compact && "prose-sm")}>
+    // Cream-paper foundation (KUI-101) means we render dark ink on
+    // light background. PM #25 round 2 P1 caught a leftover
+    // `prose-invert` from the v0.7 dark-default era making body
+    // text near-invisible on the graph rail; dropping it lets the
+    // default Tailwind Typography ink tokens take effect across
+    // every consumer (graph rail, session detail, etc.).
+    <div
+      className={cn(
+        "prose max-w-none text-(--color-ink) prose-headings:text-(--color-ink) prose-strong:text-(--color-ink) prose-a:text-(--color-rule)",
+        compact && "prose-sm",
+      )}
+    >
       <Markdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
