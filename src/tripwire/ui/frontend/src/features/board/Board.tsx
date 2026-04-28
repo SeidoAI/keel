@@ -4,12 +4,6 @@ import { Link } from "react-router-dom";
 import { useProjectShell } from "@/app/ProjectShell";
 import { EntityPreviewDrawer } from "@/components/ui/entity-preview-drawer";
 import { InboxPreviewDrawer } from "@/components/ui/inbox-preview-drawer";
-import { LifecycleWire } from "@/components/ui/lifecycle-wire";
-import {
-  OFF_TRACK_STAGE_ID,
-  SESSION_STAGES,
-  sessionStageId,
-} from "@/components/ui/session-stage-row";
 import { Stamp } from "@/components/ui/stamp";
 import { useIssueStatusEnum, useIssues } from "@/features/issues/hooks/useIssues";
 import type { IssueSummary } from "@/lib/api/endpoints/issues";
@@ -21,17 +15,12 @@ import { ageBucket, useBoardFilters } from "./hooks/useBoardFilters";
 import { IssuesView } from "./IssuesView";
 import { SessionsView } from "./SessionsView";
 
-const IN_FLOW_STAGES = SESSION_STAGES.filter((s) => s.id !== OFF_TRACK_STAGE_ID);
-
 /**
  * v0.8 Board — operational view of everything in flight.
  *
- * Composes the four building blocks:
+ * Composes the building blocks:
  *  - `<FilterPills>` — multi-select filter pills, URL-persisted via
  *    `useBoardFilters`.
- *  - `<LifecycleWire>` — continuous red rule running through the
- *    in-flow column headers (Sessions view only — issues use their
- *    own status enum).
  *  - `<SessionsView>` / `<IssuesView>` — the active view's columns
  *    + drag-and-drop wiring.
  *  - `<EntityPreviewDrawer>` — opens when a card body is clicked,
@@ -62,15 +51,6 @@ export function Board() {
     () => filterIssues(issues, filters, blockedInbox.byIssue),
     [issues, filters, blockedInbox.byIssue],
   );
-
-  const sessionCounts = useMemo<Record<string, number>>(() => {
-    const out: Record<string, number> = {};
-    for (const s of filteredSessions) {
-      const stage = sessionStageId(s.status);
-      if (stage && stage !== OFF_TRACK_STAGE_ID) out[stage] = (out[stage] ?? 0) + 1;
-    }
-    return out;
-  }, [filteredSessions]);
 
   const agentOptions = useMemo(() => {
     const set = new Set<string>();
@@ -122,23 +102,15 @@ export function Board() {
       />
 
       {filters.view === "sessions" ? (
-        <>
-          <LifecycleWire
-            stations={IN_FLOW_STAGES.map((s) => ({ id: s.id, label: s.label }))}
-            counts={sessionCounts}
-            height={64}
-            className="px-1"
+        <div className="min-h-0 flex-1">
+          <SessionsView
+            sessions={filteredSessions}
+            blockedInbox={blockedInbox}
+            activeStages={null}
+            onCardClick={(s) => setDrawer({ kind: "session", session: s })}
+            onCrossLinkClick={(s) => openInbox(s.id, blockedInbox.bySession.get(s.id), setDrawer)}
           />
-          <div className="min-h-0 flex-1">
-            <SessionsView
-              sessions={filteredSessions}
-              blockedInbox={blockedInbox}
-              activeStages={null}
-              onCardClick={(s) => setDrawer({ kind: "session", session: s })}
-              onCrossLinkClick={(s) => openInbox(s.id, blockedInbox.bySession.get(s.id), setDrawer)}
-            />
-          </div>
-        </>
+        </div>
       ) : (
         <div className="min-h-0 flex-1">
           <IssuesView

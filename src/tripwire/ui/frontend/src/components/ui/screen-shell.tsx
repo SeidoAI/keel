@@ -47,7 +47,15 @@ export function ScreenShell({ projectId, topBarStatus, children }: ScreenShellPr
   };
 
   return (
-    <div className="flex h-screen bg-(--color-paper) text-(--color-ink)">
+    <div
+      className="flex h-screen bg-(--color-paper) text-(--color-ink)"
+      // `--paper-image` is set by the Tweaks panel (notebook ruled
+      // lines, graph grid, or `none` for solid variants). Applied
+      // here at the shell so it's visible everywhere the inner page
+      // wrapper is transparent. Cards (bg-paper-2) stay solid and
+      // occlude the texture inside them — desired effect.
+      style={{ backgroundImage: "var(--paper-image, none)" }}
+    >
       <SideRail projectId={projectId} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar status={topBarStatus} onTweaksClick={onTweaksClick} />
@@ -65,7 +73,7 @@ function SideRail({ projectId }: { projectId: string }) {
             (img/mark-accent.svg in the repo). The SVG ships with its
             own colours (cream paper inside the letterforms + accent
             ink); larger height for visual weight. */}
-        <img src="/img/mark-accent.svg" alt="tripwire" className="block h-[44px] w-auto" />
+        <img src="/img/mark-accent.svg" alt="tripwire" className="block h-[58px] w-auto" />
       </div>
       <ProjectChip projectId={projectId} />
       <nav className="relative mt-2 flex flex-1 flex-col">
