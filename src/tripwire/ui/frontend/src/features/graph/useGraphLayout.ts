@@ -62,20 +62,24 @@ export function useGraphLayout({
   const [didSeed, setDidSeed] = useState<boolean>(false);
   const [newLayouts, setNewLayouts] = useState<Record<string, Vec2>>({});
 
-  // Identity of the input that triggers a re-seed: ids of unsaved
-  // nodes + the full edge topology. Using a stable key avoids
-  // re-running the simulation when only a node's `data` blob changes.
+  // Identity of the input that triggers a re-seed. Includes EVERY
+  // node id (saved + unsaved) so a same-length / same-topology
+  // swap of saved nodes still triggers a refresh — PM #25 round 3
+  // P2: two all-saved fixtures with different ids previously hit
+  // the all-saved short-circuit and left `positions` stale. Edge
+  // topology + canvas size are still part of the key so the
+  // simulation re-runs when anything that affects the layout
+  // changes.
   const seedKey = useMemo(() => {
-    const unsaved = nodes
-      .filter((n) => !n.data?.has_saved_layout)
-      .map((n) => n.id)
+    const allIds = nodes
+      .map((n) => `${n.id}:${n.data?.has_saved_layout ? "s" : "u"}`)
       .sort()
       .join(",");
     const topology = edges
       .map((e) => `${e.source}>${e.target}`)
       .sort()
       .join(",");
-    return `${nodes.length}|${unsaved}|${topology}|${width}|${height}`;
+    return `${allIds}|${topology}|${width}|${height}`;
   }, [nodes, edges, width, height]);
 
   const lastSeedRef = useRef<string | null>(null);
