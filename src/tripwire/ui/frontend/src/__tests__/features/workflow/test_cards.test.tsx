@@ -10,6 +10,7 @@ import { ValidatorCard } from "@/features/workflow/ValidatorCard";
 function renderInSvg(node: React.ReactNode) {
   return render(
     <svg width="1380" height="820">
+      <title>test canvas</title>
       {node}
     </svg>,
   );

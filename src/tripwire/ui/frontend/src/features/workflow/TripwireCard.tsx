@@ -1,6 +1,6 @@
 import { Stamp } from "@/components/ui/stamp";
-import { cn } from "@/lib/utils";
 import type { WorkflowValidator } from "@/lib/api/endpoints/workflow";
+import { cn } from "@/lib/utils";
 
 const CARD_W = 184;
 const CARD_H = 78;
@@ -28,9 +28,19 @@ export interface TripwireCardProps {
   y: number;
   dimmed: boolean;
   onClick: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
-export function TripwireCard({ tripwire, x, y, dimmed, onClick }: TripwireCardProps) {
+export function TripwireCard({
+  tripwire,
+  x,
+  y,
+  dimmed,
+  onClick,
+  onMouseEnter,
+  onMouseLeave,
+}: TripwireCardProps) {
   return (
     <foreignObject
       x={x - CARD_W / 2}
@@ -43,6 +53,8 @@ export function TripwireCard({ tripwire, x, y, dimmed, onClick }: TripwireCardPr
       <button
         type="button"
         onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         aria-label={`Tripwire ${tripwire.name}`}
         className={cn(
           "flex h-full w-full flex-col items-start gap-1.5 rounded-(--radius-stamp)",
@@ -59,9 +71,8 @@ export function TripwireCard({ tripwire, x, y, dimmed, onClick }: TripwireCardPr
           </span>
         </div>
         <span className="font-serif text-[11px] italic text-(--color-ink-2) leading-snug">
-          fires on{" "}
-          <span className="font-mono not-italic">{tripwire.fires_on_event ?? "—"}</span>; agent
-          must ack
+          fires on <span className="font-mono not-italic">{tripwire.fires_on_event ?? "—"}</span> —
+          agent must ack
         </span>
       </button>
     </foreignObject>

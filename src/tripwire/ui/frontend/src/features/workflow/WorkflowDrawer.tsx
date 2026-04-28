@@ -1,9 +1,6 @@
 import { EntityPreviewDrawer } from "@/components/ui/entity-preview-drawer";
 import { Stamp } from "@/components/ui/stamp";
-import type {
-  WorkflowArtifact,
-  WorkflowValidator,
-} from "@/lib/api/endpoints/workflow";
+import type { WorkflowArtifact, WorkflowValidator } from "@/lib/api/endpoints/workflow";
 
 /**
  * Tagged union of the things the workflow map opens a drawer for.
@@ -31,13 +28,7 @@ export function WorkflowDrawer({ selection, pmMode, onClose }: WorkflowDrawerPro
   if (!selection) return null;
   const { title, header, body } = renderContents(selection, pmMode);
   return (
-    <EntityPreviewDrawer
-      open
-      onClose={onClose}
-      title={title}
-      headerSlot={header}
-      body={body}
-    />
+    <EntityPreviewDrawer open onClose={onClose} title={title} headerSlot={header} body={body} />
   );
 }
 
@@ -95,9 +86,9 @@ function renderContents(
       body: (
         <div className="flex flex-col gap-4">
           <DefinitionBlock>
-            A <strong>tripwire</strong> fires on a lifecycle event with an agent-facing prompt.
-            The agent must <em>acknowledge</em> the prompt (act on it, then `--ack`) before
-            the event proceeds.
+            A <strong>tripwire</strong> fires on a lifecycle event with an agent-facing prompt. The
+            agent must <em>acknowledge</em> the prompt (act on it, then `--ack`) before the event
+            proceeds.
           </DefinitionBlock>
           <FieldBlock label="Fires on">
             <span className="font-mono text-[12px] text-(--color-ink)">
@@ -128,8 +119,8 @@ function renderContents(
     body: (
       <div className="flex flex-col gap-4">
         <DefinitionBlock>
-          An <strong>artifact</strong> is a typed document the workflow produces and another
-          stage may consume. Authoring is the agent's job; structure is enforced by validators.
+          An <strong>artifact</strong> is a typed document the workflow produces and another stage
+          may consume. Authoring is the agent's job; structure is enforced by validators.
         </DefinitionBlock>
         <FieldBlock label="Lineage">
           <p className="font-mono text-[12px] text-(--color-ink) leading-snug">
@@ -153,9 +144,7 @@ function renderContents(
 }
 
 function DefinitionBlock({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="font-serif text-[14px] text-(--color-ink-2) leading-relaxed">{children}</p>
-  );
+  return <p className="font-serif text-[14px] text-(--color-ink-2) leading-relaxed">{children}</p>;
 }
 
 function FieldBlock({ label, children }: { label: string; children: React.ReactNode }) {

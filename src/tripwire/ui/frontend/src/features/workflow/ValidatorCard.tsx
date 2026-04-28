@@ -1,6 +1,6 @@
 import { Stamp } from "@/components/ui/stamp";
-import { cn } from "@/lib/utils";
 import type { WorkflowValidator } from "@/lib/api/endpoints/workflow";
+import { cn } from "@/lib/utils";
 
 const CARD_W = 168;
 const CARD_H = 78;
@@ -25,9 +25,19 @@ export interface ValidatorCardProps {
    *  highlight on the canvas. */
   dimmed: boolean;
   onClick: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
-export function ValidatorCard({ validator, x, y, dimmed, onClick }: ValidatorCardProps) {
+export function ValidatorCard({
+  validator,
+  x,
+  y,
+  dimmed,
+  onClick,
+  onMouseEnter,
+  onMouseLeave,
+}: ValidatorCardProps) {
   return (
     <foreignObject
       x={x - CARD_W / 2}
@@ -40,6 +50,8 @@ export function ValidatorCard({ validator, x, y, dimmed, onClick }: ValidatorCar
       <button
         type="button"
         onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         aria-label={`Validator ${validator.name}`}
         className={cn(
           "flex h-full w-full flex-col items-start gap-1.5 rounded-(--radius-stamp)",

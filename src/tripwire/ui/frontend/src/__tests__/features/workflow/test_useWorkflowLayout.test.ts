@@ -24,19 +24,25 @@ function buildGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
   };
 }
 
+function must<T>(v: T | undefined, msg: string): T {
+  if (v === undefined) throw new Error(msg);
+  return v;
+}
+
 describe("computeWorkflowLayout", () => {
   it("evenly spaces 6 stations between left/right gutters on the wire", () => {
     const layout = computeWorkflowLayout(buildGraph());
     expect(layout.stations).toHaveLength(6);
     const xs = layout.stations.map((s) => s.x);
-    expect(xs[0]).toBeGreaterThanOrEqual(WORKFLOW_CANVAS.gutterLeft);
-    expect(xs[xs.length - 1]).toBeLessThanOrEqual(
-      WORKFLOW_CANVAS.width - WORKFLOW_CANVAS.gutterRight,
-    );
+    const first = must(xs[0], "first station x missing");
+    const last = must(xs[xs.length - 1], "last station x missing");
+    expect(first).toBeGreaterThanOrEqual(WORKFLOW_CANVAS.gutterLeft);
+    expect(last).toBeLessThanOrEqual(WORKFLOW_CANVAS.width - WORKFLOW_CANVAS.gutterRight);
     for (let i = 1; i < xs.length; i++) {
-      expect(xs[i]).toBeGreaterThan(xs[i - 1]);
+      const cur = must(xs[i], `xs[${i}] missing`);
+      const prev = must(xs[i - 1], `xs[${i - 1}] missing`);
+      expect(cur).toBeGreaterThan(prev);
     }
-    // All stations sit on the central wire.
     for (const s of layout.stations) {
       expect(s.y).toBe(WORKFLOW_CANVAS.wireY);
     }
@@ -64,13 +70,16 @@ describe("computeWorkflowLayout", () => {
       }),
     );
     expect(layout.validators).toHaveLength(2);
-    const inReviewX = layout.stations.find((s) => s.id === "in_review")!.x;
-    expect(layout.validators[0].x).toBe(inReviewX);
-    expect(layout.validators[1].x).toBe(inReviewX);
-    // Validators sit above the wire (lower y in screen coords).
-    expect(layout.validators[0].y).toBeLessThan(WORKFLOW_CANVAS.wireY);
-    // Stacked: second validator further from the wire than first.
-    expect(layout.validators[1].y).toBeLessThan(layout.validators[0].y);
+    const inReviewStation = must(
+      layout.stations.find((s) => s.id === "in_review"),
+      "in_review station missing",
+    );
+    const v0 = must(layout.validators[0], "validators[0]");
+    const v1 = must(layout.validators[1], "validators[1]");
+    expect(v0.x).toBe(inReviewStation.x);
+    expect(v1.x).toBe(inReviewStation.x);
+    expect(v0.y).toBeLessThan(WORKFLOW_CANVAS.wireY);
+    expect(v1.y).toBeLessThan(v0.y);
   });
 
   it("stacks tripwires above their fires_on_station alongside validators", () => {
@@ -96,10 +105,14 @@ describe("computeWorkflowLayout", () => {
       }),
     );
     expect(layout.tripwires).toHaveLength(1);
-    const inReviewX = layout.stations.find((s) => s.id === "in_review")!.x;
-    expect(layout.tripwires[0].x).toBe(inReviewX);
-    // Tripwires stacked higher than the existing validator at that station.
-    expect(layout.tripwires[0].y).toBeLessThan(layout.validators[0].y);
+    const inReviewStation = must(
+      layout.stations.find((s) => s.id === "in_review"),
+      "in_review station missing",
+    );
+    const t0 = must(layout.tripwires[0], "tripwires[0]");
+    const v0 = must(layout.validators[0], "validators[0]");
+    expect(t0.x).toBe(inReviewStation.x);
+    expect(t0.y).toBeLessThan(v0.y);
   });
 
   it("places artifacts below the wire under their producer station", () => {
@@ -111,9 +124,13 @@ describe("computeWorkflowLayout", () => {
       }),
     );
     expect(layout.artifacts).toHaveLength(1);
-    const queuedX = layout.stations.find((s) => s.id === "queued")!.x;
-    expect(layout.artifacts[0].x).toBe(queuedX);
-    expect(layout.artifacts[0].y).toBeGreaterThan(WORKFLOW_CANVAS.wireY);
+    const queuedStation = must(
+      layout.stations.find((s) => s.id === "queued"),
+      "queued station missing",
+    );
+    const a0 = must(layout.artifacts[0], "artifacts[0]");
+    expect(a0.x).toBe(queuedStation.x);
+    expect(a0.y).toBeGreaterThan(WORKFLOW_CANVAS.wireY);
   });
 
   it("places sources stacked vertically on the LEFT gutter", () => {
@@ -129,9 +146,11 @@ describe("computeWorkflowLayout", () => {
       }),
     );
     expect(layout.sources).toHaveLength(2);
-    expect(layout.sources[0].x).toBeLessThan(WORKFLOW_CANVAS.gutterLeft);
-    expect(layout.sources[1].x).toBe(layout.sources[0].x);
-    expect(layout.sources[1].y).not.toBe(layout.sources[0].y);
+    const s0 = must(layout.sources[0], "sources[0]");
+    const s1 = must(layout.sources[1], "sources[1]");
+    expect(s0.x).toBeLessThan(WORKFLOW_CANVAS.gutterLeft);
+    expect(s1.x).toBe(s0.x);
+    expect(s1.y).not.toBe(s0.y);
   });
 
   it("places sinks stacked vertically on the RIGHT gutter", () => {
@@ -144,7 +163,8 @@ describe("computeWorkflowLayout", () => {
       }),
     );
     expect(layout.sinks).toHaveLength(1);
-    expect(layout.sinks[0].x).toBeGreaterThan(WORKFLOW_CANVAS.width - WORKFLOW_CANVAS.gutterRight);
+    const sink0 = must(layout.sinks[0], "sinks[0]");
+    expect(sink0.x).toBeGreaterThan(WORKFLOW_CANVAS.width - WORKFLOW_CANVAS.gutterRight);
   });
 
   it("returns empty layout collections for an empty graph", () => {

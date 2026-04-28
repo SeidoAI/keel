@@ -2,18 +2,18 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { useProjectShell } from "@/app/ProjectShell";
-import { Stamp } from "@/components/ui/stamp";
 import { sessionStageColor } from "@/components/ui/session-stage-row";
+import { Stamp } from "@/components/ui/stamp";
 import { useWorkflow } from "@/lib/api/endpoints/workflow";
 import { ArtifactCard } from "./ArtifactCard";
 import { ConnectorCurve } from "./ConnectorCurve";
 import { StationCard } from "./StationCard";
 import { TripwireCard } from "./TripwireCard";
 import {
-  WORKFLOW_CANVAS,
   computeWorkflowLayout,
   type PositionedConnector,
   type PositionedStation,
+  WORKFLOW_CANVAS,
 } from "./useWorkflowLayout";
 import { ValidatorCard } from "./ValidatorCard";
 import { WorkflowDrawer, type WorkflowSelection } from "./WorkflowDrawer";
@@ -47,37 +47,26 @@ export function WorkflowMap() {
           Workflow
         </h1>
         <p className="font-serif text-[14px] italic text-(--color-ink-2) leading-snug">
-          how Tripwire orchestrates a session — read this once, the dashboard reads it
-          every day.
+          how Tripwire orchestrates a session — read this once, the dashboard reads it every day.
         </p>
       </header>
       <Legend />
       {layout ? (
-        <Canvas
-          layout={layout}
-          hovered={hovered}
-          onHover={setHovered}
-          onSelect={setSelection}
-        />
+        <Canvas layout={layout} hovered={hovered} onHover={setHovered} onSelect={setSelection} />
       ) : (
         <EmptyState />
       )}
-      <WorkflowDrawer
-        selection={selection}
-        pmMode={pmMode}
-        onClose={() => setSelection(null)}
-      />
+      <WorkflowDrawer selection={selection} pmMode={pmMode} onClose={() => setSelection(null)} />
     </div>
   );
 }
 
 type HoverKey =
-  | { kind: "station"; id: string }
-  | { kind: "validator"; id: string; station: string }
-  | { kind: "tripwire"; id: string; station: string }
-  | { kind: "artifact"; id: string; producer: string; consumer: string | null }
-  | { kind: "source"; id: string; station: string | undefined }
-  | { kind: "sink"; id: string; station: string | undefined };
+  | { kind: "validator"; id: string }
+  | { kind: "tripwire"; id: string }
+  | { kind: "artifact"; id: string }
+  | { kind: "source"; id: string }
+  | { kind: "sink"; id: string };
 
 interface CanvasProps {
   layout: NonNullable<ReturnType<typeof computeWorkflowLayout>>;
@@ -88,17 +77,12 @@ interface CanvasProps {
 
 function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
   const { stations, validators, tripwires, artifacts, sources, sinks } = layout;
-  const stationXById = new Map(stations.map((s) => [s.id, s] as const));
-
-  // Hover-highlight: collect the set of (entity id, connector id)
-  // that should stay opaque while the user hovers an item. Anything
-  // outside that set drops to ~25% opacity.
+  const stationsById = new Map(stations.map((s) => [s.id, s] as const));
   const hl = useMemo(() => computeHighlight(hovered), [hovered]);
 
   return (
-    <div
+    <section
       className="relative w-full overflow-auto rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2)"
-      role="region"
       aria-label="Workflow map canvas"
     >
       <svg
@@ -107,6 +91,7 @@ function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
         preserveAspectRatio="xMidYMid meet"
         style={{ minHeight: 600 }}
       >
+        <title>Workflow orchestration graph</title>
         <line
           x1={WORKFLOW_CANVAS.gutterLeft}
           x2={WORKFLOW_CANVAS.width - WORKFLOW_CANVAS.gutterRight}
@@ -121,22 +106,22 @@ function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
             key={`source-${c.id}`}
             id={`source-${c.id}`}
             from={{ x: c.x, y: c.y }}
-            to={attachmentPoint(c, stationXById)}
-            dimmed={!hl.connectors.has(`source-${c.id}`)}
+            to={attachmentPoint(c, stationsById)}
+            dimmed={hl.connectorDimmed(`source-${c.id}`)}
           />
         ))}
         {sinks.map((c) => (
           <ConnectorCurve
             key={`sink-${c.id}`}
             id={`sink-${c.id}`}
-            from={attachmentPoint(c, stationXById)}
+            from={attachmentPoint(c, stationsById)}
             to={{ x: c.x, y: c.y }}
-            dimmed={!hl.connectors.has(`sink-${c.id}`)}
+            dimmed={hl.connectorDimmed(`sink-${c.id}`)}
           />
         ))}
         {artifacts.map((a) => {
-          const producer = stationXById.get(a.produced_by);
-          const consumer = a.consumed_by ? stationXById.get(a.consumed_by) : null;
+          const producer = stationsById.get(a.produced_by);
+          const consumer = a.consumed_by ? stationsById.get(a.consumed_by) : null;
           return (
             <g key={`artifact-wires-${a.id}`}>
               {producer ? (
@@ -144,7 +129,7 @@ function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
                   id={`artifact-out-${a.id}`}
                   from={{ x: producer.x, y: producer.y + 14 }}
                   to={{ x: a.x, y: a.y - 30 }}
-                  dimmed={!hl.connectors.has(`artifact-out-${a.id}`)}
+                  dimmed={hl.connectorDimmed(`artifact-out-${a.id}`)}
                   stroke="var(--color-info)"
                 />
               ) : null}
@@ -153,7 +138,7 @@ function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
                   id={`artifact-in-${a.id}`}
                   from={{ x: a.x, y: a.y - 30 }}
                   to={{ x: consumer.x, y: consumer.y + 14 }}
-                  dimmed={!hl.connectors.has(`artifact-in-${a.id}`)}
+                  dimmed={hl.connectorDimmed(`artifact-in-${a.id}`)}
                   stroke="var(--color-info)"
                 />
               ) : null}
@@ -164,68 +149,48 @@ function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
           <StationCard key={`station-${s.id}`} station={s} x={s.x} y={s.y} />
         ))}
         {validators.map((v) => (
-          <g
+          <ValidatorCard
             key={`validator-${v.id}`}
-            onMouseEnter={() =>
-              onHover({ kind: "validator", id: v.id, station: v.fires_on_station })
-            }
+            validator={v}
+            x={v.x}
+            y={v.y}
+            dimmed={hl.entityDimmed(`validator-${v.id}`)}
+            onClick={() => onSelect({ kind: "validator", entity: v })}
+            onMouseEnter={() => onHover({ kind: "validator", id: v.id })}
             onMouseLeave={() => onHover(null)}
-          >
-            <ValidatorCard
-              validator={v}
-              x={v.x}
-              y={v.y}
-              dimmed={hl.dimmedEntities.has(`validator-${v.id}`)}
-              onClick={() => onSelect({ kind: "validator", entity: v })}
-            />
-          </g>
+          />
         ))}
         {tripwires.map((t) => (
-          <g
+          <TripwireCard
             key={`tripwire-${t.id}`}
-            onMouseEnter={() =>
-              onHover({ kind: "tripwire", id: t.id, station: t.fires_on_station })
-            }
+            tripwire={t}
+            x={t.x}
+            y={t.y}
+            dimmed={hl.entityDimmed(`tripwire-${t.id}`)}
+            onClick={() => onSelect({ kind: "tripwire", entity: t })}
+            onMouseEnter={() => onHover({ kind: "tripwire", id: t.id })}
             onMouseLeave={() => onHover(null)}
-          >
-            <TripwireCard
-              tripwire={t}
-              x={t.x}
-              y={t.y}
-              dimmed={hl.dimmedEntities.has(`tripwire-${t.id}`)}
-              onClick={() => onSelect({ kind: "tripwire", entity: t })}
-            />
-          </g>
+          />
         ))}
         {artifacts.map((a) => (
-          <g
+          <ArtifactCard
             key={`artifact-${a.id}`}
-            onMouseEnter={() =>
-              onHover({
-                kind: "artifact",
-                id: a.id,
-                producer: a.produced_by,
-                consumer: a.consumed_by,
-              })
-            }
+            artifact={a}
+            x={a.x}
+            y={a.y}
+            dimmed={hl.entityDimmed(`artifact-${a.id}`)}
+            onClick={() => onSelect({ kind: "artifact", entity: a })}
+            onMouseEnter={() => onHover({ kind: "artifact", id: a.id })}
             onMouseLeave={() => onHover(null)}
-          >
-            <ArtifactCard
-              artifact={a}
-              x={a.x}
-              y={a.y}
-              dimmed={hl.dimmedEntities.has(`artifact-${a.id}`)}
-              onClick={() => onSelect({ kind: "artifact", entity: a })}
-            />
-          </g>
+          />
         ))}
         {sources.map((c) => (
           <ConnectorEndpoint
             key={`source-end-${c.id}`}
             connector={c}
             side="left"
-            dimmed={hl.dimmedEntities.has(`source-${c.id}`)}
-            onMouseEnter={() => onHover({ kind: "source", id: c.id, station: c.attachStation })}
+            dimmed={hl.entityDimmed(`source-${c.id}`)}
+            onMouseEnter={() => onHover({ kind: "source", id: c.id })}
             onMouseLeave={() => onHover(null)}
           />
         ))}
@@ -234,13 +199,13 @@ function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
             key={`sink-end-${c.id}`}
             connector={c}
             side="right"
-            dimmed={hl.dimmedEntities.has(`sink-${c.id}`)}
-            onMouseEnter={() => onHover({ kind: "sink", id: c.id, station: c.attachStation })}
+            dimmed={hl.entityDimmed(`sink-${c.id}`)}
+            onMouseEnter={() => onHover({ kind: "sink", id: c.id })}
             onMouseLeave={() => onHover(null)}
           />
         ))}
       </svg>
-    </div>
+    </section>
   );
 }
 
@@ -268,12 +233,21 @@ function ConnectorEndpoint({
       height={ENDPOINT_H}
       opacity={dimmed ? 0.25 : 1}
       style={{ transition: "opacity 120ms ease-out", overflow: "visible" }}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
     >
       <div
-        className="flex h-full w-full items-center justify-center gap-1.5 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-2"
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onFocus={onMouseEnter}
+        onBlur={onMouseLeave}
+        // biome-ignore lint/a11y/noStaticElementInteractions: hover-only
+        // visualisation; connector endpoints are non-interactive (no
+        // click target — the cards above the wire are the click
+        // surface). The lint rule fires because plain divs shouldn't
+        // catch pointer events; we keep it for hover-highlight only,
+        // mirrored to focus/blur for keyboard parity.
+        role="img"
         aria-label={`${side === "left" ? "Source" : "Sink"} ${connector.name}`}
+        className="flex h-full w-full items-center justify-center gap-1.5 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-2"
       >
         <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
           {side === "left" ? "src" : "sink"}
@@ -288,95 +262,46 @@ function ConnectorEndpoint({
 
 function attachmentPoint(
   c: PositionedConnector,
-  stationXById: Map<string, PositionedStation>,
+  stationsById: Map<string, PositionedStation>,
 ): { x: number; y: number } {
-  if (c.attachStation && stationXById.has(c.attachStation)) {
-    const s = stationXById.get(c.attachStation)!;
-    return { x: s.x, y: s.y };
-  }
+  const s = c.attachStation ? stationsById.get(c.attachStation) : undefined;
+  if (s) return { x: s.x, y: s.y };
   return { x: WORKFLOW_CANVAS.width / 2, y: WORKFLOW_CANVAS.wireY };
 }
 
 interface Highlight {
-  /** Connector ids that should stay opaque (defaults to "all opaque"
-   *  when nothing is hovered — captured here as a sentinel). */
-  connectors: Set<string> & { _all?: true };
-  /** Entity keys that should DROP to 25% (the inverse — "everything
-   *  not touching the hovered entity"). When nothing is hovered the
-   *  set is empty, so nothing dims. */
-  dimmedEntities: Set<string>;
+  /** Returns true when the connector should drop to dim opacity. */
+  connectorDimmed: (id: string) => boolean;
+  /** Returns true when the entity card should drop to dim opacity. */
+  entityDimmed: (id: string) => boolean;
 }
 
 function computeHighlight(hovered: HoverKey | null): Highlight {
   if (!hovered) {
-    const all = new Set<string>() as Highlight["connectors"];
-    all._all = true;
     return {
-      connectors: new Proxy(all, {
-        get(target, prop) {
-          if (prop === "has") return () => true;
-          // biome-ignore lint/suspicious/noExplicitAny: proxy-through
-          return (target as any)[prop];
-        },
-      }) as Highlight["connectors"],
-      dimmedEntities: new Set(),
+      connectorDimmed: () => false,
+      entityDimmed: () => false,
     };
   }
+  const liveEntity = `${hovered.kind}-${hovered.id}`;
   const liveConnectors = new Set<string>();
-  const liveEntities = new Set<string>();
-  switch (hovered.kind) {
-    case "station": {
-      // Station hover keeps all connectors touching this station opaque.
-      liveEntities.add(`station-${hovered.id}`);
-      break;
-    }
-    case "validator": {
-      liveEntities.add(`validator-${hovered.id}`);
-      break;
-    }
-    case "tripwire": {
-      liveEntities.add(`tripwire-${hovered.id}`);
-      break;
-    }
-    case "artifact": {
-      liveEntities.add(`artifact-${hovered.id}`);
-      liveConnectors.add(`artifact-out-${hovered.id}`);
-      liveConnectors.add(`artifact-in-${hovered.id}`);
-      break;
-    }
-    case "source": {
-      liveEntities.add(`source-${hovered.id}`);
-      liveConnectors.add(`source-${hovered.id}`);
-      break;
-    }
-    case "sink": {
-      liveEntities.add(`sink-${hovered.id}`);
-      liveConnectors.add(`sink-${hovered.id}`);
-      break;
-    }
+  if (hovered.kind === "artifact") {
+    liveConnectors.add(`artifact-out-${hovered.id}`);
+    liveConnectors.add(`artifact-in-${hovered.id}`);
+  } else if (hovered.kind === "source") {
+    liveConnectors.add(`source-${hovered.id}`);
+  } else if (hovered.kind === "sink") {
+    liveConnectors.add(`sink-${hovered.id}`);
   }
-  // The dimmedEntities set is "everything that exists but isn't in
-  // liveEntities" — but since we only know live entities here, we
-  // flip the logic at render time: each card asks
-  // dimmedEntities.has(its-key), defaulting to false. So we leave
-  // the set empty and instead build it from a closure over the
-  // hovered key.
   return {
-    connectors: liveConnectors as Highlight["connectors"],
-    dimmedEntities: new Proxy(new Set<string>(), {
-      get(_, prop) {
-        if (prop === "has")
-          return (key: string) => liveEntities.size > 0 && !liveEntities.has(key);
-        // biome-ignore lint/suspicious/noExplicitAny: proxy-through
-        return (Set.prototype as any)[prop as string];
-      },
-    }),
+    connectorDimmed: (id) => !liveConnectors.has(id),
+    entityDimmed: (id) => id !== liveEntity,
   };
 }
 
 function Legend() {
   return (
-    <div
+    <section
       aria-label="Legend"
       className="flex flex-wrap items-stretch gap-4 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-4 py-3"
     >
@@ -421,14 +346,14 @@ function Legend() {
       <LegendItem
         swatch={<Stamp tone="tripwire">TRIPWIRE</Stamp>}
         label="tripwire"
-        copy="fires on event; agent must ack"
+        copy="fires on event — agent must ack"
       />
       <LegendItem
         swatch={<Stamp tone="info">ARTIFACT</Stamp>}
         label="artifact"
         copy="typed document the workflow produces"
       />
-    </div>
+    </section>
   );
 }
 

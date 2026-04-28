@@ -24,14 +24,7 @@ export function StationCard({ station, x, y }: StationCardProps) {
   const fill = sessionStageColor(station.id);
   return (
     <g>
-      <circle
-        cx={x}
-        cy={y}
-        r={STATION_R}
-        fill={fill}
-        stroke="var(--color-ink)"
-        strokeWidth={1.4}
-      />
+      <circle cx={x} cy={y} r={STATION_R} fill={fill} stroke="var(--color-ink)" strokeWidth={1.4} />
       <text
         x={x}
         y={y - STATION_R - LABEL_GAP}
