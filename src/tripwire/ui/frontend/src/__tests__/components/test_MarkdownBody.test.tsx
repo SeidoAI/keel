@@ -26,6 +26,12 @@ describe("MarkdownBody", () => {
       // (cream paper) made body text effectively invisible. Fix is
       // to drop prose-invert from the wrapper so the default
       // ink-on-light prose tokens take effect.
+      //
+      // Note (PM #25 round 3 nit 3): we assert on `.prose-invert`
+      // class absence rather than the rendered foreground colour
+      // because jsdom doesn't compute Tailwind utility CSS — the
+      // class-name contract is the strongest available assertion
+      // without a real-DOM browser harness.
       const { container } = renderMarkdown("Body text on cream.");
       const wrapper = container.querySelector(".prose");
       expect(wrapper).not.toBeNull();

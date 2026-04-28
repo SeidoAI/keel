@@ -46,6 +46,13 @@ const KIND_COLOR: Record<string, string> = {
   custom: "var(--color-ink-2)",
 };
 
+/** Above this many distinct categories, the sidebar collapses
+ *  every category except the one holding the current selection
+ *  (or all if nothing is selected). Six fits one ~900px viewport
+ *  before scrolling kicks in; lower thresholds get loud, higher
+ *  ones lose their reason to collapse. */
+export const CATEGORY_COLLAPSE_THRESHOLD = 6;
+
 function colorForKind(kind: string): string {
   return KIND_COLOR[kind] ?? "var(--color-ink-2)";
 }
@@ -55,7 +62,7 @@ export function GraphSidebar({ graph, selectedId, onSelect }: GraphSidebarProps)
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    const collapseAll = grouped.length > 6;
+    const collapseAll = grouped.length > CATEGORY_COLLAPSE_THRESHOLD;
     const selectedKind = selectedId
       ? grouped.find(([, list]) => list.some((e) => e.id === selectedId))?.[0]
       : undefined;
