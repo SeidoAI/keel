@@ -79,7 +79,7 @@ export function TweaksPanel({ defaultOpen = false }: TweaksPanelProps) {
         label="Paper warmth"
         value={values.paperWarmth}
         onChange={(v) => setTweak("paperWarmth", v as PaperWarmth)}
-        options={["cream", "off-white", "linen"]}
+        options={["cream", "off-white", "linen", "parchment", "notebook", "graph"]}
       />
       <Field
         label="Rule colour"

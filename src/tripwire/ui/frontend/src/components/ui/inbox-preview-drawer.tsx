@@ -1,10 +1,9 @@
-import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Check, X } from "lucide-react";
 
 import { MarkdownBody } from "@/components/MarkdownBody";
+import { EntityPreviewDrawer } from "@/components/ui/entity-preview-drawer";
 import { Stamp } from "@/components/ui/stamp";
 import { type InboxItem, useInboxItem, useResolveInbox } from "@/lib/api/endpoints/inbox";
-import { cn } from "@/lib/utils";
 
 /**
  * Side-sliding drawer that previews a single inbox entry —
@@ -15,13 +14,11 @@ import { cn } from "@/lib/utils";
  * separate detail screen. Content fetched lazily (only when
  * ``open=true``) via ``useInboxItem``.
  *
- * Anchored to the right edge of the viewport, ~480px wide on
- * desktop, full width on mobile. Built on Radix Dialog for focus
- * trap, ESC handling, and overlay click-to-dismiss.
- *
- * Future: when issues + sessions land their preview drawers, the
- * outer chrome moves to a shared ``EntityPreviewDrawer`` and this
- * file becomes a thin inbox-specific renderer.
+ * Outer chrome (overlay, slide-in panel, close button, header /
+ * footer bands) lives in :class:`EntityPreviewDrawer` so the same
+ * shape is shared across inbox / session / issue previews per
+ * `[[dec-shared-preview-drawer]]`. This module owns just the
+ * inbox-specific body + footer renderer.
  */
 export interface InboxPreviewDrawerProps {
   projectId: string;
@@ -59,51 +56,153 @@ export function InboxPreviewDrawer({
     );
   };
 
+  if (item) {
+    return (
+      <EntityPreviewDrawer
+        open={open}
+        onClose={onClose}
+        title={item.title}
+        headerSlot={<InboxHeaderRow item={item} isDemo={Boolean(prefetchedItem)} />}
+        body={<InboxBody item={item} projectId={projectId} />}
+        footerSlot={
+          <InboxFooter
+            item={item}
+            isDemo={Boolean(prefetchedItem)}
+            onResolve={handleResolve}
+            resolving={resolveMutation.isPending}
+          />
+        }
+      />
+    );
+  }
+  if (isLoading) {
+    return (
+      <EntityPreviewDrawer open={open} onClose={onClose} title="loading…" body={<LoadingBody />} />
+    );
+  }
+  if (isError) {
+    return (
+      <EntityPreviewDrawer
+        open={open}
+        onClose={onClose}
+        title="entry not found"
+        body={<ErrorBody />}
+      />
+    );
+  }
+  return null;
+}
+
+function LoadingBody() {
+  return <p className="font-serif text-[13px] italic text-(--color-ink-3)">loading…</p>;
+}
+
+function ErrorBody() {
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={(o) => (o ? null : onClose())}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay
-          className={cn(
-            "fixed inset-0 z-50 bg-(--color-ink)/30",
-            "data-[state=open]:animate-in data-[state=open]:fade-in-0",
-            "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
-          )}
-        />
-        <DialogPrimitive.Content
-          className={cn(
-            "fixed top-0 right-0 z-50 flex h-full w-full max-w-[520px] flex-col",
-            "border-(--color-edge) border-l bg-(--color-paper) shadow-2xl",
-            "data-[state=open]:animate-in data-[state=open]:slide-in-from-right",
-            "data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right",
-          )}
-          aria-describedby={undefined}
-        >
-          <DialogPrimitive.Title className="sr-only">
-            {item?.title ?? "Inbox entry"}
-          </DialogPrimitive.Title>
-          {item ? (
-            <InboxDrawerContents
-              item={item}
-              projectId={projectId}
-              onClose={onClose}
-              onResolve={handleResolve}
-              resolving={resolveMutation.isPending}
-              isDemo={Boolean(prefetchedItem)}
-            />
-          ) : isLoading ? (
-            <DrawerLoading onClose={onClose} />
-          ) : isError ? (
-            <DrawerError onClose={onClose} />
-          ) : null}
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+    <p className="font-mono text-[11px] text-(--color-rule) uppercase tracking-[0.18em]">
+      entry not found
+    </p>
   );
 }
 
-/** The presentational guts of the drawer — exported so tests can
- *  exercise it directly without going through the Radix Dialog
- *  portal (which jsdom + animations don't render reliably). */
+function InboxHeaderRow({ item, isDemo }: { item: InboxItem; isDemo: boolean }) {
+  const isBlocked = item.bucket === "blocked";
+  const created = new Date(item.created_at);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Stamp tone={isBlocked ? "rule" : "default"} variant="status">
+        {item.bucket}
+      </Stamp>
+      <span className="font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]">
+        {item.author} · {created.toISOString().slice(0, 16).replace("T", " ")}
+      </span>
+      {isDemo ? (
+        <Stamp tone="info" variant="identifier">
+          demo
+        </Stamp>
+      ) : null}
+    </div>
+  );
+}
+
+function InboxBody({ item, projectId }: { item: InboxItem; projectId: string }) {
+  return (
+    <>
+      {item.body.trim() ? (
+        <MarkdownBody content={item.body} projectId={projectId} compact={false} />
+      ) : (
+        <p className="font-serif text-[14px] italic text-(--color-ink-3)">
+          (no body — title-only entry)
+        </p>
+      )}
+      {item.references.length > 0 ? (
+        <div className="mt-6">
+          <div className="mb-2 font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
+            references
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {item.references.map((ref, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: refs have no stable id
+              <li key={i}>
+                <ReferenceRow reference={ref} projectId={projectId} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {item.escalation_reason ? (
+        <div className="mt-6 font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]">
+          escalation reason · {item.escalation_reason}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function InboxFooter({
+  item,
+  isDemo,
+  onResolve,
+  resolving,
+}: {
+  item: InboxItem;
+  isDemo: boolean;
+  onResolve: () => void;
+  resolving: boolean;
+}) {
+  const isBlocked = item.bucket === "blocked";
+  return (
+    <>
+      {item.resolved ? (
+        <span className="font-mono text-[11px] text-(--color-ink-3) tracking-[0.06em]">
+          resolved · {item.resolved_by ?? "—"}
+        </span>
+      ) : (
+        <span className="font-mono text-[11px] text-(--color-ink-3) tracking-[0.06em]">
+          {isBlocked ? "needs your decision" : "informational"}
+        </span>
+      )}
+      {item.resolved || isDemo ? null : (
+        <button
+          type="button"
+          onClick={onResolve}
+          disabled={resolving}
+          className="inline-flex items-center gap-1.5 rounded-(--radius-stamp) border border-(--color-rule) bg-(--color-rule) px-3 py-1.5 font-mono text-[11px] text-(--color-paper) uppercase tracking-[0.18em] transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          <Check className="h-3.5 w-3.5" aria-hidden />
+          {resolving ? "resolving…" : "resolve"}
+        </button>
+      )}
+    </>
+  );
+}
+
+/** Test-friendly renderer that mounts the inbox drawer body without
+ *  going through the Radix Dialog portal (jsdom doesn't render the
+ *  portal + animations reliably). Composes the same slot helpers
+ *  the production drawer uses, so test coverage of the inbox-specific
+ *  bits — header row, body, footer, references — also covers the
+ *  shipped drawer one indirection level up. */
 export function InboxDrawerContents({
   item,
   projectId,
@@ -124,24 +223,12 @@ export function InboxDrawerContents({
   resolving: boolean;
   isDemo: boolean;
 }) {
-  const isBlocked = item.bucket === "blocked";
-  const created = new Date(item.created_at);
   return (
     <>
       <header className="flex items-start justify-between gap-3 border-(--color-edge) border-b px-5 pt-4 pb-3">
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <Stamp tone={isBlocked ? "rule" : "default"} variant="status">
-              {item.bucket}
-            </Stamp>
-            <span className="font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]">
-              {item.author} · {created.toISOString().slice(0, 16).replace("T", " ")}
-            </span>
-            {isDemo ? (
-              <Stamp tone="info" variant="identifier">
-                demo
-              </Stamp>
-            ) : null}
+          <div className="mb-2">
+            <InboxHeaderRow item={item} isDemo={isDemo} />
           </div>
           <h2 className="m-0 font-sans font-semibold text-[20px] text-(--color-ink) leading-tight tracking-[-0.01em]">
             {item.title}
@@ -157,91 +244,12 @@ export function InboxDrawerContents({
         </button>
       </header>
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {item.body.trim() ? (
-          <MarkdownBody content={item.body} projectId={projectId} compact={false} />
-        ) : (
-          <p className="font-serif text-[14px] italic text-(--color-ink-3)">
-            (no body — title-only entry)
-          </p>
-        )}
-        {item.references.length > 0 ? (
-          <div className="mt-6">
-            <div className="mb-2 font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
-              references
-            </div>
-            <ul className="flex flex-col gap-1.5">
-              {item.references.map((ref, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: refs have no stable id
-                <li key={i}>
-                  <ReferenceRow reference={ref} projectId={projectId} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-        {item.escalation_reason ? (
-          <div className="mt-6 font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]">
-            escalation reason · {item.escalation_reason}
-          </div>
-        ) : null}
+        <InboxBody item={item} projectId={projectId} />
       </div>
       <footer className="flex items-center justify-between gap-3 border-(--color-edge) border-t bg-(--color-paper-2) px-5 py-3">
-        {item.resolved ? (
-          <span className="font-mono text-[11px] text-(--color-ink-3) tracking-[0.06em]">
-            resolved · {item.resolved_by ?? "—"}
-          </span>
-        ) : (
-          <span className="font-mono text-[11px] text-(--color-ink-3) tracking-[0.06em]">
-            {isBlocked ? "needs your decision" : "informational"}
-          </span>
-        )}
-        {item.resolved || isDemo ? null : (
-          <button
-            type="button"
-            onClick={onResolve}
-            disabled={resolving}
-            className="inline-flex items-center gap-1.5 rounded-(--radius-stamp) border border-(--color-rule) bg-(--color-rule) px-3 py-1.5 font-mono text-[11px] text-(--color-paper) uppercase tracking-[0.18em] transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            <Check className="h-3.5 w-3.5" aria-hidden />
-            {resolving ? "resolving…" : "resolve"}
-          </button>
-        )}
+        <InboxFooter item={item} isDemo={isDemo} onResolve={onResolve} resolving={resolving} />
       </footer>
     </>
-  );
-}
-
-function DrawerLoading({ onClose }: { onClose: () => void }) {
-  return (
-    <header className="flex items-center justify-between border-(--color-edge) border-b px-5 py-3">
-      <span className="font-serif text-[13px] italic text-(--color-ink-3)">loading…</span>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close preview"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-(--radius-stamp) text-(--color-ink-3) hover:bg-(--color-paper-3) hover:text-(--color-ink)"
-      >
-        <X className="h-4 w-4" aria-hidden />
-      </button>
-    </header>
-  );
-}
-
-function DrawerError({ onClose }: { onClose: () => void }) {
-  return (
-    <header className="flex items-center justify-between border-(--color-edge) border-b px-5 py-3">
-      <span className="font-mono text-[11px] text-(--color-rule) uppercase tracking-[0.18em]">
-        entry not found
-      </span>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close preview"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-(--radius-stamp) text-(--color-ink-3) hover:bg-(--color-paper-3) hover:text-(--color-ink)"
-      >
-        <X className="h-4 w-4" aria-hidden />
-      </button>
-    </header>
   );
 }
 

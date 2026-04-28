@@ -121,7 +121,7 @@ export function ProjectDashboard() {
   const description = project.data?.description?.trim() || null;
 
   return (
-    <div className="bg-(--color-paper) px-7 pt-6 pb-8 text-(--color-ink)">
+    <div className="px-7 pt-6 pb-8 text-(--color-ink)">
       <header className="flex items-start justify-between gap-6">
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex items-center gap-2">

@@ -6,7 +6,7 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useState
  * defaults can later be hard-baked back into `app.css` and the panel
  * stays for ongoing experiments.
  */
-export type PaperWarmth = "cream" | "off-white" | "linen";
+export type PaperWarmth = "cream" | "off-white" | "linen" | "parchment" | "notebook" | "graph";
 export type RuleColour = "red" | "ochre" | "indigo";
 export type Density = "compact" | "comfortable" | "loose";
 export type StampShape = "rect" | "pill" | "ticket-cut";
@@ -44,10 +44,32 @@ export const STORAGE_KEY = "tripwire.tweaks.v1";
  * default — so that toggling back to the default visibly clears any
  * prior override.
  */
+// Each variant sets the base `--color-paper` colour and an optional
+// `--paper-image` background stack, applied at <html> by app.css.
+// Solid variants set `--paper-image: none` so toggling between
+// textured ↔ solid clears the previous texture cleanly.
 const PAPER_VARS: Record<PaperWarmth, Record<string, string>> = {
-  cream: { "--color-paper": "#f0eee9" },
-  "off-white": { "--color-paper": "#f5f4ef" },
-  linen: { "--color-paper": "#ece5d8" },
+  cream: { "--color-paper": "#f0eee9", "--paper-image": "none" },
+  "off-white": { "--color-paper": "#f5f4ef", "--paper-image": "none" },
+  linen: { "--color-paper": "#ece5d8", "--paper-image": "none" },
+  parchment: { "--color-paper": "#ebe1d0", "--paper-image": "none" },
+  // Field-notebook texture: light horizontal ruled lines every 32px
+  // plus a single rule-red vertical margin line ~80px from the left.
+  // Cards/panels (which use --color-paper-2/-3) sit on top and
+  // occlude the texture inside them — texture is only visible in
+  // gutters and empty page areas, which is the desired effect.
+  notebook: {
+    "--color-paper": "#f0eee9",
+    "--paper-image":
+      "repeating-linear-gradient(to bottom, transparent 0, transparent 31px, rgba(96, 110, 130, 0.22) 31px, rgba(96, 110, 130, 0.22) 32px), linear-gradient(to right, transparent 0, transparent 79px, rgba(200, 61, 46, 0.6) 79px, rgba(200, 61, 46, 0.6) 80px, transparent 80px)",
+  },
+  // Graph paper: faint grid every 24px in both axes. Reads as
+  // engineering-pad rather than ruled-pad.
+  graph: {
+    "--color-paper": "#f0eee9",
+    "--paper-image":
+      "repeating-linear-gradient(to bottom, transparent 0, transparent 23px, rgba(96, 110, 130, 0.16) 23px, rgba(96, 110, 130, 0.16) 24px), repeating-linear-gradient(to right, transparent 0, transparent 23px, rgba(96, 110, 130, 0.16) 23px, rgba(96, 110, 130, 0.16) 24px)",
+  },
 };
 
 const RULE_VARS: Record<RuleColour, Record<string, string>> = {
