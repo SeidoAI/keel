@@ -106,8 +106,7 @@ function SessionDetailReady({
   // API response. Otherwise the user clicks a "blocked" warning and
   // lands on a non-blocking item, hiding urgent work. Falls back to
   // `linkedInbox[0]` only when no blocked entries exist (chip is fyi).
-  const inboxChipTargetId =
-    blockedCount > 0 ? blockedInbox[0]?.id : linkedInbox[0]?.id;
+  const inboxChipTargetId = blockedCount > 0 ? blockedInbox[0]?.id : linkedInbox[0]?.id;
 
   const [previewInboxId, setPreviewInboxId] = useState<string | null>(null);
 
