@@ -166,9 +166,7 @@ class TestPauseSession:
         sess = load_session(sess_project, "live-session")
         assert sess.status == "paused"
 
-    def test_non_executing_session_returns_409(
-        self, session_client, sess_project_id
-    ):
+    def test_non_executing_session_returns_409(self, session_client, sess_project_id):
         # session-a is `planned` per the session_client fixture.
         r = session_client.post(
             f"/api/projects/{sess_project_id}/sessions/session-a/pause"
