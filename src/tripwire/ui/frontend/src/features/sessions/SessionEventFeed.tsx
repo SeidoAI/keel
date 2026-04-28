@@ -232,7 +232,15 @@ function kindToTone(kind: ProcessEventKind): StampTone {
 }
 
 function formatTimestamp(iso: string): string {
+  // Same pattern as SessionEngagementList.formatTimestamp — falls back
+  // to the raw string on parse failure (so we never drop data) and
+  // emits a dev-only warn so the bad payload surfaces in dev tools.
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
+  if (Number.isNaN(d.getTime())) {
+    if (import.meta.env.DEV) {
+      console.warn("SessionEventFeed: failed to parse event timestamp", iso);
+    }
+    return iso;
+  }
   return d.toISOString().slice(0, 16).replace("T", " ");
 }

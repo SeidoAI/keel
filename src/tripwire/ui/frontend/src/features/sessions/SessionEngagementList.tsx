@@ -99,9 +99,16 @@ function outcomeToTone(outcome: string): "default" | "gate" | "tripwire" | "rule
 function formatTimestamp(iso: string): string {
   // ISO → "YYYY-MM-DD HH:mm" — readable, fixed width, parses back to
   // Date if anyone cares. Falls back to the raw string when the input
-  // doesn't parse so we never silently drop data.
+  // doesn't parse so we never silently drop data; in dev we emit a
+  // warn so an unrecognised payload shows up in dev tools rather than
+  // as a quiet bad value in the UI.
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
+  if (Number.isNaN(d.getTime())) {
+    if (import.meta.env.DEV) {
+      console.warn("SessionEngagementList: failed to parse engagement timestamp", iso);
+    }
+    return iso;
+  }
   return d.toISOString().slice(0, 16).replace("T", " ");
 }
 
