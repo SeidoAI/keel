@@ -19,6 +19,7 @@ from __future__ import annotations
 import re
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, ConfigDict
 
 from tripwire.ui.dependencies import ProjectContext, get_project
 from tripwire.ui.routes._common import envelope_exception
@@ -38,6 +39,18 @@ from tripwire.ui.services.node_service import (
 from tripwire.ui.services.node_service import (
     reverse_refs as svc_reverse_refs,
 )
+from tripwire.ui.services.node_service import (
+    update_node_layout as svc_update_layout,
+)
+
+
+class LayoutPatchBody(BaseModel):
+    """Request body for ``PATCH /nodes/{id}/layout`` (KUI-104)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    x: float
+    y: float
 
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["nodes"])
 
@@ -93,6 +106,26 @@ async def get_node(
             code="node/not_found",
             detail=f"Node {node_id!r} not found in this project.",
         ) from exc
+
+
+@router.patch("/nodes/{node_id}/layout", response_model=NodeDetail)
+async def patch_node_layout(
+    node_id: str,
+    body: LayoutPatchBody,
+    project: ProjectContext = Depends(get_project),  # noqa: B008
+) -> NodeDetail:
+    """Persist a Concept Graph (x, y) to ``nodes/<id>.yaml`` (KUI-104)."""
+    _ensure_slug(node_id)
+    try:
+        return svc_update_layout(project.project_dir, node_id, x=body.x, y=body.y)
+    except FileNotFoundError as exc:
+        raise envelope_exception(
+            404,
+            code="node/not_found",
+            detail=f"Node {node_id!r} not found in this project.",
+        ) from exc
+    except ValueError as exc:
+        raise envelope_exception(400, code="node/bad_slug", detail=str(exc)) from exc
 
 
 @router.get("/refs/reverse/{node_id}", response_model=ReverseRefsResult)

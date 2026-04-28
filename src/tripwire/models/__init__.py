@@ -34,7 +34,7 @@ from tripwire.models.graph import (
     GraphNode,
 )
 from tripwire.models.issue import Issue
-from tripwire.models.node import ConceptNode, NodeSource
+from tripwire.models.node import ConceptNode, NodeLayout, NodeSource
 from tripwire.models.project import (
     GraphSettings,
     LabelCategories,
@@ -76,6 +76,7 @@ __all__ = [
     "IssueStatus",
     "LabelCategories",
     "MessageType",
+    "NodeLayout",
     "NodeSource",
     "NodeStatus",
     "NodeType",

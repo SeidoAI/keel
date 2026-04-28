@@ -17,10 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from tripwire.core import graph_cache
 from tripwire.core.freshness import check_node_freshness
 from tripwire.core.node_store import list_nodes as _core_list_nodes
-from tripwire.core.node_store import load_node
+from tripwire.core.node_store import load_node, save_node
 from tripwire.core.store import ProjectNotFoundError, load_project
 from tripwire.models.graph import FreshnessStatus
 from tripwire.models.node import NODE_ID_PATTERN
+from tripwire.models.node import NodeLayout as ModelNodeLayout
 
 logger = logging.getLogger("tripwire.ui.services.node_service")
 
@@ -45,6 +46,15 @@ class NodeSource(BaseModel):
     content_hash: str | None = None
 
 
+class NodeLayout(BaseModel):
+    """Persisted (x, y) layout, mirrored from the YAML model layer."""
+
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
+    x: float
+    y: float
+
+
 class NodeSummary(BaseModel):
     """Lightweight node descriptor for list views."""
 
@@ -58,6 +68,7 @@ class NodeSummary(BaseModel):
     tags: list[str] = Field(default_factory=list)
     related: list[str] = Field(default_factory=list)
     ref_count: int = 0
+    layout: NodeLayout | None = None
 
 
 class NodeDetail(NodeSummary):
@@ -242,6 +253,11 @@ def list_nodes(
                 tags=list(node.tags),
                 related=list(node.related),
                 ref_count=ref_counts.get(node.id, 0),
+                layout=(
+                    NodeLayout(x=node.layout.x, y=node.layout.y)
+                    if node.layout is not None
+                    else None
+                ),
             )
         )
     return out
@@ -279,10 +295,32 @@ def get_node(project_dir: Path, node_id: str) -> NodeDetail:
         tags=list(node.tags),
         related=list(node.related),
         ref_count=ref_count,
+        layout=(
+            NodeLayout(x=node.layout.x, y=node.layout.y)
+            if node.layout is not None
+            else None
+        ),
         body=node.body,
         source=source,
         is_stale=node.id in stale_set,
     )
+
+
+def update_node_layout(
+    project_dir: Path, node_id: str, *, x: float, y: float
+) -> NodeDetail:
+    """Persist a node's Concept Graph (x, y) and return the updated detail.
+
+    The graph canvas calls this once per node after the d3-force seeding
+    settles. Subsequent loads read the stored layout and skip the
+    simulation. Wraps :func:`tripwire.core.node_store.save_node` so the
+    graph cache invalidates automatically.
+    """
+    _require_valid_id(node_id)
+    node = load_node(project_dir, node_id)
+    node.layout = ModelNodeLayout(x=x, y=y)
+    save_node(project_dir, node)
+    return get_node(project_dir, node_id)
 
 
 def check_all_freshness(project_dir: Path) -> FreshnessReport:
@@ -350,6 +388,7 @@ __all__ = [
     "FreshnessEntry",
     "FreshnessReport",
     "NodeDetail",
+    "NodeLayout",
     "NodeSource",
     "NodeSummary",
     "Referrer",
@@ -358,4 +397,5 @@ __all__ = [
     "get_node",
     "list_nodes",
     "reverse_refs",
+    "update_node_layout",
 ]

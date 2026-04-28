@@ -37,6 +37,20 @@ class NodeSource(BaseModel):
     content_hash: str | None = None
 
 
+class NodeLayout(BaseModel):
+    """Persisted (x, y) position used by the Concept Graph canvas (KUI-104).
+
+    First page-load runs d3-force on the client and PATCHes the resting
+    position back to each node's YAML. Subsequent loads read the stored
+    layout and skip the simulation, so reloads don't re-shuffle.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    x: float
+    y: float
+
+
 class ConceptNode(BaseModel):
     """A node in the concept graph.
 
@@ -57,6 +71,10 @@ class ConceptNode(BaseModel):
     description: str | None = None
 
     source: NodeSource | None = None
+
+    # Persisted Concept Graph canvas position (KUI-104). Optional —
+    # nodes without a layout get fresh d3-force seeding on first load.
+    layout: NodeLayout | None = None
 
     related: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)

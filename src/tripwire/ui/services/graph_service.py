@@ -212,6 +212,8 @@ def _react_flow_type_for(graph_node: GraphNode) -> str:
 def _react_flow_node(
     node: GraphNode,
     positions: dict[str, tuple[float, float]],
+    *,
+    has_saved: bool = False,
 ) -> ReactFlowNode:
     pos = positions.get(node.id, (0.0, 0.0))
     data: dict[str, Any] = {"label": node.label or node.id, "kind": node.kind}
@@ -219,6 +221,10 @@ def _react_flow_node(
         data["type"] = node.type
     if node.status is not None:
         data["status"] = node.status
+    # Tells the Concept Graph canvas it can skip d3-force seeding for
+    # this node — the position came from the persisted YAML layout.
+    if has_saved:
+        data["has_saved_layout"] = True
     return ReactFlowNode(
         id=node.id,
         type=_react_flow_type_for(node),
@@ -371,6 +377,27 @@ def build_dependency_graph(
 # ---------------------------------------------------------------------------
 
 
+def _saved_layouts(project_dir: Path) -> dict[str, tuple[float, float]]:
+    """Read every node's persisted (x, y) layout for the canvas (KUI-104).
+
+    Returns an empty dict when the nodes dir is missing or unreadable —
+    callers fall back to the layered BFS positions.
+    """
+    from tripwire.core.node_store import list_nodes as _list_nodes
+    from tripwire.core.paths import nodes_dir
+
+    if not nodes_dir(project_dir).is_dir():
+        return {}
+    out: dict[str, tuple[float, float]] = {}
+    try:
+        for node in _list_nodes(project_dir):
+            if node.layout is not None:
+                out[node.id] = (node.layout.x, node.layout.y)
+    except Exception as exc:  # noqa: BLE001 — best effort, don't break the graph
+        logger.warning("graph_service: failed to read saved layouts: %s", exc)
+    return out
+
+
 def build_concept_graph(
     project_dir: Path,
     *,
@@ -378,7 +405,13 @@ def build_concept_graph(
     upstream: bool = False,
     downstream: bool = False,
 ) -> ReactFlowGraph:
-    """Build the full concept graph (issues + nodes + all edge types)."""
+    """Build the full concept graph (issues + nodes + all edge types).
+
+    Per KUI-104, individual concept-node files may carry a persisted
+    ``layout: {x, y}``. When present, that overrides the deterministic
+    layered BFS so the canvas reuses the user-blessed position from
+    the previous d3-force run instead of re-shuffling on every reload.
+    """
     result: FullGraphResult = build_full_graph(project_dir)
 
     nodes: list[GraphNode] = list(result.nodes)
@@ -391,7 +424,12 @@ def build_concept_graph(
         nodes, edges = _restrict_to_ids(nodes, edges, focus_ids)
 
     layout = _layered_layout([n.id for n in nodes], edges)
-    rf_nodes = [_react_flow_node(n, layout.positions) for n in nodes]
+    saved = _saved_layouts(project_dir)
+    positions: dict[str, tuple[float, float]] = dict(layout.positions)
+    positions.update(saved)
+    rf_nodes = [
+        _react_flow_node(n, positions, has_saved=n.id in saved) for n in nodes
+    ]
     rf_edges = _react_flow_edges(edges)
 
     return ReactFlowGraph(
