@@ -181,6 +181,73 @@ describe("SessionDetail (v0.8 — Option C)", () => {
     expect(within(dialog).getByText("Needs human review")).toBeInTheDocument();
   });
 
+  it("opens the FIRST blocked entry when fyi entries sort earlier in the API response", async () => {
+    // Codex P2 (2026-04-28): chip label says 'blocked' so click MUST
+    // route to the blocked entry, even if a fyi entry sorts before it
+    // in the unresolved list.
+    const inboxItems: InboxItem[] = [
+      {
+        // FYI sorts first in API order — but the chip says 'blocked',
+        // so clicking should NOT land here.
+        id: "inb-fyi",
+        bucket: "fyi",
+        title: "FYI ping (should NOT open)",
+        body: "",
+        author: "pm-agent",
+        created_at: "2026-04-27T08:00:00Z",
+        references: [{ session: "sess-a" }],
+        escalation_reason: null,
+        resolved: false,
+        resolved_at: null,
+        resolved_by: null,
+      },
+      {
+        id: "inb-blocked",
+        bucket: "blocked",
+        title: "Needs human review (must open)",
+        body: "",
+        author: "pm-agent",
+        created_at: "2026-04-27T12:00:00Z",
+        references: [{ session: "sess-a" }],
+        escalation_reason: null,
+        resolved: false,
+        resolved_at: null,
+        resolved_by: null,
+      },
+    ];
+    server.use(
+      http.get("/api/projects/p1/events", () =>
+        HttpResponse.json({ events: [], next_cursor: null }),
+      ),
+      http.get("/api/projects/p1/inbox", () => HttpResponse.json(inboxItems)),
+      http.get("/api/projects/p1/inbox/:id", ({ params }) => {
+        const item = inboxItems.find((i) => i.id === params.id);
+        return item
+          ? HttpResponse.json(item)
+          : HttpResponse.json({ detail: "missing" }, { status: 404 });
+      }),
+    );
+
+    const session = fixtureSession();
+    const qc = makeTestQueryClient();
+    qc.setQueryData(queryKeys.session("p1", session.id), session);
+
+    renderWithProviders(<SessionDetail />, {
+      queryClient: qc,
+      initialPath: `/p/p1/sessions/${session.id}`,
+      routePath: "/p/:projectId/sessions/:sid",
+      extraRoutes: SESSION_DETAIL_EXTRAS,
+    });
+
+    // Chip label promises 'blocked', so clicking MUST land on the
+    // blocked entry — not the fyi entry that sorts earlier.
+    const chip = await screen.findByRole("button", { name: /inbox.*1.*blocked/i });
+    fireEvent.click(chip);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Needs human review (must open)")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/should NOT open/)).not.toBeInTheDocument();
+  });
+
   it("renders the engagement list when runtime_state.engagements has entries", async () => {
     setupServer();
     const session = fixtureSession({
