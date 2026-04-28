@@ -93,3 +93,22 @@ export function useWorkflowEvents(pid: string, params: ListEventsParams = {}) {
     },
   });
 }
+
+/**
+ * Per-session view of the events feed — thin wrapper that always
+ * pins `session_id`. Used by the Session Detail screen (S3) to
+ * render the per-session filtered ProcessEvent feed in lieu of the
+ * v0.9 turn timeline (deferred under Option C — see
+ * `sessions/v08-session-detail/plan.md`).
+ *
+ * The cache key includes `session_id` plus any extra params, so a
+ * second hook in the same project filtering different kinds gets a
+ * separate cache entry.
+ */
+export function useSessionEvents(
+  pid: string,
+  sid: string,
+  opts: Omit<ListEventsParams, "session_id"> = {},
+) {
+  return useWorkflowEvents(pid, { ...opts, session_id: sid });
+}
