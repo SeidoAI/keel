@@ -5,6 +5,7 @@ import { useProjectShell } from "@/app/ProjectShell";
 import { sessionStageColor } from "@/components/ui/session-stage-row";
 import { Stamp } from "@/components/ui/stamp";
 import { useWorkflow } from "@/lib/api/endpoints/workflow";
+import { isPmMode } from "@/lib/role";
 import { ArtifactCard } from "./ArtifactCard";
 import { ConnectorCurve } from "./ConnectorCurve";
 import { StationCard } from "./StationCard";
@@ -32,9 +33,14 @@ import { WorkflowDrawer, type WorkflowSelection } from "./WorkflowDrawer";
  */
 export function WorkflowMap() {
   const { projectId } = useProjectShell();
-  const { data: graph } = useWorkflow(projectId);
   const [searchParams] = useSearchParams();
+  // Detect PM-mode BEFORE the fetch so the hook can pin
+  // X-Tripwire-Role on the request and the React Query cache key
+  // — the backend nulls `tripwires[*].prompt_revealed` for non-PM
+  // viewers, so without this the drawer never has the prompt body
+  // even when ?role=pm is set.
   const pmMode = useMemo(() => isPmMode(searchParams.get("role")), [searchParams]);
+  const { data: graph } = useWorkflow(projectId, { pmMode });
 
   const layout = useMemo(() => (graph ? computeWorkflowLayout(graph) : null), [graph]);
   const [hovered, setHovered] = useState<HoverKey | null>(null);
@@ -391,16 +397,3 @@ function EmptyState() {
   );
 }
 
-/**
- * PM-mode detection: `?role=pm` URL flag (dev convenience) OR the
- * `tripwire-role` localStorage key set to `pm`. Mirrors spec §4.13.
- */
-function isPmMode(roleParam: string | null): boolean {
-  if (roleParam === "pm") return true;
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem("tripwire-role") === "pm";
-  } catch {
-    return false;
-  }
-}

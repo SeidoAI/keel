@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { pmRoleHeaders } from "@/lib/role";
 import { ApiError, apiGet } from "../client";
 import { queryKeys, staleTime } from "../queryKeys";
 
@@ -56,13 +57,28 @@ export interface WorkflowGraph {
 }
 
 export const workflowApi = {
-  get: (pid: string) => apiGet<WorkflowGraph>(`/api/projects/${encodeURIComponent(pid)}/workflow`),
+  /**
+   * GET the orchestration graph for a project.
+   *
+   * `pmMode` toggles the `X-Tripwire-Role: pm` header so the
+   * server fills `tripwires[*].prompt_revealed` with the
+   * unredacted body (otherwise it returns `null`). The role gate
+   * is a semantic separation, not auth — see `role_gate.py`.
+   */
+  get: (pid: string, opts?: { pmMode?: boolean }) =>
+    apiGet<WorkflowGraph>(`/api/projects/${encodeURIComponent(pid)}/workflow`, {
+      headers: pmRoleHeaders(Boolean(opts?.pmMode)),
+    }),
 };
 
-export function useWorkflow(pid: string) {
+export function useWorkflow(pid: string, opts?: { pmMode?: boolean }) {
+  const pmMode = Boolean(opts?.pmMode);
   return useQuery<WorkflowGraph>({
-    queryKey: queryKeys.workflow(pid),
-    queryFn: () => workflowApi.get(pid),
+    // PM-mode payload differs from default (tripwire prompt
+    // bodies revealed); cache them under separate keys so toggling
+    // role doesn't return a stale redacted graph.
+    queryKey: [...queryKeys.workflow(pid), { pmMode }] as const,
+    queryFn: () => workflowApi.get(pid, { pmMode }),
     staleTime: staleTime.default,
     // The endpoint is additive — until Strand Y ships, the backend
     // returns 404. Don't retry on a clean 404; surface as undefined to

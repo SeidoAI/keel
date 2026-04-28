@@ -57,14 +57,19 @@ function makeGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
   };
 }
 
-function withProviders(graph: WorkflowGraph | null) {
+function withProviders(graph: WorkflowGraph | null, opts?: { pmMode?: boolean }) {
+  const pmMode = Boolean(opts?.pmMode);
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
-  if (graph) qc.setQueryData(queryKeys.workflow("p1"), graph);
+  // Mirror the cache-key shape used by `useWorkflow` — without the
+  // pmMode suffix the hook misses cache and falls back to MSW's
+  // stub handler, which returns an empty graph.
+  if (graph) qc.setQueryData([...queryKeys.workflow("p1"), { pmMode }], graph);
+  const initialEntry = pmMode ? "/p/p1/workflow?role=pm" : "/p/p1/workflow";
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/p/p1/workflow"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route path="/p/:projectId/workflow" element={children} />
         </Routes>
@@ -131,6 +136,35 @@ describe("WorkflowMap", () => {
     fireEvent.click(tripwireButton);
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("<<tripwire registered>>")).toBeTruthy();
+  });
+
+  it("reveals the prompt body for ?role=pm viewers (PM-mode payload reaches the drawer)", () => {
+    // Seed the PM-mode cache key with a graph whose tripwire has
+    // `prompt_revealed` populated (mirroring what the server returns
+    // when the `X-Tripwire-Role: pm` header arrives). The drawer
+    // should render that body, not the placeholder.
+    const graph = makeGraph({
+      tripwires: [
+        {
+          id: "t1",
+          kind: "tripwire",
+          name: "stale-context",
+          fires_on_station: "in_review",
+          fires_on_event: "session.complete",
+          prompt_revealed: "secret-prompt-body for the agent",
+          prompt_redacted: "<<tripwire registered>>",
+        },
+      ],
+    });
+    const Wrapper = withProviders(graph, { pmMode: true });
+    render(
+      <Wrapper>
+        <WorkflowMap />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByLabelText(/Tripwire stale-context/));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/secret-prompt-body for the agent/i)).toBeTruthy();
   });
 
   it("auto-renders new validators added to the API without code changes", () => {
