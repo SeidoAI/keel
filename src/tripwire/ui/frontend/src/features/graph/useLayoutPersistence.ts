@@ -24,8 +24,14 @@ export interface UseLayoutPersistence {
 export function useLayoutPersistence(projectId: string): UseLayoutPersistence {
   const pendingRef = useRef<Map<string, NodeLayout>>(new Map());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const projectRef = useRef(projectId);
-  projectRef.current = projectId;
+  // Tracks the project id that owns the *current* buffer. We pin
+  // it at persist time (and again when projectId changes through a
+  // synchronous flush) so the eventual PATCHes always go to the
+  // project that produced the position. PM #25 round 3 P1: React
+  // Router keeps the same component instance across `/p/:pid`
+  // changes, so a debounced batch from project A can otherwise
+  // dispatch against project B.
+  const bufferOwnerRef = useRef<string>(projectId);
 
   const flush = useMemo(() => {
     return async (): Promise<void> => {
@@ -36,7 +42,7 @@ export function useLayoutPersistence(projectId: string): UseLayoutPersistence {
       const batch = pendingRef.current;
       if (batch.size === 0) return;
       pendingRef.current = new Map();
-      const pid = projectRef.current;
+      const pid = bufferOwnerRef.current;
       // Fire-and-forget per node; failures don't block subsequent
       // persistence attempts. The next debounce window will retry
       // anything the canvas re-emits.
@@ -45,6 +51,16 @@ export function useLayoutPersistence(projectId: string): UseLayoutPersistence {
       );
     };
   }, []);
+
+  // When the route's projectId changes, synchronously flush the
+  // pending batch to the OLD project before the new one starts
+  // collecting. The empty-batch fast path inside flush() means
+  // this is a no-op when there's nothing pending.
+  useEffect(() => {
+    if (bufferOwnerRef.current === projectId) return;
+    void flush();
+    bufferOwnerRef.current = projectId;
+  }, [projectId, flush]);
 
   useEffect(() => {
     return () => {
