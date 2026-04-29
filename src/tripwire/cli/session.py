@@ -1320,6 +1320,8 @@ def session_scaffold_cmd(
     # so scaffold respects whatever the user has customised locally.
     from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+    from tripwire.core import paths as _paths
+
     templates_root = resolved / "templates" / "artifacts"
     env = Environment(
         loader=FileSystemLoader(str(templates_root)),
@@ -1328,8 +1330,16 @@ def session_scaffold_cmd(
         lstrip_blocks=True,
     )
 
-    session_dir = resolved / "sessions" / session_id
-    session_dir.mkdir(parents=True, exist_ok=True)
+    # Modern (post-KUI-110) layout: manifest artifacts live under
+    # `sessions/<sid>/artifacts/` to match `check_artifact_presence`'s
+    # subdir-aware path resolution. Pre-KUI-110 sessions kept these at
+    # the session root (flat); the validator's strict check now expects
+    # subdir, and the helpers in `core.paths` resolve subdir-first with
+    # a flat fallback for legacy sessions.
+    session_root = _paths.session_dir(resolved, session_id)
+    artifacts_dest_dir = _paths.session_artifacts_dir(resolved, session_id)
+    session_root.mkdir(parents=True, exist_ok=True)
+    artifacts_dest_dir.mkdir(parents=True, exist_ok=True)
 
     context = {
         "session": session,
@@ -1341,7 +1351,7 @@ def session_scaffold_cmd(
 
     wrote = 0
     for entry in targets:
-        dest = session_dir / entry.file
+        dest = artifacts_dest_dir / entry.file
         if dest.exists() and not force:
             click.echo(f"  Skipping {entry.file} — exists (use --force to overwrite)")
             continue
@@ -1353,7 +1363,7 @@ def session_scaffold_cmd(
             ) from exc
         rendered = tpl.render(**context)
         dest.write_text(rendered, encoding="utf-8")
-        click.echo(f"  Wrote {entry.file}")
+        click.echo(f"  Wrote {_paths.SESSION_ARTIFACTS_SUBDIR}/{entry.file}")
         wrote += 1
 
     if wrote == 0 and not artifact_name:

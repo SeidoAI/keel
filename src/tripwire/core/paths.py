@@ -170,7 +170,24 @@ def session_yaml_path(project_dir: Path, session_id: str) -> Path:
 
 
 def session_plan_path(project_dir: Path, session_id: str) -> Path:
-    return session_dir(project_dir, session_id) / SESSION_PLAN
+    """Resolve the plan.md path for a session.
+
+    Modern (post-KUI-110) layout puts plan.md under
+    ``sessions/<sid>/artifacts/plan.md`` to match the manifest's
+    subdir-aware artifact contract (see ``check_artifact_presence``).
+    Legacy sessions kept it at flat ``sessions/<sid>/plan.md``.
+
+    This resolver prefers the subdir path when the file is on disk
+    there; otherwise falls back to the legacy flat path. New writes
+    SHOULD go through the scaffolder which writes subdir-canonical;
+    this fallback exists so resume/UI/validator reads on existing
+    legacy sessions continue to work without an eager migration.
+    """
+    sd = session_dir(project_dir, session_id)
+    subdir = sd / SESSION_ARTIFACTS_SUBDIR / SESSION_PLAN
+    if subdir.is_file():
+        return subdir
+    return sd / SESSION_PLAN
 
 
 def session_artifacts_dir(project_dir: Path, session_id: str) -> Path:

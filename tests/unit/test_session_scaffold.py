@@ -87,13 +87,26 @@ class TestSessionScaffold:
         )
 
         assert result.exit_code == 0, result.output
-        vc_path = tmp_path_project / "sessions" / "s1" / "verification-checklist.md"
+        # Modern (post-KUI-110) layout: manifest artifacts live under the
+        # `artifacts/` subdir to match `check_artifact_presence`'s subdir-
+        # aware path resolution.
+        vc_path = (
+            tmp_path_project
+            / "sessions"
+            / "s1"
+            / "artifacts"
+            / "verification-checklist.md"
+        )
         assert vc_path.is_file()
         body = vc_path.read_text()
         # Rendered with session context — not just a placeholder.
         assert "s1" in body
         assert "Agent: backend-coder" in body
         assert "Issues: 2" in body
+        # Should NOT have written a flat-layout copy.
+        assert not (
+            tmp_path_project / "sessions" / "s1" / "verification-checklist.md"
+        ).is_file()
 
     def test_scaffold_skips_in_progress_phase_artifacts(
         self, tmp_path_project, save_test_session
@@ -111,6 +124,9 @@ class TestSessionScaffold:
         )
 
         assert not (tmp_path_project / "sessions" / "s1" / "task-checklist.md").exists()
+        assert not (
+            tmp_path_project / "sessions" / "s1" / "artifacts" / "task-checklist.md"
+        ).exists()
 
     def test_scaffold_refuses_existing_without_force(
         self, tmp_path_project, save_test_session
@@ -118,9 +134,9 @@ class TestSessionScaffold:
         _seed_manifest_with_verification(tmp_path_project)
         save_test_session(tmp_path_project, "s1", status="planned")
 
-        sess_dir = tmp_path_project / "sessions" / "s1"
-        sess_dir.mkdir(parents=True, exist_ok=True)
-        (sess_dir / "verification-checklist.md").write_text("CUSTOM\n")
+        artifacts_dir = tmp_path_project / "sessions" / "s1" / "artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        (artifacts_dir / "verification-checklist.md").write_text("CUSTOM\n")
 
         runner = CliRunner()
         result = runner.invoke(
@@ -130,15 +146,15 @@ class TestSessionScaffold:
         assert result.exit_code == 0, result.output
         assert "Skipping" in result.output
         # File preserved — scaffold is refusing to overwrite.
-        assert (sess_dir / "verification-checklist.md").read_text() == "CUSTOM\n"
+        assert (artifacts_dir / "verification-checklist.md").read_text() == "CUSTOM\n"
 
     def test_scaffold_force_overwrites(self, tmp_path_project, save_test_session):
         _seed_manifest_with_verification(tmp_path_project)
         save_test_session(tmp_path_project, "s1", status="planned")
 
-        sess_dir = tmp_path_project / "sessions" / "s1"
-        sess_dir.mkdir(parents=True, exist_ok=True)
-        (sess_dir / "verification-checklist.md").write_text("CUSTOM\n")
+        artifacts_dir = tmp_path_project / "sessions" / "s1" / "artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        (artifacts_dir / "verification-checklist.md").write_text("CUSTOM\n")
 
         runner = CliRunner()
         result = runner.invoke(
@@ -152,7 +168,7 @@ class TestSessionScaffold:
             ],
         )
         assert result.exit_code == 0, result.output
-        body = (sess_dir / "verification-checklist.md").read_text()
+        body = (artifacts_dir / "verification-checklist.md").read_text()
         assert "CUSTOM" not in body
         assert "Verification Checklist — s1" in body
 
@@ -175,11 +191,12 @@ class TestSessionScaffold:
             ],
         )
         assert result.exit_code == 0, result.output
-        sess_dir = tmp_path_project / "sessions" / "s1"
-        assert (sess_dir / "verification-checklist.md").is_file()
+        artifacts_dir = tmp_path_project / "sessions" / "s1" / "artifacts"
+        assert (artifacts_dir / "verification-checklist.md").is_file()
         # plan.md is ALSO a planning-phase pm-owned required artifact in
         # the test manifest, but --artifact scoped us to one.
-        assert not (sess_dir / "plan.md").is_file()
+        assert not (artifacts_dir / "plan.md").is_file()
+        assert not (tmp_path_project / "sessions" / "s1" / "plan.md").is_file()
 
     def test_scaffold_unknown_artifact_errors(
         self, tmp_path_project, save_test_session
