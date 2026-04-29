@@ -29,6 +29,7 @@ from tripwire.core.issue_artifact_store import (
 )
 from tripwire.core.session_store import load_session, save_session
 from tripwire.core.store import load_issue, save_issue
+from tripwire.models.enums import SessionStatus
 
 
 class CompleteError(ValueError):
@@ -107,7 +108,7 @@ def complete_session(
             result.issues_closed.append(issue_key)
 
     now = datetime.now(tz=timezone.utc)
-    session.status = "completed"
+    session.status = SessionStatus.COMPLETED
     session.updated_at = now
     if session.engagements:
         last = session.engagements[-1]

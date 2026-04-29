@@ -1,10 +1,13 @@
-"""v0.7.9 §A1 — `status: done` ⇒ required artifacts exist on origin/main.
+"""v0.7.9 §A1 — terminal-success ⇒ required artifacts exist on origin/main.
 
-The correctness contract. For every session and issue with
-``status: done``, every file listed in
+The correctness contract. For every session at ``status: completed``
+and every issue at ``status: done``, every file listed in
 ``project.yaml.artifact_manifest`` must be present on the merged-main
 snapshot of the project tracking repo (``origin/main``). "On main" is
 the only state that counts; worktree files don't.
+
+KUI-110: sessions transitioned to ``completed`` (not the legacy ``done``
+which is no longer a SessionStatus value); issues stay at ``done``.
 
 Online-first. We don't ``git fetch`` from inside validate (would hit
 the network on every run). If ``origin/main`` is unreadable (no remote,
@@ -30,7 +33,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     if ctx.project_config is None:
         return []
 
-    done_sessions = [e for e in ctx.sessions if e.model.status == "done"]
+    done_sessions = [e for e in ctx.sessions if e.model.status == "completed"]
     done_issues = [e for e in ctx.issues if e.model.status == "done"]
     if not done_sessions and not done_issues:
         return []
@@ -70,7 +73,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
                     severity="error",
                     file=entity.rel_path,
                     message=(
-                        f"Session {session.id!r} is `done` but required "
+                        f"Session {session.id!r} is `completed` but required "
                         f"artifact {rel!r} is not on origin/main."
                     ),
                     fix_hint=(

@@ -40,7 +40,7 @@ def test_abandon_planned_session_transitions_status(
 
 
 def test_abandon_refuses_already_terminal(tmp_path_project: Path, save_test_session):
-    save_test_session(tmp_path_project, "s1", status="done")
+    save_test_session(tmp_path_project, "s1", status="completed")
     with pytest.raises(AbandonError) as exc:
         abandon_session(tmp_path_project, "s1")
     assert exc.value.code == "abandon/already_terminal"
@@ -252,7 +252,7 @@ def test_cli_abandon_unknown_session(tmp_path_project: Path):
 
 
 def test_cli_abandon_already_done_refuses(tmp_path_project: Path, save_test_session):
-    save_test_session(tmp_path_project, "s1", status="done")
+    save_test_session(tmp_path_project, "s1", status="completed")
     runner = CliRunner()
     result = runner.invoke(
         session_cmd, ["abandon", "s1", "--project-dir", str(tmp_path_project)]

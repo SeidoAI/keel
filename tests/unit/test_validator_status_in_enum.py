@@ -1,17 +1,24 @@
 """Tests for the upstream-enum status check rules (KUI-110 Phase 2.4).
 
 These rules are the belt-and-suspenders layer that catches statuses
-which slipped past Pydantic (e.g. hand-edited YAML on disk) and which
-would have validated against a drifted project-side enum YAML. They
-assert the upstream Python enum (`SessionStatus`, `IssueStatus`) is the
-floor, regardless of how the project's enum YAML has been customised.
+not in the upstream Python enum. Post-Phase 2.1 the typed schema
+(``AgentSession.status: SessionStatus``) rejects invalid values during
+``model_validate``, so most invalid YAML never makes it past the
+loader — the load-time error code is ``session/schema_invalid``. The
+``status/invalid_enum`` rule still has belt-and-suspenders value for
+issues (``Issue.status`` remains a plain ``str``) and for any future
+session in-memory mutation that bypasses validation.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from tripwire.core.validator import validate_project
+from tripwire.core.validator import (
+    ValidationContext,
+    check_session_status_in_enum,
+    validate_project,
+)
 from tests.unit.test_validator import (  # type: ignore[import-not-found]
     write_issue,
     write_project_yaml,
@@ -19,44 +26,84 @@ from tests.unit.test_validator import (  # type: ignore[import-not-found]
 )
 
 
-def test_session_with_invalid_status_flagged(tmp_path: Path) -> None:
-    """A session with status not in SessionStatus → status/invalid_enum error."""
+def test_session_with_invalid_status_blocked_at_load(tmp_path: Path) -> None:
+    """A session with status not in SessionStatus is rejected at load
+    time (typed schema field). Either ``status/invalid_enum`` or
+    ``session/schema_invalid`` must be reported for the bad session."""
     write_project_yaml(tmp_path)
     write_session(tmp_path, "good-sess", status="executing")
     write_session(tmp_path, "bad-sess", status="nonsense_value")
 
     report = validate_project(tmp_path, strict=True, fix=False)
 
-    codes = [r.code for r in report.errors]
-    assert "status/invalid_enum" in codes, (
-        f"expected 'status/invalid_enum' in errors, got codes={codes}"
-    )
-    matches = [r for r in report.errors if r.code == "status/invalid_enum"]
-    files = [m.file for m in matches]
-    assert any("bad-sess" in (f or "") for f in files), (
-        f"expected error on bad-sess, got files={files}"
-    )
-    assert not any("good-sess" in (f or "") for f in files), (
-        f"good-sess should not be flagged, got files={files}"
-    )
+    flagged_for_bad = [
+        r.code for r in report.errors if "bad-sess" in (r.file or "")
+    ]
+    assert any(
+        c in {"status/invalid_enum", "session/schema_invalid"}
+        for c in flagged_for_bad
+    ), f"expected schema or rule error on bad-sess, got {flagged_for_bad}"
+
+    flagged_for_good = [
+        r.code for r in report.errors if "good-sess" in (r.file or "")
+    ]
+    assert "status/invalid_enum" not in flagged_for_good
+    assert "session/schema_invalid" not in flagged_for_good
 
 
-def test_session_with_legacy_done_status_flagged(tmp_path: Path) -> None:
-    """`status: done` is the exact failure mode that motivated this rule."""
+def test_session_with_legacy_done_status_blocked(tmp_path: Path) -> None:
+    """`status: done` is the exact failure mode that motivated KUI-110."""
     write_project_yaml(tmp_path)
-    # Bypass Pydantic by hand-writing the YAML — uses write_session directly.
     write_session(tmp_path, "legacy-done", status="done")
 
     report = validate_project(tmp_path, strict=True, fix=False)
 
-    codes_for_legacy = [
-        r.code for r in report.errors if "legacy-done" in (r.file or "")
-    ]
-    assert "status/invalid_enum" in codes_for_legacy
+    flagged = [r.code for r in report.errors if "legacy-done" in (r.file or "")]
+    assert any(
+        c in {"status/invalid_enum", "session/schema_invalid"} for c in flagged
+    ), f"expected legacy-done to be rejected, got {flagged}"
+
+
+def test_check_session_status_in_enum_catches_in_memory_mutation() -> None:
+    """If a session model is mutated in-memory to an invalid status
+    (Pydantic doesn't validate on assignment by default), the rule
+    catches it."""
+    from tripwire.models.session import AgentSession
+    from tripwire.core.validator import LoadedEntity
+
+    sess = AgentSession.model_validate(
+        {
+            "id": "mutated",
+            "name": "Test",
+            "agent": "backend-coder",
+            "issues": [],
+            "repos": [],
+            "status": "completed",
+        }
+    )
+    # Force the field past the typed-enum guard. Pydantic v2 doesn't
+    # validate on assignment by default, so this models the bypass.
+    object.__setattr__(sess, "status", "nonsense_value")
+
+    entity = LoadedEntity(
+        rel_path="sessions/mutated/session.yaml",
+        raw_frontmatter={},
+        body="",
+        model=sess,
+    )
+    ctx = ValidationContext(project_dir=Path("/tmp/proj"))
+    ctx.sessions = [entity]
+
+    results = check_session_status_in_enum(ctx)
+    assert any(r.code == "status/invalid_enum" for r in results), (
+        f"expected status/invalid_enum on mutated session, got "
+        f"{[r.code for r in results]}"
+    )
 
 
 def test_issue_with_invalid_status_flagged(tmp_path: Path) -> None:
-    """An issue with status not in IssueStatus → status/invalid_enum error."""
+    """``Issue.status`` is still a plain ``str``, so the validator rule
+    is the only layer that catches an invalid issue status."""
     write_project_yaml(tmp_path)
     write_issue(tmp_path, "TST-1", status="todo")
     write_issue(tmp_path, "TST-2", status="ghost_state")

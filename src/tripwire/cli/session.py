@@ -29,6 +29,8 @@ from typing import Any
 
 import click
 from rich.console import Console
+
+from tripwire.models.enums import SessionStatus
 from rich.table import Table
 
 from tripwire.cli._utils import require_project as _require_project
@@ -507,7 +509,7 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
                     click.echo(f"    → {item.fix_hint}")
         raise click.ClickException("Not ready to queue — fix errors above")
 
-    session.status = "queued"
+    session.status = SessionStatus.QUEUED
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
     click.echo(f"Session '{session_id}' → queued")
@@ -649,7 +651,7 @@ def session_spawn_cmd(
     start_result = runtime.start(prepped)
 
     now = datetime.now(tz=timezone.utc)
-    session.status = "executing"
+    session.status = SessionStatus.EXECUTING
     session.runtime_state.worktrees = start_result.worktrees
     session.runtime_state.claude_session_id = start_result.claude_session_id
     session.runtime_state.pid = start_result.pid
@@ -809,7 +811,7 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     # make sense once the process is gone.
     pid = session.runtime_state.pid
     if pid and not is_alive(pid):
-        session.status = "failed"
+        session.status = SessionStatus.FAILED
         click.echo(f"Warning: PID {pid} not alive — session '{session_id}' → failed")
         session.updated_at = datetime.now(tz=timezone.utc)
         save_session(resolved, session)
@@ -824,7 +826,7 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
         )
         return
 
-    session.status = "paused"
+    session.status = SessionStatus.PAUSED
     click.echo(f"Session '{session_id}' → paused")
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
@@ -890,7 +892,7 @@ def session_transition_cmd(
             f"allowed targets from {session.status!r}: {sorted(allowed) or '<none>'}"
         )
 
-    session.status = target_status
+    session.status = SessionStatus(target_status)
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
     click.echo(f"Session '{session_id}' → {target_status}")
@@ -1045,7 +1047,7 @@ def session_reopen_cmd(session_id: str, reason: str, project_dir: Path) -> None:
 
     # Status: completed → paused (the slot `spawn --resume` already
     # accepts).
-    session.status = "paused"
+    session.status = SessionStatus.PAUSED
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
 

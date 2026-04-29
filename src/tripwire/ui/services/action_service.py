@@ -36,6 +36,7 @@ from tripwire.core.parser import serialize_frontmatter_body
 from tripwire.core.session_store import load_session
 from tripwire.core.store import load_project
 from tripwire.core.validator import ValidationReport, validate_project
+from tripwire.models.enums import SessionStatus
 from tripwire.models.project import ProjectConfig, ProjectPhase
 from tripwire.models.session import AgentSession
 from tripwire.ui.services._atomic_write import atomic_write_text, atomic_write_yaml
@@ -311,7 +312,7 @@ def pause_session(project_dir: Path, session_id: str) -> SessionResult:
         now = datetime.now(tz=timezone.utc)
         pid = session.runtime_state.pid
         if pid and not is_alive(pid):
-            session.status = "failed"
+            session.status = SessionStatus.FAILED
             session.updated_at = now
             _atomic_save_session(project_dir, session)
             write_audit_entry(
@@ -334,7 +335,7 @@ def pause_session(project_dir: Path, session_id: str) -> SessionResult:
         except RuntimeError as exc:
             raise SessionRuntimeError(str(exc)) from exc
 
-        session.status = "paused"
+        session.status = SessionStatus.PAUSED
         session.updated_at = now
         _atomic_save_session(project_dir, session)
         write_audit_entry(
@@ -369,7 +370,7 @@ def finalize_session(project_dir: Path, session_id: str) -> SessionResult:
         session = load_session(project_dir, session_id)
         now = datetime.now(tz=timezone.utc)
         old_status = session.status
-        session.status = "completed"
+        session.status = SessionStatus.COMPLETED
         session.updated_at = now
         closed_engagements = 0
         for engagement in session.engagements:

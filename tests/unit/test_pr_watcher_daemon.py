@@ -34,7 +34,7 @@ def project(tmp_path: Path, save_test_session) -> Path:
 
 
 def test_build_watched_sessions_filters_inactive(project: Path, save_test_session):
-    save_test_session(project, "s_done", plan=False, status="done")
+    save_test_session(project, "s_done", plan=False, status="completed")
     save_test_session(
         project,
         "s_active",

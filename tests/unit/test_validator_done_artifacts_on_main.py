@@ -103,7 +103,7 @@ def test_done_session_missing_self_review_errors(
 ):
     """The §A1 default `session_required` includes self-review.md and
     pm-response.yaml. Missing either → error."""
-    save_test_session(tmp_path_project, "s1", status="done")
+    save_test_session(tmp_path_project, "s1", status="completed")
     _stub_main(
         monkeypatch,
         {
@@ -126,7 +126,7 @@ def test_done_session_missing_self_review_errors(
 def test_done_session_with_all_artifacts_passes(
     tmp_path_project: Path, save_test_session, monkeypatch
 ):
-    save_test_session(tmp_path_project, "s1", status="done")
+    save_test_session(tmp_path_project, "s1", status="completed")
     _stub_main(
         monkeypatch,
         {
