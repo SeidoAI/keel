@@ -5,9 +5,9 @@ Used by both the CLI (``tripwire session progress``) and the UI service
 a given checklist file.
 
 The canonical template (``templates/artifacts/task-checklist.md.j2``)
-emits a Markdown table with a ``status`` column. Legacy projects that
-still have checkbox-form (``- [ ]`` / ``- [x]``) checklists report
-``done=0, total=0`` — they should migrate to the table format.
+emits a Markdown table with a ``status`` column. Files that don't
+match this shape report ``done=0, total=0`` — there is no fallback
+parser for the pre-v0.6 checkbox form (retired in KUI-158).
 """
 
 from __future__ import annotations

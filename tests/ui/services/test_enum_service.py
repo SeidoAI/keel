@@ -47,26 +47,11 @@ class TestListEnums:
         assert enum.values[0] == EnumValue(value="todo", label="Todo")
         assert enum.values[1].color == "#00ff00"
 
-    def test_loads_flat_list(self, tmp_path_project: Path):
-        _write_enum(
-            tmp_path_project,
-            "priority",
-            "- low\n- medium\n- high\n",
-        )
-
-        result = list_enums(tmp_path_project)
-        enum = result["priority"]
-        assert [v.value for v in enum.values] == ["low", "medium", "high"]
-        # Default label is title-cased.
-        assert enum.values[0].label == "Low"
-        # Colour defaults to None for flat list.
-        assert enum.values[0].color is None
-
     def test_default_label_from_snake_case(self, tmp_path_project: Path):
         _write_enum(
             tmp_path_project,
             "states",
-            "- in_progress\n",
+            "values:\n  - id: in_progress\n",
         )
         enum = list_enums(tmp_path_project)["states"]
         assert enum.values[0].label == "In Progress"

@@ -1,9 +1,9 @@
 """Enum read service — list + get of project-level enum YAML files.
 
 Surfaces the project's ``enums/*.yaml`` files in an API-friendly shape
-for UI label + colour rendering. Supports both the structured
-``values:`` form used by new projects and the legacy flat-list form
-that early projects shipped.
+for UI label + colour rendering. Each YAML carries a top-level
+``values:`` list of dicts; entries may use ``id`` (the core-dataclass
+name) or ``value`` (the API-shape name) interchangeably.
 
 Note: the ``tripwire.core.enum_loader`` dataclass uses ``EnumValue.id``,
 but this service exposes ``EnumValue.value`` to match the API naming
@@ -66,16 +66,14 @@ def _coerce_value_entry(entry: object, source: Path) -> EnumValue | None:
     """Build an EnumValue from a single YAML entry.
 
     Returns ``None`` and logs a debug line when the entry is malformed —
-    callers should skip malformed entries rather than crash.
+    callers should skip malformed entries rather than crash. Entries are
+    dicts with `id` (core-dataclass name) or `value` (API-shape name);
+    the pre-v0.6 flat-string list form was retired in KUI-158.
     """
-    if isinstance(entry, str):
-        return EnumValue(value=entry, label=_default_label(entry), color=None)
-
     if not isinstance(entry, dict):
         logger.debug("enum_service: unexpected value entry in %s: %r", source, entry)
         return None
 
-    # Structured form — accept `value` or legacy `id` as the key.
     raw_value = entry.get("value") or entry.get("id")
     if not raw_value:
         logger.debug(
