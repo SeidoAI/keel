@@ -87,14 +87,6 @@ class SessionStatus(StrEnum):
     IN_REVIEW = "in_review"
     VERIFIED = "verified"
     COMPLETED = "completed"
-    # KUI-110 carve-out: pre-v0.8 sessions that completed under the
-    # legacy flat-file artifact layout (no `sessions/<sid>/artifacts/`
-    # subdir, and missing the v0.8 `recommended-testing-plan.md` /
-    # `post-completion-comments.md` outputs). They're terminal-success
-    # but excluded from `MERGED_STATUSES` so `check_artifact_presence`
-    # doesn't fabricate missing-artifact errors against the modern
-    # contract. New sessions must use `COMPLETED`.
-    LEGACY_COMPLETED = "legacy_completed"
     FAILED = "failed"
     PAUSED = "paused"
     ABANDONED = "abandoned"

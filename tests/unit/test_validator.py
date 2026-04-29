@@ -175,7 +175,9 @@ def write_session(
     path = sdir / "session.yaml"
     path.write_text(text, encoding="utf-8")
     if plan:
-        (sdir / "plan.md").write_text("# Plan\n", encoding="utf-8")
+        artifacts_dir = sdir / "artifacts"
+        artifacts_dir.mkdir(parents=True, exist_ok=True)
+        (artifacts_dir / "plan.md").write_text("# Plan\n", encoding="utf-8")
     return path
 
 
@@ -272,9 +274,9 @@ def save_test_session(
     fm.update(kwargs)
     save_session(project_dir, AgentSession.model_validate(fm))
     if plan:
-        paths.session_plan_path(project_dir, session_id).write_text(
-            "# Plan\n", encoding="utf-8"
-        )
+        plan_path = paths.session_plan_path(project_dir, session_id)
+        plan_path.parent.mkdir(parents=True, exist_ok=True)
+        plan_path.write_text("# Plan\n", encoding="utf-8")
 
 
 @pytest.fixture

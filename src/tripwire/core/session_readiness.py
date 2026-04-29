@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from tripwire.core import paths
 from tripwire.core.handoff_store import handoff_exists, load_handoff
 from tripwire.core.session_store import load_session
 from tripwire.core.store import load_issue
@@ -48,13 +49,13 @@ def check_readiness(
 
     manifest, _ = load_artifact_manifest(project_dir)
     if manifest is not None:
-        sess_dir = project_dir / "sessions" / session_id
+        artifacts_dir = paths.session_artifacts_dir(project_dir, session_id)
         for entry in manifest.artifacts:
             if entry.produced_at != "planning" or entry.owned_by != "pm":
                 continue
             if not entry.required:
                 continue
-            present = (sess_dir / entry.file).is_file()
+            present = (artifacts_dir / entry.file).is_file()
             items.append(
                 ReadinessItem(
                     label=f"planning artifact: {entry.file}",

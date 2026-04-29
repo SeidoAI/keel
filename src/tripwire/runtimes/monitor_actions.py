@@ -20,6 +20,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from tripwire.core import paths
 from tripwire.core.process_helpers import send_sigcont, send_sigstop, send_sigterm
 from tripwire.core.session_store import load_session, save_session
 from tripwire.models.enums import SessionStatus
@@ -173,7 +174,7 @@ class ActionExecutor:
             )
             self._append_monitor_log(action.tripwire_id, action.message)
             return
-        plan_path = self.project_dir / "sessions" / self.session_id / "plan.md"
+        plan_path = paths.session_plan_path(self.project_dir, self.session_id)
         if not plan_path.exists():
             logger.warning("monitor: plan.md missing for session '%s'", self.session_id)
             return

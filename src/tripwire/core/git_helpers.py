@@ -117,7 +117,7 @@ class MainTreeUnavailable(RuntimeError):
 def list_paths_on_main(repo_dir: Path) -> set[str]:
     """Return every file path tracked on ``origin/main`` of ``repo_dir``.
 
-    Used by the ``done_implies_artifacts_on_main`` validator rule. One
+    Used by the ``done_implies_issue_artifacts_on_main`` validator rule. One
     `git ls-tree -r --name-only origin/main` call covers the whole repo
     — way cheaper than ``git show origin/main:<path>`` per artifact.
 

@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from tripwire.core import paths
 from tripwire.core.session_store import load_session
 from tripwire.core.spawn_config import load_resolved_spawn_config
 from tripwire.core.store import load_issue, load_project
@@ -78,7 +79,7 @@ _PLAN_BODY_MIN_CHARS = 200
 def _check_plan_unfilled(
     project_dir: Path, session: AgentSession
 ) -> StrictCheckResult | None:
-    plan_path = project_dir / "sessions" / session.id / "plan.md"
+    plan_path = paths.session_plan_path(project_dir, session.id)
     if not plan_path.is_file():
         return StrictCheckResult(
             error_code="check/plan_unfilled",

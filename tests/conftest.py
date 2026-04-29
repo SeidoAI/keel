@@ -107,7 +107,9 @@ def save_test_session():
             # only care about lifecycle / runtime mechanics. Tests that
             # specifically exercise the strict check should overwrite
             # plan.md with a placeholder body of their own.
-            paths.session_plan_path(project_dir, session_id).write_text(
+            plan_path = paths.session_plan_path(project_dir, session_id)
+            plan_path.parent.mkdir(parents=True, exist_ok=True)
+            plan_path.write_text(
                 "# Plan — test session\n\n"
                 "## Goal\n"
                 "Drive the lifecycle path under test end to end. This "

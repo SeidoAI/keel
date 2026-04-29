@@ -1,10 +1,9 @@
-"""Tests for `check_artifact_presence` and the `MERGED_STATUSES` constant
-(KUI-110 Phase 2.3).
+"""Tests for `check_artifact_presence` (KUI-110 + KUI-158).
 
-The rule used to gate on a literal ``"completed"`` string. Phase 2.3
-extracts a module-level frozenset so the gate is one place to update if
-v1 ever introduces additional terminal-success statuses (e.g. a separate
-``done`` after post-merge cleanup ships in some future release).
+The rule gates artifact enforcement on ``status == SessionStatus.COMPLETED``.
+The previous ``MERGED_STATUSES`` frozenset abstraction was removed in the
+v0.9 prune (KUI-158) once ``LEGACY_COMPLETED`` was deleted — there is now
+only one terminal-success state.
 """
 
 from __future__ import annotations
@@ -15,15 +14,7 @@ from tests.unit.test_validator import (  # type: ignore[import-not-found]
     write_project_yaml,
     write_session,
 )
-from tripwire.core.validator import MERGED_STATUSES, validate_project
-from tripwire.models.enums import SessionStatus
-
-
-def test_merged_statuses_constant_is_frozenset_of_completed() -> None:
-    """`MERGED_STATUSES` is the single place that decides which statuses
-    require artifact-presence enforcement. v1 baseline: just COMPLETED."""
-    assert isinstance(MERGED_STATUSES, frozenset)
-    assert SessionStatus.COMPLETED in MERGED_STATUSES
+from tripwire.core.validator import validate_project
 
 
 def _write_minimal_manifest(project_dir: Path) -> None:

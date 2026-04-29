@@ -68,7 +68,9 @@ repos:
         encoding="utf-8",
     )
     # v0.7.9 §A6: plan.md must clear placeholder + body-floor checks.
-    (sess / "plan.md").write_text(
+    artifacts_dir = sess / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    (artifacts_dir / "plan.md").write_text(
         "# Plan — Ship v0.6a\n\n## Goal\n"
         "Drive the lifecycle integration test through CLI surfaces. "
         "The body must be long enough to clear the v0.7.9 strict check "
