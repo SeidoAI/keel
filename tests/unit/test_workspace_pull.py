@@ -52,7 +52,7 @@ def workspace_repo_with_node(fresh_workspace):
         fresh_workspace(ws_dir, slug="ws")
         (workspace_nodes_dir(ws_dir) / f"{node_id}.yaml").write_text(
             f"""---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: {node_id}
 type: system
 name: Auth System
@@ -111,7 +111,7 @@ class TestWorkspacePullTrivial:
         # Update the workspace node.
         (workspace_nodes_dir(ws_dir) / "auth-system.yaml").write_text(
             """---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: auth-system
 type: system
 name: Auth System
@@ -166,7 +166,7 @@ tags: []
         # Update workspace node.
         (workspace_nodes_dir(ws_dir) / "auth-system.yaml").write_text(
             """---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: auth-system
 type: system
 name: Auth System
@@ -212,7 +212,7 @@ tags: []
         # Update workspace.
         (workspace_nodes_dir(ws_dir) / "auth-system.yaml").write_text(
             """---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: auth-system
 type: system
 name: Auth System

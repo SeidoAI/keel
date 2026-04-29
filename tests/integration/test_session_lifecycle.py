@@ -40,7 +40,7 @@ def test_full_session_lifecycle(save_test_issue, tmp_path_project):
         key="TMP-1",
         kind="feat",
         title="Ship v0.6a",
-        status="ready",
+        status="todo",
     )
 
     # Allocate a session key via the CLI.
@@ -54,7 +54,7 @@ def test_full_session_lifecycle(save_test_issue, tmp_path_project):
     sess.mkdir(parents=True)
     (sess / "session.yaml").write_text(
         f"""---
-uuid: 11111111-1111-1111-1111-111111111111
+uuid: 11111111-1111-4111-8111-111111111111
 id: {session_id}
 name: Ship v0.6a
 agent: pm
@@ -103,7 +103,7 @@ repos:
     # Write a handoff.yaml (/pm-session-create would do this).
     (sess / "handoff.yaml").write_text(
         f"""---
-uuid: 22222222-2222-2222-2222-222222222222
+uuid: 22222222-2222-4222-8222-222222222222
 session_id: {session_id}
 handoff_at: 2026-04-15T00:00:00Z
 handed_off_by: pm

@@ -1,5 +1,5 @@
 ---
-uuid: 8d4b5c2e-af3f-4b9d-c6e7-2f3e4b5c6d7e
+uuid: 8d4b5c2e-af3f-4b9d-86e7-2f3e4b5c6d7e
 id: SEI-45
 title: Add rate limit check to the auth endpoint
 status: todo

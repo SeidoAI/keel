@@ -9,9 +9,15 @@ import re
 import uuid as _uuid
 from datetime import datetime
 from typing import Literal
-from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    UUID4,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 NODE_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]*$")
 
@@ -61,7 +67,7 @@ class ConceptNode(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     # Canonical identity (never changes)
-    uuid: UUID = Field(default_factory=_uuid.uuid4)
+    uuid: UUID4 = Field(default_factory=_uuid.uuid4)
 
     # Human-readable slug, unique within a project (filename = id).
     id: str

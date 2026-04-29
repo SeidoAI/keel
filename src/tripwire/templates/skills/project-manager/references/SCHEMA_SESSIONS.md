@@ -174,7 +174,7 @@ is in `queued` state** (validator rule `handoff_schema/required_at_queued`).
 
 ```yaml
 ---
-uuid: 8b7c6d5e-4f3a-2b1c-9d8e-7f6a5b4c3d2e
+uuid: 8b7c6d5e-4f3a-4b1c-9d8e-7f6a5b4c3d2e
 session_id: session-auth-42-setup
 handoff_at: 2026-04-15T14:30:00Z
 handed_off_by: pm

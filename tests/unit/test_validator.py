@@ -392,9 +392,12 @@ class TestIdFormat:
 
 class TestEnumValues:
     def test_invalid_issue_status(self, empty_project: Path) -> None:
+        # Post-KUI-158: Issue.status is typed as IssueStatus, so Pydantic
+        # rejects unknown values at load time → schema_invalid (not the
+        # project-enum check, which only sees successfully-loaded issues).
         write_issue(empty_project, "TST-1", status="bogus_status")
         report = validate_project(empty_project)
-        assert "enum/issue_status" in codes(report)
+        assert "issue/schema_invalid" in codes(report)
 
     def test_invalid_priority(self, empty_project: Path) -> None:
         write_issue(empty_project, "TST-1", priority="ultra_high")
@@ -551,19 +554,20 @@ class TestIssueBodyStructure:
 
 class TestStatusTransitions:
     def test_unreachable_status(self, tmp_path: Path) -> None:
-        # Build a project where `done` exists but isn't reachable from backlog.
+        # Build a project where `canceled` is in the status enum but isn't
+        # reachable from backlog (dropped from every transitions list).
         write_project_yaml(
             tmp_path,
-            statuses=["backlog", "todo", "done", "orphan"],
+            statuses=["backlog", "todo", "done", "canceled"],
             status_transitions={
                 "backlog": ["todo"],
                 "todo": ["done"],
                 "done": [],
-                "orphan": [],
+                "canceled": [],
             },
         )
         write_node(tmp_path, "user-model")
-        write_issue(tmp_path, "TST-1", status="orphan")
+        write_issue(tmp_path, "TST-1", status="canceled")
         report = validate_project(tmp_path)
         assert "status/unreachable" in codes(report)
 
@@ -863,28 +867,30 @@ class TestCategorySummary:
 
 
 class TestUuidV4Validation:
-    """Tests for the uuid/not_v4 check (v0.2)."""
+    """Pydantic UUID4 typing rejects non-v4 UUIDs at model_validate time
+    (KUI-158: replaced the standalone check_uuid_v4_version rule with
+    Pydantic-side enforcement)."""
 
     def test_real_uuid4_passes(self, empty_project: Path) -> None:
         import uuid
 
         write_issue(empty_project, "TST-1", uuid=str(uuid.uuid4()))
         report = validate_project(empty_project)
-        assert not any(e.code == "uuid/not_v4" for e in report.errors)
+        assert not any(e.code == "issue/schema_invalid" for e in report.errors)
 
     def test_hand_crafted_uuid_fails(self, empty_project: Path) -> None:
-        # Version nibble is '1' (not '4') and variant is '0' (not 8-b)
+        # Version nibble is '1' (not '4') — UUID4 typing rejects.
         write_issue(empty_project, "TST-1", uuid="10a1b2c3-d4e5-1f6a-0b8c-9d0e1f2a3b4c")
         report = validate_project(empty_project)
-        assert any(e.code == "uuid/not_v4" for e in report.errors)
+        assert any(e.code == "issue/schema_invalid" for e in report.errors)
 
     def test_uuid_with_correct_version_but_wrong_variant(
         self, empty_project: Path
     ) -> None:
-        # Version nibble is '4' but variant is '0' (should be 8/9/a/b)
+        # Version nibble is '4' but variant is '0' (should be 8/9/a/b) — UUID4 rejects.
         write_issue(empty_project, "TST-1", uuid="10a1b2c3-d4e5-4f6a-0b8c-9d0e1f2a3b4c")
         report = validate_project(empty_project)
-        assert any(e.code == "uuid/not_v4" for e in report.errors)
+        assert any(e.code == "issue/schema_invalid" for e in report.errors)
 
 
 class TestCoverageWarnings:

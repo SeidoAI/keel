@@ -8,7 +8,7 @@ def _write_session_yaml(project_dir: Path, session_id: str, status: str) -> None
     sess.mkdir(parents=True)
     (sess / "session.yaml").write_text(
         f"""---
-uuid: 11111111-1111-1111-1111-111111111111
+uuid: 11111111-1111-4111-8111-111111111111
 id: {session_id}
 name: test
 agent: pm
@@ -51,7 +51,7 @@ def test_handoff_schema_branch_format(tmp_project_manifest):
     handoff = project_dir / "sessions" / "session-x" / "handoff.yaml"
     handoff.write_text(
         """---
-uuid: 22222222-2222-2222-2222-222222222222
+uuid: 22222222-2222-4222-8222-222222222222
 session_id: session-x
 handoff_at: 2026-04-15T00:00:00Z
 handed_off_by: pm
@@ -72,7 +72,7 @@ def test_handoff_schema_valid_handoff_no_findings(tmp_project_manifest):
     handoff = project_dir / "sessions" / "session-x" / "handoff.yaml"
     handoff.write_text(
         """---
-uuid: 33333333-3333-3333-3333-333333333333
+uuid: 33333333-3333-4333-8333-333333333333
 session_id: session-x
 handoff_at: 2026-04-15T00:00:00Z
 handed_off_by: pm

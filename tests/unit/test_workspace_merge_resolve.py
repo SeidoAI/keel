@@ -52,7 +52,7 @@ def pull_produced_conflict(fresh_workspace, fresh_project):
         fresh_workspace(ws_dir, slug="ws")
         (workspace_nodes_dir(ws_dir) / "auth-system.yaml").write_text(
             """---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: auth-system
 type: system
 name: Auth System
@@ -93,7 +93,7 @@ tags: []
         # Workspace edit.
         (workspace_nodes_dir(ws_dir) / "auth-system.yaml").write_text(
             """---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: auth-system
 type: system
 name: Auth System

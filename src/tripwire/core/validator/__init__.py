@@ -63,7 +63,7 @@ from tripwire.core.store import (
     load_project,
 )
 from tripwire.models.comment import Comment
-from tripwire.models.enums import IssueStatus, SessionStatus
+from tripwire.models.enums import SessionStatus
 from tripwire.models.issue import Issue
 from tripwire.models.manifest import ArtifactManifest
 from tripwire.models.node import ConceptNode
@@ -1231,65 +1231,6 @@ def check_manifest_phase_ownership_consistent(
 
 
 
-def check_session_status_in_enum(ctx: ValidationContext) -> list[CheckResult]:
-    """Belt-and-suspenders: every session.status must be a SessionStatus member.
-
-    The project-side ``enums/session_status.yaml`` is the runtime enum
-    source for ``check_enum_values``. If a project's YAML drifts from the
-    upstream Python ``SessionStatus`` (e.g. carries a legacy ``done``
-    value), the project enum check still passes but the session is
-    actually in an invalid state per the package's contract. This rule
-    catches that drift independent of the project YAML.
-    """
-    valid = {s.value for s in SessionStatus}
-    results: list[CheckResult] = []
-    for entity in ctx.sessions:
-        session: AgentSession = entity.model
-        status = str(session.status)
-        if status not in valid:
-            results.append(
-                CheckResult(
-                    code="status/invalid_enum",
-                    severity="error",
-                    file=entity.rel_path,
-                    field="status",
-                    message=(
-                        f"session.status {status!r} is not a member of "
-                        f"the upstream SessionStatus enum."
-                    ),
-                    fix_hint=f"Set status to one of: {sorted(valid)}",
-                )
-            )
-    return results
-
-
-def check_issue_status_in_enum(ctx: ValidationContext) -> list[CheckResult]:
-    """Belt-and-suspenders: every issue.status must be an IssueStatus member.
-
-    See ``check_session_status_in_enum`` — same pattern, applied to issues.
-    """
-    valid = {s.value for s in IssueStatus}
-    results: list[CheckResult] = []
-    for entity in ctx.issues:
-        issue: Issue = entity.model
-        status = str(issue.status)
-        if status not in valid:
-            results.append(
-                CheckResult(
-                    code="status/invalid_enum",
-                    severity="error",
-                    file=entity.rel_path,
-                    field="status",
-                    message=(
-                        f"issue.status {status!r} is not a member of "
-                        f"the upstream IssueStatus enum."
-                    ),
-                    fix_hint=f"Set status to one of: {sorted(valid)}",
-                )
-            )
-    return results
-
-
 def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     """Sessions at status=completed must have all required artifacts.
 
@@ -1714,44 +1655,8 @@ def _filter_none(items: list[Any]) -> list[Any]:
 
 
 # ============================================================================
-# v0.2 checks — UUID v4 + coverage heuristics
+# v0.2 checks — coverage heuristics
 # ============================================================================
-
-
-def check_uuid_v4_version(ctx: ValidationContext) -> list[CheckResult]:
-    """Check that UUIDs have RFC 4122 version 4 bits set."""
-    results: list[CheckResult] = []
-    for _bucket_name, bucket in [
-        ("issue", ctx.issues),
-        ("node", ctx.nodes),
-        ("session", ctx.sessions),
-    ]:
-        for entity in bucket:
-            uid = entity.raw_frontmatter.get("uuid")
-            if uid is None:
-                continue
-            uid_str = str(uid).replace("-", "")
-            if len(uid_str) != 32:
-                continue
-            # Version nibble (char 12, 0-indexed) must be '4'
-            version_char = uid_str[12]
-            # Variant nibble (char 16) must be 8, 9, a, or b
-            variant_char = uid_str[16]
-            if version_char != "4" or variant_char not in "89ab":
-                results.append(
-                    CheckResult(
-                        code="uuid/not_v4",
-                        severity="error",
-                        file=entity.rel_path,
-                        field="uuid",
-                        message=(
-                            f"UUID {uid} is not a valid RFC 4122 v4 UUID. "
-                            f"Use `tripwire uuid` to generate real UUIDs."
-                        ),
-                        fix_hint="Run `tripwire uuid` and replace the value.",
-                    )
-                )
-    return results
 
 
 def check_coverage_heuristics(ctx: ValidationContext) -> list[CheckResult]:
@@ -2511,11 +2416,8 @@ def check_pm_response_followups_resolve(
 
 ALL_CHECKS = [
     check_uuid_present,
-    check_uuid_v4_version,
     check_id_format,
     check_enum_values,
-    check_session_status_in_enum,
-    check_issue_status_in_enum,
     check_reference_integrity,
     check_bidirectional_related,
     check_issue_body_structure,

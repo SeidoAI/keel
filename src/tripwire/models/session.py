@@ -13,9 +13,8 @@ re-engagements of the same container). It carries:
 import uuid as _uuid
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import UUID4, BaseModel, ConfigDict, Field
 
 from tripwire.models.enums import SessionStatus
 
@@ -147,7 +146,7 @@ class AgentSession(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    uuid: UUID = Field(default_factory=_uuid.uuid4)
+    uuid: UUID4 = Field(default_factory=_uuid.uuid4)
 
     # Human-readable slug, e.g. "api-endpoints-core".
     id: str
