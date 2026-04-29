@@ -17,6 +17,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from tripwire.models.enums import SessionStatus
+
 
 class RepoBinding(BaseModel):
     """One repo a session can work in.
@@ -167,7 +169,7 @@ class AgentSession(BaseModel):
     key_files: list[str] = Field(default_factory=list)
     grouping_rationale: str | None = None
 
-    status: str = "planned"
+    status: SessionStatus = SessionStatus.PLANNED
 
     # Latest agent state from the most recent `status` message. The
     # orchestration runtime writes this back here as new status messages

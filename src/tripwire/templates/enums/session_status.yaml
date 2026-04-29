@@ -6,24 +6,49 @@ values:
     color: gray
   - id: queued
     label: Queued
-    color: gray
+    color: cyan
+  # executing: local spawn via `tripwire session spawn` (v0.6c)
   - id: executing
     label: Executing
     color: blue
-  - id: paused
-    label: Paused
+  # active: orchestrator-managed sessions (container runtime)
+  - id: active
+    label: Active
+    color: blue
+  - id: waiting_for_ci
+    label: Waiting for CI
     color: yellow
-  - id: failed
-    label: Failed
-    color: red
-  # `completed` is deprecated post-v0.7.9 — `done` is now the canonical
-  # terminal-success state (written by `tripwire session complete`).
-  # `completed` is kept here so existing tripwire-v0 data continues to
-  # validate; `core/session_readiness.py` accepts both. v0.7.10 candidate
-  # to remove this row entirely after a one-shot data migration.
+  - id: waiting_for_review
+    label: Waiting for Review
+    color: yellow
+  - id: waiting_for_deploy
+    label: Waiting for Deploy
+    color: yellow
+  - id: re_engaged
+    label: Re-engaged
+    color: orange
+  # in_review: session PR opened, PM reviewing (v0.7b)
+  - id: in_review
+    label: In Review
+    color: purple
+  # verified: PR verified (PM fills the QA role until a QA agent ships) (v0.7b)
+  - id: verified
+    label: Verified
+    color: green
+  # completed: canonical terminal-success state (KUI-110). `tripwire
+  # session complete` writes this; the legacy `done` value was dropped
+  # because it never made it into the upstream `SessionStatus` enum and
+  # let invalid sessions land on disk.
   - id: completed
     label: Completed
     color: green
-  - id: done
-    label: Done
-    color: green
+  - id: failed
+    label: Failed
+    color: red
+  - id: paused
+    label: Paused
+    color: yellow
+  # abandoned: terminal-but-not-claimed-success (v0.7.9 §A4)
+  - id: abandoned
+    label: Abandoned
+    color: gray

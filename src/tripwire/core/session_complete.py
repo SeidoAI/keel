@@ -107,7 +107,7 @@ def complete_session(
             result.issues_closed.append(issue_key)
 
     now = datetime.now(tz=timezone.utc)
-    session.status = "done"
+    session.status = "completed"
     session.updated_at = now
     if session.engagements:
         last = session.engagements[-1]

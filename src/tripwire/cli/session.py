@@ -909,7 +909,7 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
     transition to `abandoned`.
 
     `abandoned` is the terminal-but-not-claimed-success path (v0.7.9
-    §A4). Use it for sessions that can't legitimately reach `done`.
+    §A4). Use it for sessions that can't legitimately reach `completed`.
     Issues are NOT closed as `done` — they stay where they are; move
     them to backlog/canceled separately if appropriate.
     """
@@ -2105,7 +2105,7 @@ def session_complete_cmd(
             click.echo(f"  Node diffs to review: {len(result.node_diffs)}")
         return
 
-    click.echo(f"Session {session_id} → done")
+    click.echo(f"Session {session_id} → completed")
     for iss in result.issues_closed:
         click.echo(f"  closed: {iss}")
     for wt in result.worktrees_removed:
