@@ -127,7 +127,9 @@ def install_settings_into(project_dir: Path, *, force: bool = False) -> Path:
     template = load_template_settings()
 
     if not settings_path.is_file():
-        settings_path.write_text(json.dumps(template, indent=2) + "\n", encoding="utf-8")
+        settings_path.write_text(
+            json.dumps(template, indent=2) + "\n", encoding="utf-8"
+        )
         return settings_path
 
     try:
@@ -144,9 +146,7 @@ def install_settings_into(project_dir: Path, *, force: bool = False) -> Path:
             return settings_path
         merged = _merge_hook_into_settings(existing, template)
 
-    settings_path.write_text(
-        json.dumps(merged, indent=2) + "\n", encoding="utf-8"
-    )
+    settings_path.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
     return settings_path
 
 
@@ -274,7 +274,7 @@ def validate_on_edit_cmd(timeout_seconds: int) -> None:
     def _run() -> None:
         try:
             report_holder[0] = validate_project(project_root, strict=True, fix=False)
-        except BaseException as exc:  # noqa: BLE001 — log and exit silently
+        except BaseException as exc:
             error_holder[0] = exc
 
     thread = threading.Thread(target=_run, daemon=True)
@@ -282,8 +282,7 @@ def validate_on_edit_cmd(timeout_seconds: int) -> None:
     thread.join(timeout=timeout_seconds)
     if thread.is_alive():
         click.echo(
-            f"tripwire hook: validation exceeded {timeout_seconds}s timeout; "
-            "skipping",
+            f"tripwire hook: validation exceeded {timeout_seconds}s timeout; skipping",
             err=True,
         )
         return

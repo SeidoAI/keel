@@ -658,9 +658,7 @@ def install_claude_settings(*, worktree: Path) -> None:
     try:
         install_settings_into(worktree)
     except OSError as exc:
-        log.warning(
-            "claude settings install failed for %s: %s", worktree, exc
-        )
+        log.warning("claude settings install failed for %s: %s", worktree, exc)
 
 
 def install_pre_push_hook(

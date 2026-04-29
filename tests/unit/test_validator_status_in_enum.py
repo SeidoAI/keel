@@ -14,15 +14,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tripwire.core.validator import (
-    ValidationContext,
-    check_session_status_in_enum,
-    validate_project,
-)
 from tests.unit.test_validator import (  # type: ignore[import-not-found]
     write_issue,
     write_project_yaml,
     write_session,
+)
+from tripwire.core.validator import (
+    ValidationContext,
+    check_session_status_in_enum,
+    validate_project,
 )
 
 
@@ -36,17 +36,12 @@ def test_session_with_invalid_status_blocked_at_load(tmp_path: Path) -> None:
 
     report = validate_project(tmp_path, strict=True, fix=False)
 
-    flagged_for_bad = [
-        r.code for r in report.errors if "bad-sess" in (r.file or "")
-    ]
+    flagged_for_bad = [r.code for r in report.errors if "bad-sess" in (r.file or "")]
     assert any(
-        c in {"status/invalid_enum", "session/schema_invalid"}
-        for c in flagged_for_bad
+        c in {"status/invalid_enum", "session/schema_invalid"} for c in flagged_for_bad
     ), f"expected schema or rule error on bad-sess, got {flagged_for_bad}"
 
-    flagged_for_good = [
-        r.code for r in report.errors if "good-sess" in (r.file or "")
-    ]
+    flagged_for_good = [r.code for r in report.errors if "good-sess" in (r.file or "")]
     assert "status/invalid_enum" not in flagged_for_good
     assert "session/schema_invalid" not in flagged_for_good
 
@@ -68,8 +63,8 @@ def test_check_session_status_in_enum_catches_in_memory_mutation() -> None:
     """If a session model is mutated in-memory to an invalid status
     (Pydantic doesn't validate on assignment by default), the rule
     catches it."""
-    from tripwire.models.session import AgentSession
     from tripwire.core.validator import LoadedEntity
+    from tripwire.models.session import AgentSession
 
     sess = AgentSession.model_validate(
         {

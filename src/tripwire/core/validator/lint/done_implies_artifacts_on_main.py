@@ -37,9 +37,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     if ctx.project_config is None:
         return []
 
-    done_sessions = [
-        e for e in ctx.sessions if e.model.status == "legacy_completed"
-    ]
+    done_sessions = [e for e in ctx.sessions if e.model.status == "legacy_completed"]
     done_issues = [e for e in ctx.issues if e.model.status == "done"]
     if not done_sessions and not done_issues:
         return []

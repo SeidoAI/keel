@@ -29,8 +29,6 @@ from typing import Any
 
 import click
 from rich.console import Console
-
-from tripwire.models.enums import SessionStatus
 from rich.table import Table
 
 from tripwire.cli._utils import require_project as _require_project
@@ -48,6 +46,7 @@ from tripwire.core.session_check import (
 from tripwire.core.session_readiness import check_readiness
 from tripwire.core.session_store import list_sessions, load_session, save_session
 from tripwire.core.task_checklist import parse_task_checklist
+from tripwire.models.enums import SessionStatus
 from tripwire.models.session import EngagementEntry
 
 console = Console()

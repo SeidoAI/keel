@@ -11,12 +11,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tripwire.core.validator import MERGED_STATUSES, validate_project
-from tripwire.models.enums import SessionStatus
 from tests.unit.test_validator import (  # type: ignore[import-not-found]
     write_project_yaml,
     write_session,
 )
+from tripwire.core.validator import MERGED_STATUSES, validate_project
+from tripwire.models.enums import SessionStatus
 
 
 def test_merged_statuses_constant_is_frozenset_of_completed() -> None:

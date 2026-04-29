@@ -54,9 +54,7 @@ def test_install_creates_settings_when_absent(tmp_path: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()
 
-    result = runner.invoke(
-        cli, ["hooks", "install", "--project-dir", str(tmp_path)]
-    )
+    result = runner.invoke(cli, ["hooks", "install", "--project-dir", str(tmp_path)])
 
     assert result.exit_code == 0, result.output
     settings_path = tmp_path / ".claude" / "settings.json"
@@ -75,9 +73,7 @@ def test_install_is_idempotent(tmp_path: Path) -> None:
     settings_path = tmp_path / ".claude" / "settings.json"
     first = settings_path.read_text()
 
-    result = runner.invoke(
-        cli, ["hooks", "install", "--project-dir", str(tmp_path)]
-    )
+    result = runner.invoke(cli, ["hooks", "install", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0
 
     second = settings_path.read_text()
@@ -95,9 +91,7 @@ def test_install_merges_with_existing_unrelated_settings(tmp_path: Path) -> None
     (claude_dir / "settings.json").write_text(json.dumps(pre))
 
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["hooks", "install", "--project-dir", str(tmp_path)]
-    )
+    result = runner.invoke(cli, ["hooks", "install", "--project-dir", str(tmp_path)])
 
     assert result.exit_code == 0, result.output
     merged = _read_settings(tmp_path)

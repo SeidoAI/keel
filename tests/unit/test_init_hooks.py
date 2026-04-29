@@ -48,6 +48,6 @@ def test_init_writes_claude_settings_with_hook_entry(tmp_path: Path) -> None:
     for block in post_tool_use:
         for h in block.get("hooks", []):
             commands.append(h.get("command"))
-    assert any(
-        "tripwire hook validate-on-edit" in (c or "") for c in commands
-    ), f"expected validate-on-edit hook in {commands}"
+    assert any("tripwire hook validate-on-edit" in (c or "") for c in commands), (
+        f"expected validate-on-edit hook in {commands}"
+    )
