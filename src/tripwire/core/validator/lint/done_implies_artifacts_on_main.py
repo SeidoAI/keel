@@ -1,13 +1,17 @@
 """v0.7.9 §A1 — terminal-success ⇒ required artifacts exist on origin/main.
 
-The correctness contract. For every session at ``status: completed``
-and every issue at ``status: done``, every file listed in
-``project.yaml.artifact_manifest`` must be present on the merged-main
-snapshot of the project tracking repo (``origin/main``). "On main" is
-the only state that counts; worktree files don't.
+The correctness contract. For sessions, this rule checks the **flat-
+file** layout (``sessions/<sid>/<file>``) used by pre-v0.8 sessions —
+post-KUI-110 these are tagged with ``status: legacy_completed``. Modern
+``completed`` sessions use the subdir layout
+(``sessions/<sid>/artifacts/<file>``) which is exercised by
+``check_artifact_presence`` instead. Every required file listed in
+``project.yaml.artifact_manifest.session_required`` must be present
+on the merged-main snapshot of the project tracking repo
+(``origin/main``); "on main" is the only state that counts.
 
-KUI-110: sessions transitioned to ``completed`` (not the legacy ``done``
-which is no longer a SessionStatus value); issues stay at ``done``.
+For issues, the rule checks ``status: done`` (issues retained that
+terminal value through KUI-110).
 
 Online-first. We don't ``git fetch`` from inside validate (would hit
 the network on every run). If ``origin/main`` is unreadable (no remote,
@@ -33,7 +37,9 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     if ctx.project_config is None:
         return []
 
-    done_sessions = [e for e in ctx.sessions if e.model.status == "completed"]
+    done_sessions = [
+        e for e in ctx.sessions if e.model.status == "legacy_completed"
+    ]
     done_issues = [e for e in ctx.issues if e.model.status == "done"]
     if not done_sessions and not done_issues:
         return []
@@ -73,8 +79,8 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
                     severity="error",
                     file=entity.rel_path,
                     message=(
-                        f"Session {session.id!r} is `completed` but required "
-                        f"artifact {rel!r} is not on origin/main."
+                        f"Session {session.id!r} is `legacy_completed` but "
+                        f"required artifact {rel!r} is not on origin/main."
                     ),
                     fix_hint=(
                         f"Commit {rel} to the project tracking branch and "

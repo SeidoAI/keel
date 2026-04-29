@@ -42,6 +42,13 @@ values:
   - id: completed
     label: Completed
     color: green
+  # legacy_completed: KUI-110 carve-out for pre-v0.8 sessions that
+  # completed under the flat-file artifact layout. Excluded from
+  # MERGED_STATUSES so the modern subdir-based artifact-presence rule
+  # doesn't fire on them. New sessions must NOT use this state.
+  - id: legacy_completed
+    label: Legacy Completed
+    color: green
   - id: failed
     label: Failed
     color: red
