@@ -24,18 +24,14 @@ def register_routes(app: FastAPI) -> None:
         _common,
         actions,
         artifacts,
-        containers,
         enums,
         events,
-        github,
         graph,
         health,
         inbox,
         issues,
-        messages,
         nodes,
         orchestration,
-        pm_reviews,
         projects,
         sessions,
         workflow,
@@ -59,11 +55,6 @@ def register_routes(app: FastAPI) -> None:
         events,
         workflow,
         ws,
-        # v2 stubs
-        messages,
-        github,
-        containers,
-        pm_reviews,
     ]
 
     count = 0

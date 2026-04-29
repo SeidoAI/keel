@@ -56,16 +56,6 @@ export function dispatchEvent(event: TripwireUiEvent, queryClient: QueryClient):
       // Heartbeat — connection liveness only.
       return;
 
-    // v2 stubs — acknowledged here so the discriminated union is
-    // exhaustively handled. They never fire in v1.
-    case "container_status":
-    case "message_received":
-    case "github_event":
-    case "status_update":
-    case "pm_review_completed":
-    case "approval_pending":
-      return;
-
     default: {
       // Unknown event kinds: log once and keep the socket open.
       // A runtime miss here means the frontend mirror drifted from

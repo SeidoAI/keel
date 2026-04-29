@@ -195,23 +195,6 @@ describe("dispatchEvent", () => {
     expect(setQueryData).not.toHaveBeenCalled();
   });
 
-  it("v2 stub events are ignored without touching the cache", () => {
-    dispatchEvent(
-      makeEvent({
-        type: "container_status",
-        project_id: "p1",
-        session_id: "sess-01",
-        container_id: "c1",
-        status: "running",
-        exit_code: null,
-        cpu_percent: "5%",
-        memory_usage: "50MB",
-      }),
-      queryClient,
-    );
-    expect(invalidate).not.toHaveBeenCalled();
-  });
-
   it("unknown event kind is logged without throwing", () => {
     const warn = vi.spyOn(console, "warn");
     dispatchEvent(
