@@ -19,6 +19,26 @@ function renderMarkdown(
 afterEach(cleanup);
 
 describe("MarkdownBody", () => {
+  describe("contrast on cream paper (PM #25 round 2 P1)", () => {
+    it("does not apply prose-invert (which renders white text on cream)", () => {
+      // Regression: prose-invert renders body copy in a near-white
+      // text colour designed for dark backgrounds. The graph rail
+      // (cream paper) made body text effectively invisible. Fix is
+      // to drop prose-invert from the wrapper so the default
+      // ink-on-light prose tokens take effect.
+      //
+      // Note (PM #25 round 3 nit 3): we assert on `.prose-invert`
+      // class absence rather than the rendered foreground colour
+      // because jsdom doesn't compute Tailwind utility CSS — the
+      // class-name contract is the strongest available assertion
+      // without a real-DOM browser harness.
+      const { container } = renderMarkdown("Body text on cream.");
+      const wrapper = container.querySelector(".prose");
+      expect(wrapper).not.toBeNull();
+      expect(wrapper?.className ?? "").not.toMatch(/prose-invert\b/);
+    });
+  });
+
   describe("basic rendering", () => {
     it("renders headings", () => {
       renderMarkdown("# Hello\n\n## World");

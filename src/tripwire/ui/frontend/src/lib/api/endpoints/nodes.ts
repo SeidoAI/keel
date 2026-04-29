@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { apiGet } from "../client";
+import { apiGet, apiPatch } from "../client";
 import { queryKeys, staleTime } from "../queryKeys";
 
 export interface NodeSource {
@@ -9,6 +9,11 @@ export interface NodeSource {
   lines?: [number, number] | null;
   branch?: string | null;
   content_hash?: string | null;
+}
+
+export interface NodeLayout {
+  x: number;
+  y: number;
 }
 
 export interface NodeSummary {
@@ -20,6 +25,7 @@ export interface NodeSummary {
   tags: string[];
   related: string[];
   ref_count: number;
+  layout?: NodeLayout | null;
 }
 
 export interface NodeDetail extends NodeSummary {
@@ -67,6 +73,11 @@ export const nodesApi = {
     apiGet<ReverseRefsResult>(
       `/api/projects/${encodeURIComponent(pid)}/refs/reverse/${encodeURIComponent(nid)}`,
     ),
+  updateLayout: (pid: string, nid: string, layout: NodeLayout) =>
+    apiPatch<NodeDetail>(
+      `/api/projects/${encodeURIComponent(pid)}/nodes/${encodeURIComponent(nid)}/layout`,
+      layout,
+    ),
 };
 
 export function useNode(pid: string, nid: string) {
@@ -74,6 +85,10 @@ export function useNode(pid: string, nid: string) {
     queryKey: queryKeys.node(pid, nid),
     queryFn: () => nodesApi.get(pid, nid),
     staleTime: staleTime.default,
+    // Skip the fetch when no node is selected — callers like
+    // GraphRail render a "no concept selected" placeholder and
+    // pass `nid=""`, which would otherwise round-trip a 404.
+    enabled: Boolean(nid),
   });
 }
 
