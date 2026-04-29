@@ -1229,6 +1229,13 @@ def check_manifest_phase_ownership_consistent(
     return results
 
 
+# Statuses that mean "this session is terminal-success and must have shipped
+# its required artifacts." v1 baseline: just COMPLETED. If a future release
+# splits "merged" from "merged + post-merge cleanup applied" into two
+# statuses, add the later one here so check_artifact_presence enforces both.
+MERGED_STATUSES: frozenset[SessionStatus] = frozenset({SessionStatus.COMPLETED})
+
+
 def check_session_status_in_enum(ctx: ValidationContext) -> list[CheckResult]:
     """Belt-and-suspenders: every session.status must be a SessionStatus member.
 
@@ -1289,7 +1296,11 @@ def check_issue_status_in_enum(ctx: ValidationContext) -> list[CheckResult]:
 
 
 def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
-    """Sessions in `completed` status must have all required artifacts."""
+    """Sessions in a terminal-success status must have all required artifacts.
+
+    Gated by ``MERGED_STATUSES`` so the set of statuses that requires
+    artifact presence stays in one place.
+    """
     manifest, _ = _load_manifest(ctx)
     if manifest is None:
         return []
@@ -1298,7 +1309,7 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     results: list[CheckResult] = []
     for entity in ctx.sessions:
         session: AgentSession = entity.model
-        if session.status != "completed":
+        if session.status not in MERGED_STATUSES:
             continue
         artifacts_dir = paths.session_artifacts_dir(ctx.project_dir, session.id)
         for artifact_file in required_files:

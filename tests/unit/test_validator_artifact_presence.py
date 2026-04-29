@@ -32,7 +32,9 @@ def _write_minimal_manifest(project_dir: Path) -> None:
     manifest_dir.mkdir(parents=True, exist_ok=True)
     (manifest_dir / "manifest.yaml").write_text(
         "artifacts:\n"
-        "  - file: developer.md\n"
+        "  - name: developer\n"
+        "    file: developer.md\n"
+        "    template: developer.md.j2\n"
         "    required: true\n"
         "    produced_at: completion\n"
         "    produced_by: execution-agent\n"
