@@ -85,6 +85,14 @@ class SessionResult(BaseModel):
     changed_at: datetime
 
 
+class SessionStatusError(ValueError):
+    """Raised when a session is not in the right status for a transition."""
+
+
+class SessionRuntimeError(RuntimeError):
+    """Raised when the runtime refuses to honour a state change (e.g. SIGTERM ignored)."""
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -265,6 +273,82 @@ def advance_phase(project_dir: Path, new_phase: str) -> PhaseResult:
         )
 
 
+def pause_session(project_dir: Path, session_id: str) -> SessionResult:
+    """Pause an executing session via its runtime; mirrors `tripwire session pause`.
+
+    Behaviour parallels :func:`tripwire.cli.session.session_pause_cmd` so the
+    INTERVENE button and the CLI converge on the same status guarantees:
+
+    - status must be ``executing``; otherwise :class:`SessionStatusError`
+    - if the session's PID is non-null but no longer alive, the runtime
+      already exited; status flips to ``failed`` (not ``paused``) so we
+      don't lie about the reality on disk.
+    - otherwise, ``runtime.pause(session)`` is invoked. A
+      :class:`RuntimeError` from the runtime (e.g. SIGTERM ignored within
+      the 2-second window) leaves status as ``executing`` and surfaces
+      as :class:`SessionRuntimeError` for the caller to translate.
+
+    Raises:
+        FileNotFoundError: session yaml missing.
+        SessionStatusError: session not in ``executing`` state.
+        SessionRuntimeError: runtime refused to pause cleanly.
+    """
+    from tripwire.core.process_helpers import is_alive
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.runtimes import get_runtime
+
+    with project_lock(project_dir):
+        session = load_session(project_dir, session_id)
+        old_status = session.status
+        if old_status != "executing":
+            raise SessionStatusError(
+                f"session {session_id!r} is {old_status!r}, must be 'executing' to pause"
+            )
+
+        spawn = load_resolved_spawn_config(project_dir, session=session)
+        runtime = get_runtime(spawn.invocation.runtime)
+
+        now = datetime.now(tz=timezone.utc)
+        pid = session.runtime_state.pid
+        if pid and not is_alive(pid):
+            session.status = "failed"
+            session.updated_at = now
+            _atomic_save_session(project_dir, session)
+            write_audit_entry(
+                project_dir,
+                "actions.pause_session",
+                before={"status": old_status},
+                after={"status": "failed"},
+                result_summary=f"{session_id}: pid {pid} not alive → failed",
+                extras={"session_id": session_id, "reason": "dead_pid"},
+            )
+            logger.info(
+                "pause_session: %s pid %d not alive — flipped to failed",
+                session_id,
+                pid,
+            )
+            return SessionResult(session_id=session_id, status="failed", changed_at=now)
+
+        try:
+            runtime.pause(session)
+        except RuntimeError as exc:
+            raise SessionRuntimeError(str(exc)) from exc
+
+        session.status = "paused"
+        session.updated_at = now
+        _atomic_save_session(project_dir, session)
+        write_audit_entry(
+            project_dir,
+            "actions.pause_session",
+            before={"status": old_status},
+            after={"status": "paused"},
+            result_summary=f"{session_id}: {old_status} → paused",
+            extras={"session_id": session_id},
+        )
+    logger.info("pause_session: %s %s → paused", session_id, old_status)
+    return SessionResult(session_id=session_id, status="paused", changed_at=now)
+
+
 def finalize_session(project_dir: Path, session_id: str) -> SessionResult:
     """Mark a session as ``completed`` and stamp ``updated_at``.
 
@@ -325,8 +409,11 @@ __all__ = [
     "PhaseResult",
     "RebuildResult",
     "SessionResult",
+    "SessionRuntimeError",
+    "SessionStatusError",
     "advance_phase",
     "finalize_session",
+    "pause_session",
     "rebuild_index",
     "validate_all",
 ]

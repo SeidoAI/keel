@@ -18,6 +18,12 @@ from fastapi import APIRouter, Depends, Query
 
 from tripwire.ui.dependencies import ProjectContext, get_project
 from tripwire.ui.routes._common import envelope_exception
+from tripwire.ui.services.action_service import (
+    SessionResult,
+    SessionRuntimeError,
+    SessionStatusError,
+    pause_session,
+)
 from tripwire.ui.services.session_service import (
     SessionDetail,
     SessionSummary,
@@ -68,4 +74,39 @@ async def get_session(
             404,
             code="session/not_found",
             detail=f"Session {sid!r} not found in this project.",
+        ) from exc
+
+
+@router.post("/{sid}/pause", response_model=SessionResult)
+async def pause_session_route(
+    sid: str,
+    project: ProjectContext = Depends(get_project),  # noqa: B008
+) -> SessionResult:
+    """KUI-107 INTERVENE — pause an executing session via its runtime.
+
+    Thin HTTP face on :func:`tripwire.ui.services.action_service.pause_session`.
+    No new server-side semantics: same status guard, same dead-PID
+    fall-through to ``failed``, same audit trail as the CLI's
+    ``tripwire session pause``.
+    """
+    _ensure_sid(sid)
+    try:
+        return pause_session(project.project_dir, sid)
+    except FileNotFoundError as exc:
+        raise envelope_exception(
+            404,
+            code="session/not_found",
+            detail=f"Session {sid!r} not found in this project.",
+        ) from exc
+    except SessionStatusError as exc:
+        raise envelope_exception(
+            409,
+            code="session/bad_status",
+            detail=str(exc),
+        ) from exc
+    except SessionRuntimeError as exc:
+        raise envelope_exception(
+            409,
+            code="session/runtime_refused",
+            detail=str(exc),
         ) from exc
