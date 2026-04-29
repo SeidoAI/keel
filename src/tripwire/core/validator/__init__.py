@@ -63,6 +63,7 @@ from tripwire.core.store import (
     load_project,
 )
 from tripwire.models.comment import Comment
+from tripwire.models.enums import IssueStatus, SessionStatus
 from tripwire.models.issue import Issue
 from tripwire.models.manifest import ArtifactManifest
 from tripwire.models.node import ConceptNode
@@ -1223,6 +1224,65 @@ def check_manifest_phase_ownership_consistent(
                         f"{entry.produced_at} — consider ownership by "
                         "execution-agent or verification-agent"
                     ),
+                )
+            )
+    return results
+
+
+def check_session_status_in_enum(ctx: ValidationContext) -> list[CheckResult]:
+    """Belt-and-suspenders: every session.status must be a SessionStatus member.
+
+    The project-side ``enums/session_status.yaml`` is the runtime enum
+    source for ``check_enum_values``. If a project's YAML drifts from the
+    upstream Python ``SessionStatus`` (e.g. carries a legacy ``done``
+    value), the project enum check still passes but the session is
+    actually in an invalid state per the package's contract. This rule
+    catches that drift independent of the project YAML.
+    """
+    valid = {s.value for s in SessionStatus}
+    results: list[CheckResult] = []
+    for entity in ctx.sessions:
+        session: AgentSession = entity.model
+        status = str(session.status)
+        if status not in valid:
+            results.append(
+                CheckResult(
+                    code="status/invalid_enum",
+                    severity="error",
+                    file=entity.rel_path,
+                    field="status",
+                    message=(
+                        f"session.status {status!r} is not a member of "
+                        f"the upstream SessionStatus enum."
+                    ),
+                    fix_hint=f"Set status to one of: {sorted(valid)}",
+                )
+            )
+    return results
+
+
+def check_issue_status_in_enum(ctx: ValidationContext) -> list[CheckResult]:
+    """Belt-and-suspenders: every issue.status must be an IssueStatus member.
+
+    See ``check_session_status_in_enum`` — same pattern, applied to issues.
+    """
+    valid = {s.value for s in IssueStatus}
+    results: list[CheckResult] = []
+    for entity in ctx.issues:
+        issue: Issue = entity.model
+        status = str(issue.status)
+        if status not in valid:
+            results.append(
+                CheckResult(
+                    code="status/invalid_enum",
+                    severity="error",
+                    file=entity.rel_path,
+                    field="status",
+                    message=(
+                        f"issue.status {status!r} is not a member of "
+                        f"the upstream IssueStatus enum."
+                    ),
+                    fix_hint=f"Set status to one of: {sorted(valid)}",
                 )
             )
     return results
@@ -2454,6 +2514,8 @@ ALL_CHECKS = [
     check_uuid_v4_version,
     check_id_format,
     check_enum_values,
+    check_session_status_in_enum,
+    check_issue_status_in_enum,
     check_reference_integrity,
     check_bidirectional_related,
     check_issue_body_structure,
