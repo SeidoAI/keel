@@ -26,9 +26,10 @@ from typing import Any, Protocol, runtime_checkable
 UNFINISHED_THRESHOLD = 30
 
 # Sessions in these statuses are treated as "finished" for truncation
-# purposes. `done` and `completed` are both terminal in the project enums;
-# `abandoned` is the explicit cancel terminal.
-_FINISHED_STATUSES: frozenset[str] = frozenset({"completed", "done", "abandoned"})
+# purposes. `completed` is the terminal-success state (KUI-110, the
+# legacy `done` value was dropped from SessionStatus); `abandoned` is
+# the explicit cancel terminal.
+_FINISHED_STATUSES: frozenset[str] = frozenset({"completed", "abandoned"})
 
 # Status → mermaid classDef line. Colours chosen for github light + dark
 # themes; the `color:` attribute keeps text legible on both. Only the

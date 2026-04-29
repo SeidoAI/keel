@@ -16,21 +16,16 @@ import yaml
 
 from tripwire.templates import get_templates_dir
 
-# Canonical session-status vocabulary the tripwire CLI emits, in the
-# order listed by the v0.7.6 spec §2.B. Updated whenever a state is
-# added to or removed from the lifecycle:
+# Canonical session-status vocabulary the tripwire CLI emits. Post-
+# KUI-110 the upstream Python ``SessionStatus`` enum is the source of
+# truth: the typed ``AgentSession.status`` field rejects anything not
+# in that enum at load time, so the packaged template must include
+# every member.
 #
-#   planned   — newly created, awaiting agenda
-#   queued    — agenda finalised, awaiting executor pick-up
-#   executing — agent running (set by `tripwire session spawn`)
-#   paused    — execution paused (manual, or out of budget)
-#   failed    — terminal failure
-#   completed — execution finished, awaiting verification
-#   done      — verified + closed
-#
-# The list is duplicated here intentionally — the test guards the
-# template against drift even if the in-code enum class grows legacy
-# values for backwards compatibility.
+# This list is the subset the CLI directly writes today. The wider
+# Python enum also covers orchestrator-managed states (``active``,
+# ``waiting_for_*``, ``re_engaged``) and review states (``in_review``,
+# ``verified``) that other code paths emit.
 CANONICAL_SESSION_STATUSES: tuple[str, ...] = (
     "planned",
     "queued",
@@ -38,7 +33,7 @@ CANONICAL_SESSION_STATUSES: tuple[str, ...] = (
     "paused",
     "failed",
     "completed",
-    "done",
+    "abandoned",
 )
 
 
@@ -65,27 +60,35 @@ class TestSessionStatusEnumTemplate:
             f"hit `enum/session_status` validation errors."
         )
 
-    def test_does_not_ship_legacy_statuses(self) -> None:
-        """Legacy values were removed in v0.7.6 §B. Re-introducing them
-        in the template would re-stake the v0.7.5 paint job — projects
-        would see them as "valid" when in fact the CLI never emits them."""
-        legacy = {
-            "active",
-            "waiting_for_ci",
-            "waiting_for_review",
-            "waiting_for_deploy",
-            "re_engaged",
-            "in_review",
-            "verified",
-            "abandoned",
-        }
+    def test_does_not_ship_dropped_done_status(self) -> None:
+        """KUI-110 dropped ``done`` from the session enum: it was a
+        legacy alias never present in the upstream Python enum, and
+        the schema-strict ``AgentSession.status`` field rejects it at
+        load time. Re-introducing it would resurrect the bug the
+        v1 hardening pass closed."""
         data = _load_template_enum("session_status")
         ids = {entry["id"] for entry in data["values"]}
-        leaked = ids & legacy
-        assert not leaked, (
-            f"Template enums/session_status.yaml ships legacy values "
-            f"{sorted(leaked)}. v0.7.6 §B explicitly drops them — they "
-            f"are not in the CLI's emitted vocabulary."
+        assert "done" not in ids, (
+            "Template enums/session_status.yaml ships `done` again — "
+            "KUI-110 explicitly dropped it; `completed` is the canonical "
+            "terminal-success state."
+        )
+
+    def test_matches_python_session_status_enum(self) -> None:
+        """The packaged template MUST include every member of the
+        upstream ``SessionStatus`` Python enum: the typed schema field
+        will refuse to load any session whose status isn't in the enum,
+        so a slimmer template would silently break sessions in
+        orchestrator/review states."""
+        from tripwire.models.enums import SessionStatus
+
+        data = _load_template_enum("session_status")
+        ids = {entry["id"] for entry in data["values"]}
+        upstream = {s.value for s in SessionStatus}
+        missing = upstream - ids
+        assert not missing, (
+            f"Template enums/session_status.yaml is missing upstream "
+            f"SessionStatus values: {sorted(missing)}."
         )
 
     def test_every_entry_has_id_label_color(self) -> None:

@@ -116,7 +116,7 @@ def test_in_flight_project_health_badge_shows_progress(
 
 def test_all_done_health_badge(tmp_path_project: Path, save_test_session) -> None:
     save_test_session(tmp_path_project, "alpha", status="completed")
-    save_test_session(tmp_path_project, "bravo", status="done")
+    save_test_session(tmp_path_project, "bravo", status="completed")
     out = render(tmp_path_project, now=FIXED_NOW)
     status_line = next(
         line for line in out.splitlines() if line.startswith("> **Status:**")

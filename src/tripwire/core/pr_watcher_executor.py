@@ -29,6 +29,7 @@ from tripwire.core.pr_watcher import (
     WatcherAction,
 )
 from tripwire.core.session_store import load_session, save_session
+from tripwire.models.enums import SessionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +198,11 @@ class WatcherActionExecutor:
                 action.session_id,
             )
             return
-        session.status = action.new_status
+        # Coerce the action's string status into the typed enum so the
+        # serialiser doesn't warn (KUI-110 Phase 2.1). Invalid values
+        # raise ValueError here rather than silently writing yaml that
+        # then fails to load.
+        session.status = SessionStatus(action.new_status)
         session.updated_at = datetime.now(tz=timezone.utc)
         save_session(self.project_dir, session)
 

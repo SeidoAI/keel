@@ -22,6 +22,7 @@ from pathlib import Path
 
 from tripwire.core.process_helpers import send_sigcont, send_sigstop, send_sigterm
 from tripwire.core.session_store import load_session, save_session
+from tripwire.models.enums import SessionStatus
 from tripwire.runtimes.monitor import (
     InjectFollowUp,
     LogWarning,
@@ -150,7 +151,11 @@ class ActionExecutor:
             )
             return
         previous = session.status
-        session.status = action.new_status
+        # Coerce the action's string status into the typed enum so the
+        # serialiser doesn't warn (KUI-110 Phase 2.1). Invalid values
+        # raise ValueError here rather than silently writing yaml that
+        # then fails to load.
+        session.status = SessionStatus(action.new_status)
         session.updated_at = datetime.now(tz=timezone.utc)
         save_session(self.project_dir, session)
         self._append_monitor_log(

@@ -412,7 +412,16 @@ class TestEnumValues:
     def test_invalid_session_status(self, empty_project: Path) -> None:
         write_session(empty_project, "auth-spike", status="bogus_status")
         report = validate_project(empty_project)
-        assert "enum/session_status" in codes(report)
+        # Post-KUI-110, AgentSession.status is typed as SessionStatus
+        # so an invalid value is rejected at the load layer
+        # (`session/schema_invalid`) before the project-yaml-enum rule
+        # (`enum/session_status`) gets to fire. Accept either since
+        # both cover the same failure mode.
+        report_codes = codes(report)
+        assert (
+            "session/schema_invalid" in report_codes
+            or "enum/session_status" in report_codes
+        ), report_codes
 
 
 # ============================================================================

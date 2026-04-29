@@ -5,10 +5,15 @@ These StrEnum classes mirror the YAML enum files shipped under
 After init, the project owns its enum YAMLs and can add states, rename
 labels, recolor for the UI, or remove states it doesn't use.
 
-Pydantic models do NOT use these as field types — they use plain `str`
-so that projects can customise enums without forking the package. The
-StrEnums are exported for type hints, IDE autocomplete, default lookups
-in tests, and as canonical references for the validator.
+Field-type policy (post-KUI-110, v1 hardening): some Pydantic models DO
+use these StrEnums as field types — e.g. ``AgentSession.status:
+SessionStatus`` — to lock the upstream value set at load time.
+Project-side YAML remains the source of truth for *labels and colors*
+(and any UI metadata), but value-set drift from the upstream Python
+enum now raises ``ValidationError``. The remaining string-typed fields
+(notably ``Issue.status``) keep the old "projects can customise enums
+without forking" stance and rely on the validator's ``status_in_enum``
+rules for enforcement.
 """
 
 from enum import StrEnum
@@ -82,6 +87,14 @@ class SessionStatus(StrEnum):
     IN_REVIEW = "in_review"
     VERIFIED = "verified"
     COMPLETED = "completed"
+    # KUI-110 carve-out: pre-v0.8 sessions that completed under the
+    # legacy flat-file artifact layout (no `sessions/<sid>/artifacts/`
+    # subdir, and missing the v0.8 `recommended-testing-plan.md` /
+    # `post-completion-comments.md` outputs). They're terminal-success
+    # but excluded from `MERGED_STATUSES` so `check_artifact_presence`
+    # doesn't fabricate missing-artifact errors against the modern
+    # contract. New sessions must use `COMPLETED`.
+    LEGACY_COMPLETED = "legacy_completed"
     FAILED = "failed"
     PAUSED = "paused"
     ABANDONED = "abandoned"

@@ -58,11 +58,11 @@ class TestCheckReadiness:
     def test_done_blocker_accepted(
         self, tmp_path_project, save_test_session, write_handoff_yaml
     ):
-        """`session complete` writes status=`done` (post-v0.7.9). A
+        """`session complete` writes status=`completed` (KUI-110). A
         downstream queue check must accept that as a satisfied blocker;
         otherwise we get a contradictory "wait for X to complete" error
         for sessions that already shipped."""
-        save_test_session(tmp_path_project, "dep", plan=True, status="done")
+        save_test_session(tmp_path_project, "dep", plan=True, status="completed")
         save_test_session(
             tmp_path_project,
             "s1",

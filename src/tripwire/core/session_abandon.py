@@ -33,6 +33,7 @@ from pathlib import Path
 
 from tripwire.core.git_helpers import worktree_remove
 from tripwire.core.session_store import load_session, save_session
+from tripwire.models.enums import SessionStatus
 
 
 class AbandonError(ValueError):
@@ -68,11 +69,10 @@ def abandon_session(
     session = load_session(project_dir, session_id)
     result = AbandonResult(session_id=session_id)
 
-    # `completed` is a legacy terminal that predates the v0.7.9 split
-    # of done vs abandoned. We refuse it for the same reason as `done`:
-    # the session has already concluded and re-abandoning it would
-    # paper over a state-machine bug rather than fix it.
-    if session.status in ("done", "abandoned", "completed"):
+    # `completed` and `abandoned` are both terminal states (KUI-110).
+    # Re-abandoning a terminal session would paper over a state-machine
+    # bug rather than fix it.
+    if session.status in ("completed", "abandoned"):
         raise AbandonError(
             "abandon/already_terminal",
             f"Session {session_id!r} is already {session.status!r}; "
@@ -129,7 +129,7 @@ def abandon_session(
 
     # 4. Transition. This step always happens — it's the contract.
     now = datetime.now(tz=timezone.utc)
-    session.status = "abandoned"
+    session.status = SessionStatus.ABANDONED
     session.updated_at = now
     if session.engagements:
         last = session.engagements[-1]

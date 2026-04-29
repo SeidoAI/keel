@@ -171,7 +171,7 @@ def test_complete_closes_issues_and_transitions_session(
     issue = load_issue(tmp_path_project, "TMP-1")
     assert issue.status == "done"
     session = load_session(tmp_path_project, "s1")
-    assert session.status == "done"
+    assert session.status == "completed"
 
 
 def test_complete_signature_has_no_bypass_flags():

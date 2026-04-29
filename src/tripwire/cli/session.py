@@ -46,6 +46,7 @@ from tripwire.core.session_check import (
 from tripwire.core.session_readiness import check_readiness
 from tripwire.core.session_store import list_sessions, load_session, save_session
 from tripwire.core.task_checklist import parse_task_checklist
+from tripwire.models.enums import SessionStatus
 from tripwire.models.session import EngagementEntry
 
 console = Console()
@@ -507,7 +508,7 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
                     click.echo(f"    → {item.fix_hint}")
         raise click.ClickException("Not ready to queue — fix errors above")
 
-    session.status = "queued"
+    session.status = SessionStatus.QUEUED
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
     click.echo(f"Session '{session_id}' → queued")
@@ -649,7 +650,7 @@ def session_spawn_cmd(
     start_result = runtime.start(prepped)
 
     now = datetime.now(tz=timezone.utc)
-    session.status = "executing"
+    session.status = SessionStatus.EXECUTING
     session.runtime_state.worktrees = start_result.worktrees
     session.runtime_state.claude_session_id = start_result.claude_session_id
     session.runtime_state.pid = start_result.pid
@@ -809,7 +810,7 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     # make sense once the process is gone.
     pid = session.runtime_state.pid
     if pid and not is_alive(pid):
-        session.status = "failed"
+        session.status = SessionStatus.FAILED
         click.echo(f"Warning: PID {pid} not alive — session '{session_id}' → failed")
         session.updated_at = datetime.now(tz=timezone.utc)
         save_session(resolved, session)
@@ -824,7 +825,7 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
         )
         return
 
-    session.status = "paused"
+    session.status = SessionStatus.PAUSED
     click.echo(f"Session '{session_id}' → paused")
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
@@ -841,7 +842,7 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "paused": {"executing", "abandoned"},
     "failed": {"executing", "abandoned"},
     "in_review": {"verified", "executing", "abandoned"},
-    "verified": {"done", "in_review", "abandoned"},
+    "verified": {"completed", "in_review", "abandoned"},
 }
 
 
@@ -890,7 +891,7 @@ def session_transition_cmd(
             f"allowed targets from {session.status!r}: {sorted(allowed) or '<none>'}"
         )
 
-    session.status = target_status
+    session.status = SessionStatus(target_status)
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
     click.echo(f"Session '{session_id}' → {target_status}")
@@ -909,7 +910,7 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
     transition to `abandoned`.
 
     `abandoned` is the terminal-but-not-claimed-success path (v0.7.9
-    §A4). Use it for sessions that can't legitimately reach `done`.
+    §A4). Use it for sessions that can't legitimately reach `completed`.
     Issues are NOT closed as `done` — they stay where they are; move
     them to backlog/canceled separately if appropriate.
     """
@@ -1045,7 +1046,7 @@ def session_reopen_cmd(session_id: str, reason: str, project_dir: Path) -> None:
 
     # Status: completed → paused (the slot `spawn --resume` already
     # accepts).
-    session.status = "paused"
+    session.status = SessionStatus.PAUSED
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
 
@@ -2105,7 +2106,7 @@ def session_complete_cmd(
             click.echo(f"  Node diffs to review: {len(result.node_diffs)}")
         return
 
-    click.echo(f"Session {session_id} → done")
+    click.echo(f"Session {session_id} → completed")
     for iss in result.issues_closed:
         click.echo(f"  closed: {iss}")
     for wt in result.worktrees_removed:

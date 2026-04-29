@@ -72,7 +72,7 @@ def _no_files(repo, pr_number, token=None):
 
 
 def test_post_merge_ci_failure_on_done_session_emits_inject_pause_reengage():
-    ws = _ws(session_status="done")
+    ws = _ws(session_status="completed")
     now = datetime(2026, 4, 26, 10, 0, tzinfo=timezone.utc)
 
     def fetch_pr(repo, pr_number, token=None):
@@ -147,7 +147,7 @@ def test_no_action_when_session_still_executing():
 
 
 def test_no_action_when_check_status_pass():
-    ws = _ws(session_status="done")
+    ws = _ws(session_status="completed")
     now = datetime(2026, 4, 26, 10, 0, tzinfo=timezone.utc)
 
     def fetch_pr(repo, pr_number, token=None):
@@ -163,7 +163,7 @@ def test_no_action_when_check_status_pass():
 
 def test_no_action_when_pr_not_merged():
     """An unmerged PR with red CI is the in-flight CI-aware-exit's job."""
-    ws = _ws(session_status="done")
+    ws = _ws(session_status="completed")
     now = datetime(2026, 4, 26, 10, 0, tzinfo=timezone.utc)
 
     def fetch_pr(repo, pr_number, token=None):
@@ -181,7 +181,7 @@ def test_no_action_when_check_status_unknown():
     """A check_status of None means we don't know — don't fire on
     ambiguity. The fetcher returns None when the API response had no
     runs (e.g. CI never ran yet)."""
-    ws = _ws(session_status="done")
+    ws = _ws(session_status="completed")
     now = datetime(2026, 4, 26, 10, 0, tzinfo=timezone.utc)
 
     def fetch_pr(repo, pr_number, token=None):
@@ -202,7 +202,7 @@ def test_fires_only_once_per_session():
     """A second tick with the same condition must not re-emit. The
     plan calls this out explicitly: 'idempotent — if the auto-injected
     block already exists, no-op.'"""
-    ws = _ws(session_status="done")
+    ws = _ws(session_status="completed")
     now = datetime(2026, 4, 26, 10, 0, tzinfo=timezone.utc)
 
     def fetch_pr(repo, pr_number, token=None):
