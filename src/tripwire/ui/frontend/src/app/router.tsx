@@ -10,13 +10,11 @@ import { NodeDetail } from "@/features/nodes/NodeDetail";
 import { SessionDetail } from "@/features/sessions/SessionDetail";
 import { SessionList } from "@/features/sessions/SessionList";
 import { WorkflowMap } from "@/features/workflow/WorkflowMap";
-import { Placeholder } from "./Placeholder";
 import { ProjectShell } from "./ProjectShell";
 import { RootRedirect } from "./RootRedirect";
 
 export const router = createBrowserRouter([
   { path: "/", element: <RootRedirect /> },
-  { path: "/projects", element: <Placeholder name="ProjectList" /> },
   {
     path: "/p/:projectId",
     element: <ProjectShell />,
@@ -32,11 +30,7 @@ export const router = createBrowserRouter([
         path: "sessions/:sid/artifacts/:name",
         element: <StandaloneArtifactViewer />,
       },
-      // Strand Z new screens — placeholders here in S1; S5/S6/S7 wire
-      // the real implementations in. The ScreenShell nav already links
-      // to these paths, so the routes must exist.
       { path: "workflow", element: <WorkflowMap /> },
-      { path: "tripwires", element: <Placeholder name="TripwireLog" /> },
       { path: "sessions/:sid/live", element: <LiveMonitor /> },
     ],
   },

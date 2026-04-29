@@ -32,7 +32,6 @@ const NAV_ITEMS: ScreenShellNavItem[] = [
   { to: "workflow", label: "workflow", number: "03" },
   { to: "graph", label: "concepts", number: "04" },
   { to: "sessions", label: "sessions", number: "05" },
-  { to: "tripwires", label: "tripwires", number: "06" },
 ];
 
 export interface ScreenShellProps {

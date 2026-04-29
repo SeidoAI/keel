@@ -40,11 +40,6 @@ ALLOWED_NAMES = {
     "pm-status",
     "pm-agenda",
     "pm-graph",
-    # Deprecated forwarders (still shipped in v0.6a — removed in v0.7)
-    "pm-handoff",
-    "pm-close",
-    "pm-update",
-    "pm-plan",
 }
 
 # Commands that take arguments must have an argument-hint.

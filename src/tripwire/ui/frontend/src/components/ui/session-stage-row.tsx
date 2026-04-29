@@ -69,7 +69,7 @@ export const SESSION_STAGES: SessionStage[] = [
     id: "completed",
     label: "completed",
     color: "#5a4d3a",
-    matches: (s) => s === "completed" || s === "done",
+    matches: (s) => s === "completed",
   },
   {
     id: "off_track",

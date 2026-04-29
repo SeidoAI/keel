@@ -14,7 +14,7 @@ from tripwire.core.validator import (
 
 def test_matrix_shape_matches_spec_5_phases():
     """Matrix is keyed by spec §6.4's 5 phases — no extras."""
-    expected_phases = {"planning", "in_progress", "in_review", "verified", "done"}
+    expected_phases = {"planned", "in_progress", "in_review", "verified", "done"}
     assert set(_COHERENCE_MATRIX.keys()) == expected_phases
 
 
@@ -35,7 +35,7 @@ def test_matrix_rows_cover_all_issue_statuses():
 
 def test_session_status_to_phase_maps_all_in_lifecycle_statuses():
     """Working states (queued/executing/active) collapse to in_progress; completed → done."""
-    assert _SESSION_STATUS_TO_PHASE["planning"] == "planning"
+    assert _SESSION_STATUS_TO_PHASE["planned"] == "planned"
     assert _SESSION_STATUS_TO_PHASE["queued"] == "in_progress"
     assert _SESSION_STATUS_TO_PHASE["executing"] == "in_progress"
     assert _SESSION_STATUS_TO_PHASE["active"] == "in_progress"
@@ -127,3 +127,33 @@ def test_coherence_skips_off_lifecycle_statuses(
     codes = [f.code for f in report.findings]
     assert "coherence/issue_status_lags_session" not in codes
     assert "coherence/issue_status_ahead_of_session" not in codes
+
+
+def test_planned_session_with_in_progress_issue_warns_ahead(
+    tmp_path_project: Path, save_test_issue, save_test_session
+):
+    """Regression for KUI-158 §A1: planned sessions must run the coherence rule.
+
+    Pre-fix, ``_SESSION_STATUS_TO_PHASE`` keyed on ``"planning"`` while
+    ``SessionStatus.PLANNED = "planned"``, so the lookup missed and the
+    rule silently skipped every planned session. Asserts the rule now
+    fires ``ahead_warn`` when an issue is past the session's planning
+    phase.
+    """
+    save_test_issue(tmp_path_project, "TMP-1", status="in_progress")
+    save_test_session(
+        tmp_path_project,
+        "session-one",
+        issues=["TMP-1"],
+        status="planned",
+    )
+
+    report = validate_project(tmp_path_project)
+    codes = [f.code for f in report.findings]
+    assert "coherence/issue_status_ahead_of_session" in codes
+    ahead = [
+        f
+        for f in report.findings
+        if f.code == "coherence/issue_status_ahead_of_session"
+    ]
+    assert ahead[0].severity == "warning"

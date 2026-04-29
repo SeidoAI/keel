@@ -30,7 +30,7 @@ from tripwire.cli.queue import queue_cmd
 from tripwire.cli.readme import readme_cmd
 from tripwire.cli.refresh import refresh_cmd
 from tripwire.cli.refs import refs_cmd
-from tripwire.cli.scaffold import brief_cmd, scaffold_cmd
+from tripwire.cli.scaffold import brief_cmd
 from tripwire.cli.session import session_cmd
 from tripwire.cli.status import status_cmd
 from tripwire.cli.templates import templates_cmd
@@ -39,7 +39,6 @@ from tripwire.cli.ui import ui_cmd
 from tripwire.cli.uuid_cmd import uuid_cmd
 from tripwire.cli.validate import validate_cmd
 from tripwire.cli.validate_plan import validate_plan_cmd
-from tripwire.cli.view import view_cmd
 from tripwire.cli.watch import watch_cmd
 from tripwire.cli.workspace import workspace_cmd
 
@@ -92,7 +91,6 @@ cli.add_command(init_cmd)
 cli.add_command(issue_cmd)
 cli.add_command(ci_cmd)
 cli.add_command(brief_cmd)
-cli.add_command(scaffold_cmd)  # hidden alias — prefer `brief`
 cli.add_command(next_key_cmd)
 cli.add_command(plan_cmd)
 cli.add_command(pr_summary_cmd)
@@ -116,7 +114,6 @@ cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)
 cli.add_command(completion_cmd)
 cli.add_command(ui_cmd)
-cli.add_command(view_cmd)
 cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
 cli.add_command(tripwires_cmd)

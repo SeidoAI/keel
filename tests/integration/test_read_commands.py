@@ -961,8 +961,8 @@ class TestEndToEnd:
         s = runner.invoke(cli, ["status", "--project-dir", str(target)])
         assert s.exit_code == 0
 
-        # 3. scaffold-for-creation
-        sc = runner.invoke(cli, ["scaffold-for-creation", "--project-dir", str(target)])
+        # 3. brief
+        sc = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert sc.exit_code == 0
 
         # 4. graph deps

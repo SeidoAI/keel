@@ -237,7 +237,7 @@ class TestConcurrentSubprocess:
 
 
 # ============================================================================
-# Works after scaffold-for-creation
+# Works after brief
 # ============================================================================
 
 
@@ -249,7 +249,7 @@ class TestScaffoldIntegration:
         _init_project(runner, target)
 
         scaffold = runner.invoke(
-            cli, ["scaffold-for-creation", "--project-dir", str(target)]
+            cli, ["brief", "--project-dir", str(target)]
         )
         assert "next issue key: TST-1" in scaffold.output
 
@@ -258,6 +258,6 @@ class TestScaffoldIntegration:
 
         # After allocation, scaffold should advance
         scaffold_after = runner.invoke(
-            cli, ["scaffold-for-creation", "--project-dir", str(target)]
+            cli, ["brief", "--project-dir", str(target)]
         )
         assert "next issue key: TST-2" in scaffold_after.output

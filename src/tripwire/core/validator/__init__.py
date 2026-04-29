@@ -2170,14 +2170,14 @@ def check_quality_consistency(ctx: ValidationContext) -> list[CheckResult]:
 #                    `coherence/issue_status_lags_session` (error).
 #
 # Spec §6.4 table:
-#   planning     → warn on later
+#   planned      → warn on later
 #   in_progress  → warn on later
 #   in_review    → error on earlier
 #   verified     → error on earlier
 #   done         → error on anything else
 
 _SESSION_STATUS_TO_PHASE: dict[str, str] = {
-    "planning": "planning",
+    "planned": "planned",
     # Working states (queued waiting to launch, executing locally, active
     # in orchestrator) all represent the in_progress phase.
     "queued": "in_progress",
@@ -2192,7 +2192,7 @@ _SESSION_STATUS_TO_PHASE: dict[str, str] = {
 }
 
 _COHERENCE_MATRIX: dict[str, dict[str, str]] = {
-    "planning": {
+    "planned": {
         "backlog": "ok",
         "todo": "ok",
         "in_progress": "ahead_warn",
