@@ -27,6 +27,7 @@ from tripwire.cli.lint import lint_cmd
 from tripwire.cli.next_key import next_key_cmd
 from tripwire.cli.node import node_cmd
 from tripwire.cli.plan import plan_cmd
+from tripwire.cli.pr import pr_cmd
 from tripwire.cli.pr_summary import pr_summary_cmd
 from tripwire.cli.queue import queue_cmd
 from tripwire.cli.readme import readme_cmd
@@ -97,6 +98,7 @@ cli.add_command(ci_cmd)
 cli.add_command(brief_cmd)
 cli.add_command(next_key_cmd)
 cli.add_command(plan_cmd)
+cli.add_command(pr_cmd)
 cli.add_command(pr_summary_cmd)
 cli.add_command(readme_cmd)
 cli.add_command(uuid_cmd)

@@ -47,6 +47,38 @@ export interface WorkflowArtifact {
   consumed_by: string | null;
 }
 
+/**
+ * KUI-125 — workflow.yaml-derived definition for the Workflow Map.
+ *
+ * One entry per declared workflow (`coding-session`, `pm-review`,
+ * future workflows). Stations carry the typed `next:` shape (single
+ * id / conditional branches / terminal) so the UI can render the
+ * full directed-cyclic graph the v0.9 substrate exposes.
+ */
+export type WorkflowYamlNext =
+  | { kind: "single"; single: string }
+  | { kind: "conditional"; branches: WorkflowYamlBranch[] }
+  | { kind: "terminal" };
+
+export type WorkflowYamlBranch =
+  | { if: string; then: string }
+  | { else: string };
+
+export interface WorkflowYamlStation {
+  id: string;
+  next: WorkflowYamlNext;
+  validators: string[];
+  tripwires: string[];
+  prompt_checks: string[];
+}
+
+export interface WorkflowYamlDefinition {
+  id: string;
+  actor: string;
+  trigger: string;
+  stations: WorkflowYamlStation[];
+}
+
 export interface WorkflowGraph {
   project_id: string;
   lifecycle: { stations: WorkflowStation[] };
@@ -54,6 +86,8 @@ export interface WorkflowGraph {
   tripwires: WorkflowValidator[];
   connectors: { sources: WorkflowConnector[]; sinks: WorkflowConnector[] };
   artifacts: WorkflowArtifact[];
+  /** v0.9 — workflow.yaml-derived workflow definitions (KUI-125). */
+  workflows?: WorkflowYamlDefinition[];
 }
 
 export const workflowApi = {

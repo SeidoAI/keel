@@ -39,8 +39,11 @@ describe("SessionList", () => {
     ]);
     renderWithProviders(<SessionList />, { queryClient: qc });
 
-    expect(screen.getByText("Session A")).toBeInTheDocument();
-    expect(screen.getByText("Session B")).toBeInTheDocument();
+    // Post-#76 the surface renders BOTH a card list and a SessionFlow
+    // SVG node — the session name appears in both. `getAllByText`
+    // confirms presence without overspecifying which view.
+    expect(screen.getAllByText("Session A").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Session B").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/backend-coder/).length).toBeGreaterThan(0);
     expect(screen.getByText("2/5")).toBeInTheDocument();
     expect(screen.getAllByTestId("task-progress-empty").length).toBeGreaterThan(0);
@@ -91,13 +94,14 @@ describe("SessionList", () => {
     ]);
     renderWithProviders(<SessionList />, { queryClient: qc });
 
-    expect(screen.getByText("Blocked")).toBeInTheDocument();
-    expect(screen.getByText("Upstream")).toBeInTheDocument();
+    // Same as above: SessionFlow + card list both surface the name.
+    expect(screen.getAllByText("Blocked").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Upstream").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByLabelText(/Only actionable/));
 
-    expect(screen.queryByText("Blocked")).not.toBeInTheDocument();
-    expect(screen.getByText("Upstream")).toBeInTheDocument();
+    expect(screen.queryAllByText("Blocked").length).toBe(0);
+    expect(screen.getAllByText("Upstream").length).toBeGreaterThan(0);
   });
 
   it("renders the empty state when there are no sessions", () => {

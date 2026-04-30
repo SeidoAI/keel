@@ -1,8 +1,18 @@
 import "@testing-library/jest-dom/vitest";
 
+import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, expect } from "vitest";
 
 import { server } from "./mocks/server";
+
+// Auto-cleanup mounted React trees after every test. Vitest's
+// `globals: false` config means RTL doesn't auto-register its own
+// afterEach hook, so without this we accumulate DOM trees across
+// tests inside a single file — which then breaks `getByText`/`getByTestId`
+// with "Found multiple elements" when a second test renders the same
+// component. One global hook here beats per-file `afterEach(cleanup)`
+// boilerplate and unblocks legacy tests that lacked it.
+afterEach(() => cleanup());
 
 // MSW: intercept every fetch made by the frontend during tests.
 // `onUnhandledRequest: "error"` makes any unhandled request a
@@ -29,6 +39,12 @@ if (typeof Element !== "undefined") {
   }
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
+  }
+  // SessionFlow + EventLog drive a programmatic scroll on mount via
+  // `el.scrollTo(...)`; jsdom doesn't implement that on Element. The
+  // patch makes the call a no-op so layout effects don't throw.
+  if (!Element.prototype.scrollTo) {
+    Element.prototype.scrollTo = () => {};
   }
 }
 

@@ -6,6 +6,23 @@ import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api/client";
 import { projectApi, useProjects } from "@/lib/api/endpoints/project";
 
+// Augment Window with the experimental File System Access API surface
+// the picker uses. Available in Chromium-family browsers; the call
+// site has its own fallback path. Declared inline rather than via a
+// global ambient module so this file owns the typing it depends on.
+type DirectoryPickerOptions = {
+  mode?: "read" | "readwrite";
+  id?: string;
+  startIn?: string;
+};
+declare global {
+  interface Window {
+    showDirectoryPicker?: (
+      options?: DirectoryPickerOptions,
+    ) => Promise<FileSystemDirectoryHandle>;
+  }
+}
+
 export function ProjectPicker() {
   const navigate = useNavigate();
   const navType = useNavigationType();
@@ -16,12 +33,17 @@ export function ProjectPicker() {
   useEffect(() => {
     if (navType !== "POP") return;
     if (projects?.length === 1) {
-      navigate(`/p/${projects[0].id}`, { replace: true });
+      const first = projects[0];
+      if (first) navigate(`/p/${first.id}`, { replace: true });
     }
   }, [projects, navigate, navType]);
 
   async function openPicker() {
     setError(null);
+    if (!window.showDirectoryPicker) {
+      setError("This browser doesn't support the folder picker.");
+      return;
+    }
     let dirHandle: FileSystemDirectoryHandle;
     try {
       dirHandle = await window.showDirectoryPicker({ mode: "read" });
