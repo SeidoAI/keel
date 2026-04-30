@@ -65,7 +65,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     for entity in done_issues:
         issue = entity.model
         for fname in manifest.issue_required:
-            rel = f"issues/{issue.key}/{fname}"
+            rel = f"issues/{issue.id}/{fname}"
             if rel in on_main:
                 continue
             results.append(
@@ -74,7 +74,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
                     severity="error",
                     file=entity.rel_path,
                     message=(
-                        f"Issue {issue.key!r} is `done` but required artifact "
+                        f"Issue {issue.id!r} is `done` but required artifact "
                         f"{fname!r} is missing on origin/main."
                     ),
                     fix_hint=(
