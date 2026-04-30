@@ -84,6 +84,9 @@ def save_session(
     path.parent.mkdir(parents=True, exist_ok=True)
 
     data = session.model_dump(mode="json", exclude={"body"}, exclude_none=True)
+    # KUI-126 / A1: omit default `version: 1`.
+    if data.get("version") == 1:
+        data.pop("version", None)
     text = serialize_frontmatter_body(data, session.body)
     path.write_text(text, encoding="utf-8")
 

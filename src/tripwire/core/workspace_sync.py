@@ -64,6 +64,11 @@ def _normalize(d: dict) -> dict:
             continue
         if v is None or v == "" or v == [] or v == {}:
             continue
+        # KUI-126 / A1: `version: 1` is the default and is omitted from
+        # serialised YAML. A node with version=1 in memory must compare
+        # equal to a YAML frontmatter dict that simply lacks the field.
+        if k == "version" and v == 1:
+            continue
         out[k] = v
     return out
 

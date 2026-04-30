@@ -19,6 +19,12 @@ class Comment(BaseModel):
 
     uuid: UUID4 = Field(default_factory=_uuid.uuid4)
 
+    # Integer schema/contract version. KUI-126 / A1.
+    version: int = 1
+
+    # KUI-127 / A2: PM-set marker for the latest contract-change version.
+    contract_changed_at: int | None = None
+
     issue_key: str
     author: str
     type: str

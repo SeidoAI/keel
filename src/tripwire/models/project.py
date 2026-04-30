@@ -167,6 +167,12 @@ class ProjectConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
+    # Integer schema/contract version. KUI-126 / A1.
+    version: int = 1
+
+    # KUI-127 / A2: PM-set marker for the latest contract-change version.
+    contract_changed_at: int | None = None
+
     name: str
     key_prefix: str
     description: str | None = None

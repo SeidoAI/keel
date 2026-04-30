@@ -55,6 +55,11 @@ def save_node(
     path.parent.mkdir(parents=True, exist_ok=True)
 
     data = node.model_dump(mode="json", exclude={"body"}, exclude_none=True)
+    # KUI-126 / A1: omit `version` when it equals the default (1). This
+    # implements the v0.9 "no migration step" semantics — existing
+    # files don't sprout the field until a real contract bump.
+    if data.get("version") == 1:
+        data.pop("version", None)
     text = serialize_frontmatter_body(data, node.body)
     path.write_text(text, encoding="utf-8")
 
