@@ -15,8 +15,8 @@ import yaml
 
 from tripwire._internal.tripwires import TripwireContext
 from tripwire._internal.tripwires.followups_not_filed import (
-    FollowupsNotFiledTripwire,
     _VARIATIONS,
+    FollowupsNotFiledTripwire,
     _missing_followups,
 )
 

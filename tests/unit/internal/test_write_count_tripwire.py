@@ -15,9 +15,9 @@ import yaml
 
 from tripwire._internal.tripwires import TripwireContext
 from tripwire._internal.tripwires.write_count import (
+    _VARIATIONS,
     DEFAULT_WRITE_COUNT_THRESHOLD,
     WriteCountTripwire,
-    _VARIATIONS,
     _count_writes,
     _read_threshold,
 )

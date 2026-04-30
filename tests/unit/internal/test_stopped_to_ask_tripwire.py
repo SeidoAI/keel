@@ -10,7 +10,6 @@ invoking the path AND committed files extend outside the
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -18,8 +17,8 @@ import yaml
 
 from tripwire._internal.tripwires import TripwireContext
 from tripwire._internal.tripwires.stopped_to_ask import (
-    StoppedToAskTripwire,
     _VARIATIONS,
+    StoppedToAskTripwire,
     _plan_has_stop_and_ask,
     _scope_creep,
     _stop_ask_signalled,

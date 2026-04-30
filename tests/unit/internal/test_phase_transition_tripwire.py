@@ -16,9 +16,9 @@ import yaml
 
 from tripwire._internal.tripwires import TripwireContext
 from tripwire._internal.tripwires.phase_transition import (
+    _VARIATIONS,
     PREVIOUS_PHASE,
     PhaseTransitionTripwire,
-    _VARIATIONS,
 )
 
 
@@ -169,9 +169,7 @@ def test_acknowledged_with_declared_no_findings(tmp_path: Path) -> None:
     ctx = _ctx(tmp_path)
     marker = ctx.ack_path("phase-transition")
     marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text(
-        json.dumps({"declared_no_findings": True}), encoding="utf-8"
-    )
+    marker.write_text(json.dumps({"declared_no_findings": True}), encoding="utf-8")
     assert tw.is_acknowledged(ctx) is True
 
 

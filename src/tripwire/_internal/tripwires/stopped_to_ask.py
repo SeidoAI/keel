@@ -18,8 +18,9 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
-from typing import ClassVar, Iterable
+from typing import ClassVar
 
 import yaml
 
@@ -118,11 +119,7 @@ class StoppedToAskTripwire(Tripwire):
 
     def should_fire(self, ctx: TripwireContext) -> bool:
         plan_path = (
-            ctx.project_dir
-            / "sessions"
-            / ctx.session_id
-            / "artifacts"
-            / "plan.md"
+            ctx.project_dir / "sessions" / ctx.session_id / "artifacts" / "plan.md"
         )
         if not plan_path.is_file():
             return False

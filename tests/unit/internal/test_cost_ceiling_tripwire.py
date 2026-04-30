@@ -17,9 +17,9 @@ import yaml
 
 from tripwire._internal.tripwires import TripwireContext
 from tripwire._internal.tripwires.cost_ceiling import (
+    _VARIATIONS,
     DEFAULT_COST_CEILING_USD,
     CostCeilingTripwire,
-    _VARIATIONS,
     _read_ceiling,
 )
 from tripwire.core.session_cost import CostBreakdown
