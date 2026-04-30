@@ -106,6 +106,8 @@ def test_full_lifecycle_drives_via_transition_only(
     tmp_path: Path, clean_validator
 ) -> None:
     """Drive planned → completed using `tripwire transition` only."""
+    import json
+
     from tripwire.cli.drift import drift_cmd
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
@@ -115,6 +117,19 @@ def test_full_lifecycle_drives_via_transition_only(
 
     stations = ["queued", "executing", "in_review", "verified", "completed"]
     for target in stations:
+        # Mirror the agent's real-world drive: before crossing into
+        # `verified`, the self-review tripwire (registered at
+        # `coding-session:verified` via its class-level `at = (...)`)
+        # must be acknowledged. The agent does this by writing
+        # self-review.md and re-running the transition with `--ack`;
+        # here we drop the substantive ack marker directly because
+        # the test isn't exercising the ack-writer CLI.
+        if target == "verified":
+            ack_path = pd / ".tripwire" / "acks" / "self-review-e2e-session.json"
+            ack_path.parent.mkdir(parents=True, exist_ok=True)
+            ack_path.write_text(
+                json.dumps({"declared_no_findings": True}), encoding="utf-8"
+            )
         result = runner.invoke(
             transition_cmd, ["e2e-session", target, "--project-dir", str(pd)]
         )
