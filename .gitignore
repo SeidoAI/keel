@@ -67,6 +67,8 @@ CLAUDE.md
 
 # v0.9 workflow events log (KUI-123) — per-project, dev-time emission
 # only. Each `tripwire validate` writes one row per check; we don't
-# want that churn in the code-repo history.
-events/
+# want that churn in the code-repo history. Root-anchored so it
+# doesn't accidentally match the FE feature directory at
+# `src/tripwire/ui/frontend/src/features/events/`.
+/events/
 

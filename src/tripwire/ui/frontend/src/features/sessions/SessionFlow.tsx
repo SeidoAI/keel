@@ -82,6 +82,7 @@ export function SessionFlow({ sessions, focusId, onSelect, showAllCompleted }: S
       visible.find((s) => s.id === focusId) ??
       visible.find((s) => statusOrder(s.status) === 0) ??
       visible[0];
+    if (!target) return;
     const pos = layout.positions[target.id];
     if (!pos) return;
     el.scrollTo({

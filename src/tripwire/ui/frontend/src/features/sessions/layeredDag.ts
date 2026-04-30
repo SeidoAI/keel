@@ -101,7 +101,7 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
 
   const numLayers = ids.length === 0 ? 0 : (Math.max(0, ...layer.values()) + 1);
   const layers: LayoutNode[][] = Array.from({ length: numLayers }, () => []);
-  for (const id of ids) layers[layer.get(id) ?? 0].push({ id, kind: "real" });
+  for (const id of ids) layers[layer.get(id) ?? 0]!.push({ id, kind: "real" });
 
   // ---------------- 2. Dummy insertion for skip-layer edges -------------
   const chained: ChainEdge[] = [];
@@ -133,7 +133,7 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
     for (let li = ls + 1; li < lt; li += 1) {
       const dId = `__dummy__${idx}__${li}`;
       dummies.push(dId);
-      layers[li].push({ id: dId, kind: "dummy", edgeIndex: idx });
+      layers[li]!.push({ id: dId, kind: "dummy", edgeIndex: idx });
       layer.set(dId, li);
       dummyOwner.set(dId, idx);
       ensure(segOut, prev).push(dId);
@@ -155,7 +155,7 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
   const nodeStatusOrder = (id: string): number => {
     const ownerIdx = dummyOwner.get(id);
     if (ownerIdx !== undefined) {
-      const owner = chained[ownerIdx];
+      const owner = chained[ownerIdx]!;
       return statusOrderOf(owner.source);
     }
     return statusOrderOf(id);
@@ -167,7 +167,7 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
       ? [...layers.keys()].slice(1)
       : [...layers.keys()].slice(0, -1).reverse();
     for (const li of range) {
-      const lyr = layers[li];
+      const lyr = layers[li]!;
       const bc = new Map<string, number>();
       for (const n of lyr) {
         const ns = (downward ? segIn.get(n.id) : segOut.get(n.id)) ?? [];
@@ -249,7 +249,7 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
   // ---------------- 6. Build edge polylines ----------------------------
   const dagEdges: DagEdgeRoute[] = chained.map((ce) => {
     const points: { x: number; y: number }[] = [];
-    const sPos = positions[ce.source];
+    const sPos = positions[ce.source]!;
     points.push({ x: sPos.x + halfWidthOf(ce.source), y: sPos.y });
 
     const chain = [...ce.dummies, ce.target];
@@ -258,7 +258,10 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
     for (const next of chain) {
       const lane = laneFor.get(`${ci}::${cur}`)!;
       const curY = yOf.get(cur) ?? 0;
-      const nextPos = next === ce.target ? positions[next] : { x: xForLayer(ci + 1), y: yOf.get(next) ?? 0 };
+      const nextPos =
+        next === ce.target
+          ? positions[next]!
+          : { x: xForLayer(ci + 1), y: yOf.get(next) ?? 0 };
       const nextY = nextPos.y;
       points.push({ x: lane, y: curY });
       points.push({ x: lane, y: nextY });
@@ -285,14 +288,15 @@ export function roundedOrthogonalPath(
   radius = 8,
 ): string {
   if (points.length === 0) return "";
+  const first = points[0]!;
   if (points.length === 1) {
-    return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+    return `M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
   }
-  let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  let d = `M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
   for (let i = 1; i < points.length - 1; i += 1) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const next = points[i + 1];
+    const prev = points[i - 1]!;
+    const curr = points[i]!;
+    const next = points[i + 1]!;
     const inLen = Math.hypot(curr.x - prev.x, curr.y - prev.y);
     const outLen = Math.hypot(next.x - curr.x, next.y - curr.y);
     if (inLen === 0 || outLen === 0) continue;
@@ -313,7 +317,7 @@ export function roundedOrthogonalPath(
     d += ` L ${preX.toFixed(2)} ${preY.toFixed(2)}`;
     d += ` Q ${curr.x.toFixed(2)} ${curr.y.toFixed(2)} ${postX.toFixed(2)} ${postY.toFixed(2)}`;
   }
-  const last = points[points.length - 1];
+  const last = points[points.length - 1]!;
   d += ` L ${last.x.toFixed(2)} ${last.y.toFixed(2)}`;
   return d;
 }

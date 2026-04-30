@@ -30,6 +30,12 @@ if (typeof Element !== "undefined") {
   if (!Element.prototype.scrollIntoView) {
     Element.prototype.scrollIntoView = () => {};
   }
+  // SessionFlow + EventLog drive a programmatic scroll on mount via
+  // `el.scrollTo(...)`; jsdom doesn't implement that on Element. The
+  // patch makes the call a no-op so layout effects don't throw.
+  if (!Element.prototype.scrollTo) {
+    Element.prototype.scrollTo = () => {};
+  }
 }
 
 // React Flow (ConceptGraph) and any future virtualised list call
