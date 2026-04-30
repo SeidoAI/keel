@@ -91,7 +91,11 @@ async def list_workflow_events_route(
     instance: str | None = Query(None),
     station: str | None = Query(None),
     event: str | None = Query(None),
-    limit: int = Query(workflow_events_service.DEFAULT_LIMIT, ge=1, le=workflow_events_service.MAX_LIMIT),
+    limit: int = Query(
+        workflow_events_service.DEFAULT_LIMIT,
+        ge=1,
+        le=workflow_events_service.MAX_LIMIT,
+    ),
 ) -> dict[str, Any]:
     """Return a chronologically-ordered slice of the v0.9 events log."""
     page = workflow_events_service.list_workflow_events(

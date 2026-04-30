@@ -52,9 +52,7 @@ def _seed_workflow_events(pd: Path) -> None:
 def test_workflow_events_lists_chronologically(seeded_client, project_dir, project_id):
     _seed_workflow_events(project_dir)
 
-    response = seeded_client.get(
-        f"/api/projects/{project_id}/workflow-events"
-    )
+    response = seeded_client.get(f"/api/projects/{project_id}/workflow-events")
     assert response.status_code == 200, response.text
     body = response.json()
     assert "events" in body
@@ -70,9 +68,7 @@ def test_workflow_events_lists_chronologically(seeded_client, project_dir, proje
         assert "details" in row
 
 
-def test_workflow_events_filters_by_instance(
-    seeded_client, project_dir, project_id
-):
+def test_workflow_events_filters_by_instance(seeded_client, project_dir, project_id):
     _seed_workflow_events(project_dir)
 
     response = seeded_client.get(
@@ -84,9 +80,7 @@ def test_workflow_events_filters_by_instance(
     assert all(e["instance"] == "sess-1" for e in events)
 
 
-def test_workflow_events_filters_by_event_kind(
-    seeded_client, project_dir, project_id
-):
+def test_workflow_events_filters_by_event_kind(seeded_client, project_dir, project_id):
     _seed_workflow_events(project_dir)
 
     response = seeded_client.get(
@@ -111,9 +105,7 @@ def test_workflow_stats_returns_aggregate_counts(
     """``workflow-stats`` aggregates counts by event kind + per-instance."""
     _seed_workflow_events(project_dir)
 
-    response = seeded_client.get(
-        f"/api/projects/{project_id}/workflow-stats"
-    )
+    response = seeded_client.get(f"/api/projects/{project_id}/workflow-stats")
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["total"] == 4
@@ -126,9 +118,7 @@ def test_workflow_stats_returns_aggregate_counts(
     assert by_instance["sess-2"] == 1
 
 
-def test_workflow_stats_top_n_rules(
-    seeded_client, project_dir, project_id
-):
+def test_workflow_stats_top_n_rules(seeded_client, project_dir, project_id):
     """Stats surfaces a top-N rules table keyed on details.id."""
     from tripwire.core.events.log import emit_event
 
@@ -152,9 +142,7 @@ def test_workflow_stats_top_n_rules(
             details={"id": "v_uuid_present", "outcome": "fail"},
         )
 
-    response = seeded_client.get(
-        f"/api/projects/{project_id}/workflow-stats?top_n=2"
-    )
+    response = seeded_client.get(f"/api/projects/{project_id}/workflow-stats?top_n=2")
     assert response.status_code == 200, response.text
     rules = response.json().get("top_rules") or []
     assert len(rules) <= 2

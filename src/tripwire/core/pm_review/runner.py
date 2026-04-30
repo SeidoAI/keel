@@ -81,9 +81,7 @@ def run_pm_review(
     """
     session_dir = project_dir / "sessions" / session_id
     if not session_dir.is_dir():
-        raise FileNotFoundError(
-            f"session {session_id!r} not found at {session_dir}"
-        )
+        raise FileNotFoundError(f"session {session_id!r} not found at {session_dir}")
     artifacts_dir = session_dir / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -177,7 +175,9 @@ def _verdict_from_checks(checks: list[PMReviewCheck]) -> PMReviewOutcome:
 
     ``re-engage`` is never auto-derived (see module docstring).
     """
-    return "auto-merge" if all(c.outcome == "pass" for c in checks) else "request_changes"
+    return (
+        "auto-merge" if all(c.outcome == "pass" for c in checks) else "request_changes"
+    )
 
 
 def _render_artifact(
@@ -204,8 +204,7 @@ def _render_artifact(
     for i, check in enumerate(checks, start=1):
         marker = "✓" if check.outcome == "pass" else "✗"
         lines.append(
-            f"| {i} | {check.name} | {marker} {check.outcome} | "
-            f"{len(check.findings)} |"
+            f"| {i} | {check.name} | {marker} {check.outcome} | {len(check.findings)} |"
         )
     lines.append("")
     failing = [c for c in checks if c.outcome == "fail"]

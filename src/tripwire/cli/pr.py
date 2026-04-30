@@ -53,8 +53,7 @@ def pr_status_cmd(session_id: str, project_dir: Path) -> None:
     )
     if not rows:
         raise click.ClickException(
-            f"no pm-review found for session {session_id!r}; "
-            f"run pm-review first."
+            f"no pm-review found for session {session_id!r}; run pm-review first."
         )
 
     latest = rows[-1]

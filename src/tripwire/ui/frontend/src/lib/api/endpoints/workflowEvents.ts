@@ -49,11 +49,11 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 export const workflowEventsApi = {
   list: (pid: string, filters: WorkflowEventsFilters = {}) =>
     apiGet<WorkflowEventsPage>(
-      `/api/projects/${encodeURIComponent(pid)}/workflow-events${buildQuery(filters)}`,
+      `/api/projects/${encodeURIComponent(pid)}/workflow-events${buildQuery({ ...filters })}`,
     ),
   stats: (pid: string, opts: { workflow?: string; top_n?: number } = {}) =>
     apiGet<WorkflowStatsResponse>(
-      `/api/projects/${encodeURIComponent(pid)}/workflow-stats${buildQuery(opts)}`,
+      `/api/projects/${encodeURIComponent(pid)}/workflow-stats${buildQuery({ ...opts })}`,
     ),
 };
 
