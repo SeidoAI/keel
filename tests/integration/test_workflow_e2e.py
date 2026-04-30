@@ -133,8 +133,13 @@ def test_full_lifecycle_drives_via_transition_only(
     assert len(completed) == 5
     assert [e["details"]["to_station"] for e in completed] == stations
 
-    # Drift report is clean.
-    drift = runner.invoke(drift_cmd, ["report", "--project-dir", str(pd)])
+    # Drift findings (KUI-124 / workflow gate) is clean.
+    # Note: `tripwire drift report` (KUI-128 / coherence score, from #74)
+    # and `tripwire drift findings` (KUI-124 / workflow gate codes, this
+    # PR) are sibling subcommands. The lifecycle test exercises the gate
+    # findings since that's what verifies "transition-only drives the
+    # session through with no workflow drift".
+    drift = runner.invoke(drift_cmd, ["findings", "--project-dir", str(pd)])
     assert drift.exit_code == 0, drift.output
     assert "no drift" in drift.output.lower()
 
@@ -207,7 +212,7 @@ def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(
         drift_cmd,
-        ["report", "--project-dir", str(pd), "--instance", "e2e-session"],
+        ["findings", "--project-dir", str(pd), "--instance", "e2e-session"],
     )
     assert result.exit_code != 0
     assert "drift/prompt_check_missing" in result.output
