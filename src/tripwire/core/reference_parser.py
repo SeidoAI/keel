@@ -11,5 +11,6 @@ from tripwire.core.graph.refs import (  # noqa: F401
     FENCE_PATTERN,
     REFERENCE_PATTERN,
     extract_references,
+    extract_references_with_pins,
     replace_references,
 )

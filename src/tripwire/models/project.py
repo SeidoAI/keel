@@ -167,6 +167,9 @@ class ProjectConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
+    # Integer schema/contract version. KUI-126 / A1.
+    version: int = 1
+
     name: str
     key_prefix: str
     description: str | None = None

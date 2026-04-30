@@ -151,6 +151,9 @@ class AgentSession(BaseModel):
     # Human-readable slug, e.g. "api-endpoints-core".
     id: str
 
+    # Integer schema/contract version. KUI-126 / A1.
+    version: int = 1
+
     name: str
     agent: str  # references agents/<id>.yaml in the project repo
     issues: list[str] = Field(default_factory=list)

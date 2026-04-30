@@ -19,6 +19,9 @@ class Comment(BaseModel):
 
     uuid: UUID4 = Field(default_factory=_uuid.uuid4)
 
+    # Integer schema/contract version. KUI-126 / A1.
+    version: int = 1
+
     issue_key: str
     author: str
     type: str

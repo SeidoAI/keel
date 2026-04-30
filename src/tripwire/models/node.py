@@ -74,6 +74,9 @@ class ConceptNode(BaseModel):
     # Human-readable slug, unique within a project (filename = id).
     id: str
 
+    # Integer schema/contract version. KUI-126 / A1.
+    version: int = 1
+
     type: str
     name: str
     description: str | None = None

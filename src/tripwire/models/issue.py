@@ -35,6 +35,11 @@ class Issue(BaseModel):
     # collision resolution; the `uuid` is the stable handle.
     id: str
 
+    # Integer schema/contract version. KUI-126 / A1: bumped manually
+    # when a contract change makes consumers' pinned references stale.
+    # Bare `[[id]]` resolves to the latest; `[[id@vN]]` pins to N.
+    version: int = 1
+
     title: str
     status: IssueStatus = IssueStatus.BACKLOG
     priority: str

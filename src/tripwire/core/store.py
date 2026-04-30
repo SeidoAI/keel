@@ -67,6 +67,10 @@ def save_project(project_dir: Path, config: ProjectConfig) -> None:
     """Write a ProjectConfig back to `<project_dir>/project.yaml`."""
     path = paths.project_config_path(project_dir)
     data = config.model_dump(mode="json", exclude_none=True)
+    # KUI-126 / A1: omit default `version: 1` so existing files don't
+    # sprout the field until a real contract bump.
+    if data.get("version") == 1:
+        data.pop("version", None)
     path.write_text(
         yaml.safe_dump(data, sort_keys=False, default_flow_style=False),
         encoding="utf-8",
@@ -110,6 +114,9 @@ def save_issue(project_dir: Path, issue: Issue, *, update_cache: bool = True) ->
     path.parent.mkdir(parents=True, exist_ok=True)
 
     data = issue.model_dump(mode="json", exclude={"body"}, exclude_none=True)
+    # KUI-126 / A1: omit default `version: 1`.
+    if data.get("version") == 1:
+        data.pop("version", None)
     text = serialize_frontmatter_body(data, issue.body)
     path.write_text(text, encoding="utf-8")
 
@@ -181,5 +188,8 @@ def save_comment(project_dir: Path, comment: Comment, filename: str) -> None:
     cdir.mkdir(parents=True, exist_ok=True)
     path = cdir / filename
     data = comment.model_dump(mode="json", exclude={"body"}, exclude_none=True)
+    # KUI-126 / A1: omit default `version: 1`.
+    if data.get("version") == 1:
+        data.pop("version", None)
     text = serialize_frontmatter_body(data, comment.body)
     path.write_text(text, encoding="utf-8")
