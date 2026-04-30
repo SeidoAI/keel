@@ -24,6 +24,7 @@ def register_routes(app: FastAPI) -> None:
         _common,
         actions,
         artifacts,
+        drift,
         enums,
         events,
         graph,
@@ -54,6 +55,7 @@ def register_routes(app: FastAPI) -> None:
         actions,
         events,
         workflow,
+        drift,
         ws,
     ]
 

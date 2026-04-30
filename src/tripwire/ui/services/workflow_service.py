@@ -90,6 +90,69 @@ _SYSTEM_TRIPWIRES: list[dict[str, Any]] = [
             "this tripwire fires on."
         ),
     },
+    {
+        "id": "phase-transition",
+        "name": "phase advanced past open prev-phase issues",
+        "fires_on_event": "session.complete",
+        "fires_on_station": "verified",
+        "blocks": True,
+        "prompt": (
+            "The project's phase has been advanced but issues labelled "
+            "with the previous phase are still open. Either close the "
+            "issues, roll the phase back, or re-tag the issues with "
+            "the current phase."
+        ),
+    },
+    {
+        "id": "followups-not-filed",
+        "name": "deferred follow-ups must be filed as issues",
+        "fires_on_event": "session.complete",
+        "fires_on_station": "verified",
+        "blocks": True,
+        "prompt": (
+            "PM-response declared deferred items with follow_up keys, "
+            "but the referenced issues aren't on disk. Follow-ups are "
+            "immediate, not deferred — file the issue or convert the "
+            "deferral."
+        ),
+    },
+    {
+        "id": "stopped-to-ask",
+        "name": "stop-and-ask boundary crossed silently",
+        "fires_on_event": "session.complete",
+        "fires_on_station": "verified",
+        "blocks": True,
+        "prompt": (
+            "The session plan declared a Stop-and-ask section, the diff "
+            "touched files outside session.yaml.key_files, and no "
+            "stop-and-ask comment surfaced the call. Re-scope or revert "
+            "the out-of-scope work."
+        ),
+    },
+    {
+        "id": "write-count",
+        "name": "validation cadence — write count over threshold",
+        "fires_on_event": "session.complete",
+        "fires_on_station": "verified",
+        "blocks": True,
+        "prompt": (
+            "File-edit tool calls in this session crossed the configured "
+            "threshold without an intervening tripwire validate run. "
+            "Run validate now and walk the findings."
+        ),
+    },
+    {
+        "id": "cost-ceiling",
+        "name": "cumulative session cost over ceiling",
+        "fires_on_event": "session.complete",
+        "fires_on_station": "verified",
+        "blocks": True,
+        "prompt": (
+            "The session's cumulative cost has crossed the configured "
+            "ceiling. Either justify and recalibrate the ceiling, or "
+            "diagnose the runaway and propose a guardrail."
+        ),
+    },
 ]
 
 

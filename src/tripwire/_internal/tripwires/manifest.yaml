@@ -11,6 +11,16 @@
 session.complete:
   - id: self-review
     class: tripwire._internal.tripwires.self_review.SelfReviewTripwire
+  - id: phase-transition
+    class: tripwire._internal.tripwires.phase_transition.PhaseTransitionTripwire
+  - id: followups-not-filed
+    class: tripwire._internal.tripwires.followups_not_filed.FollowupsNotFiledTripwire
+  - id: stopped-to-ask
+    class: tripwire._internal.tripwires.stopped_to_ask.StoppedToAskTripwire
+  - id: write-count
+    class: tripwire._internal.tripwires.write_count.WriteCountTripwire
+  - id: cost-ceiling
+    class: tripwire._internal.tripwires.cost_ceiling.CostCeilingTripwire
 issue.close: []
 pr.open: []
 validate.run: []

@@ -34,6 +34,7 @@ const NAV_ITEMS: ScreenShellNavItem[] = [
   { to: "sessions", label: "sessions", number: "05" },
   { to: "events", label: "events", number: "06" },
   { to: "process-quality", label: "quality", number: "07" },
+  { to: "drift", label: "drift", number: "08" },
 ];
 
 export interface ScreenShellProps {
