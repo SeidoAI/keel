@@ -78,11 +78,22 @@ class Tripwire(ABC):
     attributes and implement :meth:`fire` and :meth:`is_acknowledged`.
     The class attributes drive registry indexing and the loop-safety
     counter.
+
+    KUI-121: subclasses may also set ``at = (workflow_id, station_id)``
+    to declare the workflow station the tripwire belongs to. The
+    loader registers the mapping with
+    :mod:`tripwire.core.workflow.registry` at instantiation time so
+    the gate runner and drift detector can ask "what tripwires fire at
+    station X?". Tripwires without ``at`` are treated as
+    non-workflow-resident (legacy / not yet migrated).
     """
 
     id: ClassVar[str] = ""
     fires_on: ClassVar[str] = ""
     blocks: ClassVar[bool] = True
+    # Optional — empty tuple means "not yet registered against a
+    # station". Subclasses override to set the (workflow, station) pair.
+    at: ClassVar[tuple[str, str] | tuple[()]] = ()
 
     def __init__(self) -> None:
         # Concrete subclasses must set id and fires_on. ABC's
