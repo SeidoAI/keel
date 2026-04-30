@@ -210,3 +210,53 @@ def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(json.dumps({"fix_commits": ["abc1234"]}), encoding="utf-8")
     assert tw.is_acknowledged(ctx) is True
+
+
+def test_session_touched_files_uses_project_base_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`_session_touched_files` diffs against `project.base_branch`,
+    not a hardcoded `main`. Repos using `develop`/`master`/etc. must
+    work; otherwise the subprocess silently no-ops and scope-creep
+    detection breaks (codex P1 #1 on PR #79).
+    """
+    _seed_project(tmp_path)
+    # Override base_branch in project.yaml.
+    pyaml = tmp_path / "project.yaml"
+    payload = yaml.safe_load(pyaml.read_text())
+    payload["base_branch"] = "develop"
+    pyaml.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    seen_args: list[list[str]] = []
+
+    def _fake(args, **kwargs):
+        seen_args.append(list(args))
+        return ""
+
+    from tripwire._internal.tripwires import stopped_to_ask
+
+    monkeypatch.setattr(stopped_to_ask.subprocess, "check_output", _fake)
+    stopped_to_ask._session_touched_files(tmp_path, "alpha")
+    assert seen_args, "subprocess was not invoked"
+    cmd = seen_args[0]
+    assert "develop...HEAD" in cmd, f"expected develop...HEAD, got {cmd!r}"
+
+
+def test_session_touched_files_falls_back_to_main_when_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If project.yaml is missing (not a project root), default to
+    `main`. Avoids breaking on edge cases where the helper is invoked
+    outside a project."""
+    seen_args: list[list[str]] = []
+
+    def _fake(args, **kwargs):
+        seen_args.append(list(args))
+        return ""
+
+    from tripwire._internal.tripwires import stopped_to_ask
+
+    monkeypatch.setattr(stopped_to_ask.subprocess, "check_output", _fake)
+    stopped_to_ask._session_touched_files(tmp_path, "alpha")
+    assert seen_args
+    assert "main...HEAD" in seen_args[0]

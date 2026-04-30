@@ -68,6 +68,60 @@ def test_first_complete_writes_event_file(tmp_path: Path) -> None:
     assert (fire_dir / "0001.json").is_file()
 
 
+def test_ack_with_tripwire_id_targets_specific_marker(tmp_path: Path) -> None:
+    """`--ack --tripwire-id <id>` writes the marker for the named
+    tripwire, not just `self-review`. Required for the v0.9 deviation
+    tripwires (phase-transition, followups-not-filed, stopped-to-ask,
+    write-count, cost-ceiling) which all fire on `session.complete`
+    alongside self-review (codex P1 #2 on PR #79)."""
+    _project(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "session",
+            "complete",
+            "fixture-1",
+            "--project-dir",
+            str(tmp_path),
+            "--ack",
+            "--tripwire-id",
+            "phase-transition",
+            "--declared-no-findings",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    target = tmp_path / ".tripwire" / "acks" / "phase-transition-fixture-1.json"
+    assert target.is_file(), "phase-transition marker missing"
+    self_review_marker = (
+        tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json"
+    )
+    assert not self_review_marker.exists(), (
+        "self-review marker leaked when --tripwire-id targeted phase-transition"
+    )
+
+
+def test_ack_default_tripwire_id_remains_self_review(tmp_path: Path) -> None:
+    """Backward compat: omitting `--tripwire-id` defaults to
+    `self-review` so existing workflows keep working."""
+    _project(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "session",
+            "complete",
+            "fixture-1",
+            "--project-dir",
+            str(tmp_path),
+            "--ack",
+            "--declared-no-findings",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json").is_file()
+
+
 def test_ack_with_fix_commits_writes_marker(tmp_path: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()
