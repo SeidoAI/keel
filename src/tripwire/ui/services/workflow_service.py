@@ -175,6 +175,19 @@ def build_workflow(
     `is_pm_role` controls whether tripwire prompts are revealed. The
     `project_id` is echoed back into the payload so frontends can
     correlate without a second round trip.
+
+    The response shape carries two views:
+
+    - **legacy** (``lifecycle``, ``validators``, ``tripwires``,
+      ``connectors``, ``artifacts``) — the introspection-derived
+      shape from v0.8 the existing Workflow Map UI consumes.
+    - **workflows** (KUI-125) — the parsed workflow.yaml tree, one
+      entry per declared workflow. Carries stations with their
+      ``next:`` shape (single / conditional / terminal) and the
+      validators/tripwires/prompt-checks each station references.
+      The Workflow Map renders this directly so a project can
+      define new workflows (pm-review, future inbox-handling,
+      issue-lifecycle) without extending the backend.
     """
     stations = _build_stations(project_dir)
     return {
@@ -184,7 +197,74 @@ def build_workflow(
         "tripwires": _build_tripwires(is_pm_role=is_pm_role),
         "connectors": _CONNECTORS,
         "artifacts": _LIFECYCLE_ARTIFACTS,
+        "workflows": _build_workflows(project_dir),
     }
+
+
+def _build_workflows(project_dir: Path) -> list[dict[str, Any]]:
+    """Surface the parsed ``workflow.yaml`` for the Workflow Map UI.
+
+    Each entry is one workflow declared in the file. ``next:`` is
+    serialized as a discriminated union mirroring
+    :class:`tripwire.core.workflow.schema.NextSpec`. Empty list when
+    the file is missing or parses to zero workflows.
+    """
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import NextSpec
+
+    spec = load_workflows(project_dir)
+    out: list[dict[str, Any]] = []
+    for wf_id, wf in spec.workflows.items():
+        stations: list[dict[str, Any]] = []
+        for station in wf.stations:
+            stations.append(
+                {
+                    "id": station.id,
+                    "next": _next_spec_to_dict(station.next),
+                    "validators": list(station.validators),
+                    "tripwires": list(station.tripwires),
+                    "prompt_checks": list(station.prompt_checks),
+                }
+            )
+        out.append(
+            {
+                "id": wf_id,
+                "actor": wf.actor,
+                "trigger": wf.trigger,
+                "stations": stations,
+            }
+        )
+    # `NextSpec` import was just for the helper below; keep the
+    # serialiser local so the route module doesn't import core.workflow
+    # directly.
+    _ = NextSpec  # silence unused-import for mypy-strict linters
+    return out
+
+
+def _next_spec_to_dict(next_spec: Any) -> dict[str, Any]:
+    """Serialize a :class:`NextSpec` into a plain dict.
+
+    Shape:
+        {"kind": "single", "single": "<id>"}
+        {"kind": "conditional", "branches":
+            [{"if": "<predicate>", "then": "<id>"} | {"else": "<id>"}]}
+        {"kind": "terminal"}
+    """
+    kind = next_spec.kind
+    if kind == "single":
+        return {"kind": "single", "single": next_spec.single}
+    if kind == "conditional":
+        branches: list[dict[str, Any]] = []
+        for branch in next_spec.conditional or []:
+            if branch.predicate is None:
+                branches.append({"else": branch.then})
+            else:
+                pred = branch.predicate
+                branches.append(
+                    {"if": f"{pred.field} {pred.op} {pred.value}", "then": branch.then}
+                )
+        return {"kind": "conditional", "branches": branches}
+    return {"kind": "terminal"}
 
 
 def _build_stations(project_dir: Path) -> list[dict[str, Any]]:

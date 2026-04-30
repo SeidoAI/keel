@@ -4,7 +4,12 @@ import { useSearchParams } from "react-router-dom";
 import { useProjectShell } from "@/app/ProjectShell";
 import { Stamp } from "@/components/ui/stamp";
 import { ApiError } from "@/lib/api/client";
-import { useWorkflow } from "@/lib/api/endpoints/workflow";
+import {
+  type WorkflowYamlBranch,
+  type WorkflowYamlDefinition,
+  type WorkflowYamlStation,
+  useWorkflow,
+} from "@/lib/api/endpoints/workflow";
 import { isPmMode } from "@/lib/role";
 import { ArtifactCard } from "./ArtifactCard";
 import { ConnectorCurve } from "./ConnectorCurve";
@@ -78,9 +83,175 @@ export function WorkflowMap() {
       </header>
       <Legend />
       {stateBranch}
+      <WorkflowsPanel workflows={graph?.workflows ?? []} />
       <WorkflowDrawer selection={selection} pmMode={pmMode} onClose={() => setSelection(null)} />
     </div>
   );
+}
+
+/**
+ * Workflow.yaml-derived panel (KUI-125).
+ *
+ * Renders one card per declared workflow with stations, conditional
+ * branches, and the validators/tripwires/prompt-checks each station
+ * references. Sits below the canvas so the existing introspection-
+ * derived view (lifecycle wire) stays visible at the top — the panel
+ * is the new shape; the canvas is the live one. Future iterations
+ * fold the canvas into this panel; for v0.9 they coexist.
+ */
+function WorkflowsPanel({ workflows }: { workflows: WorkflowYamlDefinition[] }) {
+  if (!workflows || workflows.length === 0) {
+    return null;
+  }
+  return (
+    <section
+      aria-label="Workflow definitions"
+      data-testid="workflow-yaml-panel"
+      className="flex flex-col gap-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) p-4"
+    >
+      <header className="flex items-center justify-between">
+        <h2 className="font-sans font-semibold text-[14px] uppercase tracking-[0.04em] text-(--color-ink-2)">
+          workflow.yaml
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
+          {workflows.length} workflow{workflows.length === 1 ? "" : "s"}
+        </span>
+      </header>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {workflows.map((wf) => (
+          <WorkflowDefinitionCard key={wf.id} workflow={wf} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WorkflowDefinitionCard({ workflow }: { workflow: WorkflowYamlDefinition }) {
+  return (
+    <article
+      data-testid={`workflow-yaml-card-${workflow.id}`}
+      className="flex flex-col gap-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) p-3"
+    >
+      <header className="flex items-center gap-2">
+        <Stamp tone="rule">{workflow.id}</Stamp>
+        <span className="font-mono text-[11px] text-(--color-ink-2)">
+          actor: {workflow.actor || "—"}
+        </span>
+        <span className="ml-auto font-mono text-[11px] text-(--color-ink-3)">
+          trigger: {workflow.trigger || "—"}
+        </span>
+      </header>
+      <ol className="flex flex-col gap-1.5 font-mono text-[11px] text-(--color-ink-2)">
+        {workflow.stations.map((station, idx) => (
+          <li key={station.id}>
+            <WorkflowStationRow
+              station={station}
+              index={idx}
+              total={workflow.stations.length}
+            />
+          </li>
+        ))}
+      </ol>
+    </article>
+  );
+}
+
+function WorkflowStationRow({
+  station,
+  index,
+  total: _total,
+}: {
+  station: WorkflowYamlStation;
+  index: number;
+  total: number;
+}) {
+  return (
+    <div
+      data-testid={`workflow-yaml-station-${station.id}`}
+      className="flex flex-col gap-1 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-2 py-1.5"
+    >
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+        <span className="font-sans font-semibold text-(--color-ink)">
+          {station.id}
+        </span>
+        <NextSpec next={station.next} />
+      </div>
+      {(station.validators.length ||
+        station.tripwires.length ||
+        station.prompt_checks.length) > 0 ? (
+        <div className="flex flex-wrap gap-1.5 text-[10px]">
+          {station.validators.map((v) => (
+            <span
+              key={`v-${v}`}
+              data-testid={`yaml-station-${station.id}-validator-${v}`}
+              className="rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-1.5 py-0.5 text-(--color-ink-2)"
+            >
+              gate: {v}
+            </span>
+          ))}
+          {station.tripwires.map((t) => (
+            <span
+              key={`t-${t}`}
+              data-testid={`yaml-station-${station.id}-tripwire-${t}`}
+              className="rounded-(--radius-stamp) border border-(--color-tripwire) bg-(--color-paper) px-1.5 py-0.5 text-(--color-tripwire)"
+            >
+              tripwire: {t}
+            </span>
+          ))}
+          {station.prompt_checks.map((p) => (
+            <span
+              key={`pc-${p}`}
+              data-testid={`yaml-station-${station.id}-pc-${p}`}
+              className="rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-1.5 py-0.5 text-(--color-ink-2)"
+            >
+              prompt: {p}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function NextSpec({ next }: { next: WorkflowYamlStation["next"] }) {
+  if (next.kind === "terminal") {
+    return (
+      <span
+        data-testid="next-terminal"
+        className="ml-auto font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)"
+      >
+        terminal
+      </span>
+    );
+  }
+  if (next.kind === "single") {
+    return (
+      <span
+        data-testid="next-single"
+        className="ml-auto font-mono text-[10px] text-(--color-ink-3)"
+      >
+        → {next.single}
+      </span>
+    );
+  }
+  return (
+    <span
+      data-testid="next-conditional"
+      className="ml-auto flex flex-col items-end gap-0.5 font-mono text-[10px] text-(--color-ink-3)"
+    >
+      {next.branches.map((b, i) => (
+        <span key={i}>{branchLabel(b)}</span>
+      ))}
+    </span>
+  );
+}
+
+function branchLabel(branch: WorkflowYamlBranch): string {
+  if ("else" in branch) return `else → ${branch.else}`;
+  return `if ${branch.if} → ${branch.then}`;
 }
 
 function is404(err: unknown): boolean {

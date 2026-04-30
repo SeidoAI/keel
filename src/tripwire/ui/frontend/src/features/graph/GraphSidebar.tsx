@@ -26,7 +26,8 @@ export interface GraphSidebarProps {
   graph: ReactFlowGraph;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onCollapse: () => void;
+  /** Optional — caller may omit when the sidebar is non-collapsible. */
+  onCollapse?: () => void;
 }
 
 interface ConceptEntry {
