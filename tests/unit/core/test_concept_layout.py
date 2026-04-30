@@ -132,9 +132,7 @@ class TestBootstrapFromYaml:
         loaded = load_concept_layouts(project_dir)
         assert loaded == {"alpha": (10.0, 20.0), "beta": (-5.5, 99.0)}
 
-    def test_is_no_op_when_sidecar_already_exists(
-        self, project_dir: Path
-    ) -> None:
+    def test_is_no_op_when_sidecar_already_exists(self, project_dir: Path) -> None:
         # Sidecar present with a single entry; node YAML has its own
         # layout. Bootstrap must NOT clobber the sidecar.
         save_concept_layouts(project_dir, {"sidecar-blessed": (1.0, 2.0)})

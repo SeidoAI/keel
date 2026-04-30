@@ -216,9 +216,7 @@ def bootstrap_from_yaml_if_absent(project_dir: Path) -> None:
             lifted[node.id] = (float(layout.x), float(layout.y))
     except (OSError, ValueError) as exc:
         # A malformed YAML shouldn't block the bootstrap; skip and move on.
-        logger.warning(
-            "concept_layout: bootstrap could not read all nodes: %s", exc
-        )
+        logger.warning("concept_layout: bootstrap could not read all nodes: %s", exc)
 
     save_concept_layouts(project_dir, lifted)
 

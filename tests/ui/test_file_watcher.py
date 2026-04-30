@@ -155,15 +155,11 @@ class TestShouldIgnore:
         # `.tripwire/concept-layout.json`. The whole point of the sidecar
         # design is that layout writes do NOT trigger `file_changed` events
         # — that's what prevents the self-amplifying re-seed loop.
-        assert _should_ignore(
-            tmp_path / ".tripwire" / "concept-layout.json", tmp_path
-        )
+        assert _should_ignore(tmp_path / ".tripwire" / "concept-layout.json", tmp_path)
         assert _should_ignore(
             tmp_path / ".tripwire" / "concept-layout.json.tmp", tmp_path
         )
-        assert _should_ignore(
-            tmp_path / ".tripwire" / ".concept-layout.lock", tmp_path
-        )
+        assert _should_ignore(tmp_path / ".tripwire" / ".concept-layout.lock", tmp_path)
 
     def test_normal_issue_not_ignored(self, tmp_path: Path):
         assert not _should_ignore(

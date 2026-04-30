@@ -237,9 +237,7 @@ class TestPatchConceptLayout:
         assert r.status_code == 200
         assert r.json()["layouts"]["user-model"] == {"x": 10.0, "y": 20.0}
 
-    def test_malformed_slug_returns_400(
-        self, populated_client, graph_project_id
-    ):
+    def test_malformed_slug_returns_400(self, populated_client, graph_project_id):
         r = populated_client.patch(
             f"/api/projects/{graph_project_id}/graph/concept/layout",
             json={"BadSlug": {"x": 1.0, "y": 2.0}},
@@ -247,9 +245,7 @@ class TestPatchConceptLayout:
         assert r.status_code == 400
         assert r.json()["code"] == "node/bad_slug"
 
-    def test_missing_y_returns_422(
-        self, populated_client, graph_project_id
-    ):
+    def test_missing_y_returns_422(self, populated_client, graph_project_id):
         r = populated_client.patch(
             f"/api/projects/{graph_project_id}/graph/concept/layout",
             json={"user-model": {"x": 1.0}},
@@ -279,9 +275,7 @@ class TestConceptGraphReadsFromSidecar:
         from tripwire.core.concept_layout import save_concept_layouts
 
         save_concept_layouts(graph_project, {"user-model": (42.0, 84.0)})
-        r = populated_client.get(
-            f"/api/projects/{graph_project_id}/graph/concept"
-        )
+        r = populated_client.get(f"/api/projects/{graph_project_id}/graph/concept")
         assert r.status_code == 200
         body = r.json()
         target = next(n for n in body["nodes"] if n["id"] == "user-model")
