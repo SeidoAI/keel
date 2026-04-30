@@ -3,6 +3,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { StandaloneArtifactViewer } from "@/features/artifacts/StandaloneArtifactViewer";
 import { Board } from "@/features/board/Board";
 import { ProjectDashboard } from "@/features/dashboard/ProjectDashboard";
+import { DriftReport } from "@/features/drift/DriftReport";
 import { EventLog } from "@/features/events/EventLog";
 import { ConceptGraph } from "@/features/graph/ConceptGraph";
 import { IssueDetail } from "@/features/issues/IssueDetail";
@@ -35,6 +36,7 @@ export const router = createBrowserRouter([
       { path: "workflow", element: <WorkflowMap /> },
       { path: "events", element: <EventLog /> },
       { path: "process-quality", element: <ProcessQuality /> },
+      { path: "drift", element: <DriftReport /> },
       { path: "sessions/:sid/live", element: <LiveMonitor /> },
     ],
   },

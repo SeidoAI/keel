@@ -96,6 +96,18 @@ export const defaultHandlers = [
     HttpResponse.json({ events: [], next_cursor: null }),
   ),
   http.get("/api/projects/:pid/events", () => HttpResponse.json({ events: [], next_cursor: null })),
+  http.get("/api/projects/:pid/drift", () =>
+    HttpResponse.json({
+      score: 100,
+      breakdown: {
+        stale_pins: 0,
+        unresolved_refs: 0,
+        stale_concepts: 0,
+        workflow_drift_events: 0,
+      },
+      workflow_drift_events: [],
+    }),
+  ),
 
   // v0.9 — workflow events log + stats (KUI-155, KUI-156).
   http.get("/api/projects/:pid/workflow-events", () =>
