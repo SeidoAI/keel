@@ -13,6 +13,8 @@ session.complete:
     class: tripwire._internal.tripwires.self_review.SelfReviewTripwire
   - id: phase-transition
     class: tripwire._internal.tripwires.phase_transition.PhaseTransitionTripwire
+  - id: followups-not-filed
+    class: tripwire._internal.tripwires.followups_not_filed.FollowupsNotFiledTripwire
 issue.close: []
 pr.open: []
 validate.run: []
