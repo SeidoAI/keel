@@ -17,6 +17,8 @@ session.complete:
     class: tripwire._internal.tripwires.followups_not_filed.FollowupsNotFiledTripwire
   - id: stopped-to-ask
     class: tripwire._internal.tripwires.stopped_to_ask.StoppedToAskTripwire
+  - id: write-count
+    class: tripwire._internal.tripwires.write_count.WriteCountTripwire
 issue.close: []
 pr.open: []
 validate.run: []
