@@ -53,10 +53,12 @@ class TestExitCode:
     def test_info_only_exits_zero(self):
         assert exit_code_for([_make_finding("x", "info")]) == 0
 
-    def test_warning_present_exits_one(self):
+    def test_warnings_exit_zero(self):
+        # Warnings are advisory only — they surface in the report but
+        # don't fail CI. Only errors exit non-zero (KUI-158).
         assert (
             exit_code_for([_make_finding("x", "info"), _make_finding("y", "warning")])
-            == 1
+            == 0
         )
 
     def test_error_present_exits_two(self):

@@ -9,8 +9,9 @@ Stages:
 - ``handoff`` — before /pm-session-queue
 - ``session`` — in-flight health of one session
 
-Exit codes follow ``linter.exit_code_for``: 0 (info-only),
-1 (warning present), 2 (error present).
+Exit codes follow ``linter.exit_code_for``: 0 (info-only or
+warnings-only — warnings are advisory and don't fail CI),
+2 (error present).
 """
 
 from __future__ import annotations
