@@ -83,7 +83,7 @@ def _bootstrap_workspace_with_node(
 
     (ws_dir / "nodes" / f"{node_id}.yaml").write_text(
         f"""---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: {node_id}
 type: system
 name: Shared Concept
@@ -321,7 +321,7 @@ class TestConcurrentPushes:
             node_id = f"concept-{i}"
             (proj_dir / "nodes" / f"{node_id}.yaml").write_text(
                 f"""---
-uuid: 00000000-0000-0000-0000-00000000000{i}
+uuid: 00000000-0000-4000-8000-00000000000{i}
 id: {node_id}
 type: concept
 name: Concept {i}

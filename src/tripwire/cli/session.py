@@ -1330,12 +1330,6 @@ def session_scaffold_cmd(
         lstrip_blocks=True,
     )
 
-    # Modern (post-KUI-110) layout: manifest artifacts live under
-    # `sessions/<sid>/artifacts/` to match `check_artifact_presence`'s
-    # subdir-aware path resolution. Pre-KUI-110 sessions kept these at
-    # the session root (flat); the validator's strict check now expects
-    # subdir, and the helpers in `core.paths` resolve subdir-first with
-    # a flat fallback for legacy sessions.
     session_root = _paths.session_dir(resolved, session_id)
     artifacts_dest_dir = _paths.session_artifacts_dir(resolved, session_id)
     session_root.mkdir(parents=True, exist_ok=True)

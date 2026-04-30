@@ -75,10 +75,10 @@ def artifact_client(
         ],
     )
     save_test_session(artifact_project, "session-a", plan=True)
-    # Write the plan artifact on disk (plan=True creates plan.md).
-    (artifact_project / "sessions" / "session-a" / "task-checklist.md").write_text(
-        "| # | | |\n|---|---|---|\n| 1 | task | done |\n"
-    )
+    # Write the plan artifact on disk (plan=True creates plan.md under artifacts/).
+    (
+        artifact_project / "sessions" / "session-a" / "artifacts" / "task-checklist.md"
+    ).write_text("| # | | |\n|---|---|---|\n| 1 | task | done |\n")
     return TestClient(create_app(dev_mode=True))
 
 
@@ -123,7 +123,7 @@ class TestGetArtifact:
         artifact_project,
     ):
         # Remove the file on disk; manifest still lists it.
-        plan = artifact_project / "sessions" / "session-a" / "plan.md"
+        plan = artifact_project / "sessions" / "session-a" / "artifacts" / "plan.md"
         plan.unlink()
         r = artifact_client.get(
             f"/api/projects/{artifact_project_id}/sessions/session-a/artifacts/plan"

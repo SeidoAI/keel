@@ -4,7 +4,7 @@
 # Tripwire/Fortra security product). Users install as `pip install tripwire-pm`;
 # the CLI command (`tripwire`, `tw`) and `import tripwire` are unchanged.
 name = "tripwire-pm"
-version = "0.7.4"
+version = "0.9.0"
 description = "Git-native project management with concept graph for AI agents"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10,<3.14"
@@ -27,8 +27,6 @@ dependencies = [
     "uvicorn[standard]>=0.30,<1.0",
     "watchdog>=4.0,<7.0",
     "websockets>=12.0,<17.0",
-    # Containers (future — import is deferred by the containers module)
-    "docker>=7.0,<8.0",
 ]
 
 [project.optional-dependencies]

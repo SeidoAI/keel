@@ -677,10 +677,10 @@ class TestBuildClaudeArgsResumePropagation:
         fake_proc.pid = 12345
         with (
             patch(
-                "tripwire.runtimes.claude._sp.Popen", return_value=fake_proc
+                "tripwire.runtimes.base._sp.Popen", return_value=fake_proc
             ) as mock_popen,
             patch(
-                "tripwire.runtimes.claude.spawn_monitor_runner",
+                "tripwire.runtimes.monitor_runner.spawn_monitor_runner",
                 return_value=None,
             ),
         ):
@@ -833,9 +833,9 @@ class TestResolveClaudeSessionId:
         from tripwire.runtimes.prep import _resolve_claude_session_id
 
         out = _resolve_claude_session_id(
-            "abcdef12-3456-7890-abcd-ef1234567890", resume=False
+            "abcdef12-3456-4890-abcd-ef1234567890", resume=False
         )
-        assert out == "abcdef12-3456-7890-abcd-ef1234567890"
+        assert out == "abcdef12-3456-4890-abcd-ef1234567890"
 
     def test_generates_fresh_uuid_when_not_resuming(self):
         from tripwire.runtimes.prep import _resolve_claude_session_id

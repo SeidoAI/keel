@@ -1,4 +1,4 @@
-"""Typed WebSocket event schema — v1 active + v2 stubs.
+"""Typed WebSocket event schema.
 
 The backend emits these events via ``WebSocketHub.broadcast``; the frontend
 mirrors the shapes in TypeScript (see ``[[websocket-event-contract]]``) and
@@ -9,12 +9,8 @@ Every class inherits from :class:`Event` and declares a ``Literal[...]`` on
 :data:`TripwireUiEvent` and :func:`parse_event` to route an incoming
 payload to the correct subclass.
 
-v1 active types emitted today: ``file_changed``, ``artifact_updated``,
-``validation_completed``, ``ping``, ``pong``.
-
-v2 stub types declared-but-never-emitted: ``container_status``,
-``message_received``, ``github_event``, ``status_update``,
-``pm_review_completed``, ``approval_pending``.
+Active event types: ``file_changed``, ``artifact_updated``,
+``validation_completed``, ``ping``, ``pong``, ``process_event``.
 """
 
 from __future__ import annotations
@@ -119,80 +115,7 @@ class PongEvent(Event):
 
 
 # ---------------------------------------------------------------------------
-# v2 — declared-but-never-emitted stubs
-# ---------------------------------------------------------------------------
-
-
-ContainerStatus = Literal["running", "exited", "stopped"]
-
-
-class ContainerStatusEvent(Event):
-    type: Literal["container_status"] = "container_status"
-    project_id: str
-    session_id: str
-    container_id: str
-    status: ContainerStatus
-    exit_code: int | None
-    cpu_percent: str
-    memory_usage: str
-
-
-MessageDirection = Literal["agent_to_human", "human_to_agent"]
-
-
-class MessageReceivedEvent(Event):
-    type: Literal["message_received"] = "message_received"
-    project_id: str
-    session_id: str
-    message_id: str
-    direction: MessageDirection
-    msg_type: str
-    priority: str
-    author: str
-    preview: str
-
-
-GitHubEventType = Literal[
-    "checks_completed", "review_submitted", "pr_merged", "pr_closed"
-]
-
-
-class GitHubEvent(Event):
-    type: Literal["github_event"] = "github_event"
-    project_id: str
-    event_type: GitHubEventType
-    repo: str
-    pr_number: int
-    details: dict[str, Any]
-
-
-class StatusUpdateEvent(Event):
-    type: Literal["status_update"] = "status_update"
-    project_id: str
-    session_id: str
-    state: str
-    summary: str
-
-
-class PmReviewCompletedEvent(Event):
-    type: Literal["pm_review_completed"] = "pm_review_completed"
-    project_id: str
-    repo: str
-    pr_number: int
-    passed: bool
-    failed_checks: list[str]
-
-
-class ApprovalPendingEvent(Event):
-    type: Literal["approval_pending"] = "approval_pending"
-    project_id: str
-    session_id: str
-    artifact_name: str
-    agent: str
-
-
-# ---------------------------------------------------------------------------
-# v1 — process_event broadcast notifications (KUI-100)
+# process_event broadcast notifications (KUI-100)
 # ---------------------------------------------------------------------------
 
 
@@ -232,20 +155,12 @@ class ProcessEvent(Event):
 
 TripwireUiEvent = Annotated[
     (
-        # v1
         FileChangedEvent
         | ArtifactUpdatedEvent
         | ValidationCompletedEvent
         | ProcessEvent
         | PingEvent
         | PongEvent
-        # v2 stubs
-        | ContainerStatusEvent
-        | MessageReceivedEvent
-        | GitHubEvent
-        | StatusUpdateEvent
-        | PmReviewCompletedEvent
-        | ApprovalPendingEvent
     ),
     Field(discriminator="type"),
 ]
@@ -264,19 +179,13 @@ def parse_event(payload: dict[str, Any]) -> Event:
 
 
 __all__ = [
-    "ApprovalPendingEvent",
     "ArtifactUpdatedEvent",
-    "ContainerStatusEvent",
     "Event",
     "FileChangedEvent",
-    "GitHubEvent",
-    "MessageReceivedEvent",
     "PingEvent",
-    "PmReviewCompletedEvent",
     "PongEvent",
     "ProcessEvent",
     "ProcessEventKind",
-    "StatusUpdateEvent",
     "TripwireUiEvent",
     "ValidationCompletedEvent",
     "parse_event",

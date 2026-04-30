@@ -111,7 +111,7 @@ def test_start_invokes_popen_with_codex_exec_argv(tmp_path, monkeypatch):
     fake_proc.pid = 4242
 
     with patch(
-        "tripwire.runtimes.codex._sp.Popen", return_value=fake_proc
+        "tripwire.runtimes.base._sp.Popen", return_value=fake_proc
     ) as mock_popen:
         result = CodexRuntime().start(prepped)
 
@@ -151,7 +151,7 @@ def test_start_with_resume_uses_exec_resume_subcommand(tmp_path, monkeypatch):
     fake_proc.pid = 99
 
     with patch(
-        "tripwire.runtimes.codex._sp.Popen", return_value=fake_proc
+        "tripwire.runtimes.base._sp.Popen", return_value=fake_proc
     ) as mock_popen:
         CodexRuntime().start(prepped)
 
@@ -174,9 +174,9 @@ def test_pause_sigterms_live_pid():
         runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
     )
     with (
-        patch("tripwire.runtimes.codex.is_alive", side_effect=[True, False]),
-        patch("tripwire.runtimes.codex.send_sigterm") as mock_sigterm,
-        patch("tripwire.runtimes.codex.time.sleep"),
+        patch("tripwire.runtimes.base.is_alive", side_effect=[True, False]),
+        patch("tripwire.runtimes.base.send_sigterm") as mock_sigterm,
+        patch("tripwire.runtimes.base.time.sleep"),
     ):
         CodexRuntime().pause(session)
     mock_sigterm.assert_called_once_with(999)
@@ -190,8 +190,8 @@ def test_pause_noop_on_dead_pid():
         runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
     )
     with (
-        patch("tripwire.runtimes.codex.is_alive", return_value=False),
-        patch("tripwire.runtimes.codex.send_sigterm") as mock_sigterm,
+        patch("tripwire.runtimes.base.is_alive", return_value=False),
+        patch("tripwire.runtimes.base.send_sigterm") as mock_sigterm,
     ):
         CodexRuntime().pause(session)
     mock_sigterm.assert_not_called()
@@ -204,9 +204,9 @@ def test_status_reflects_is_alive():
         agent="a",
         runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
     )
-    with patch("tripwire.runtimes.codex.is_alive", return_value=True):
+    with patch("tripwire.runtimes.base.is_alive", return_value=True):
         assert CodexRuntime().status(session) == "running"
-    with patch("tripwire.runtimes.codex.is_alive", return_value=False):
+    with patch("tripwire.runtimes.base.is_alive", return_value=False):
         assert CodexRuntime().status(session) == "exited"
 
 
@@ -218,9 +218,9 @@ def test_abandon_sigkills_stubborn_process():
         runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
     )
     with (
-        patch("tripwire.runtimes.codex.is_alive", return_value=True),
-        patch("tripwire.runtimes.codex.send_sigterm"),
-        patch("tripwire.runtimes.codex.time.sleep"),
+        patch("tripwire.runtimes.base.is_alive", return_value=True),
+        patch("tripwire.runtimes.base.send_sigterm"),
+        patch("tripwire.runtimes.base.time.sleep"),
         patch("os.kill") as mock_os_kill,
     ):
         CodexRuntime().abandon(session)

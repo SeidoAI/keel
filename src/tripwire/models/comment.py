@@ -8,9 +8,8 @@ identity and a free-form Markdown body.
 
 import uuid as _uuid
 from datetime import datetime
-from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import UUID4, BaseModel, ConfigDict, Field
 
 
 class Comment(BaseModel):
@@ -18,7 +17,7 @@ class Comment(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    uuid: UUID = Field(default_factory=_uuid.uuid4)
+    uuid: UUID4 = Field(default_factory=_uuid.uuid4)
 
     issue_key: str
     author: str

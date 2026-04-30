@@ -21,6 +21,7 @@ from typing import Any
 
 import httpx
 
+from tripwire.core import paths
 from tripwire.core.pr_watcher import (
     CommentOnPR,
     InjectFollowUp,
@@ -207,7 +208,7 @@ class WatcherActionExecutor:
         save_session(self.project_dir, session)
 
     def _do_inject(self, action: InjectFollowUp) -> None:
-        plan_path = self.project_dir / "sessions" / action.session_id / "plan.md"
+        plan_path = paths.session_plan_path(self.project_dir, action.session_id)
         if not plan_path.exists():
             logger.warning(
                 "watcher: plan.md missing for session '%s'", action.session_id

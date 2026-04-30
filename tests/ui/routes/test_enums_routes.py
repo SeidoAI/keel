@@ -31,9 +31,17 @@ def enum_project(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    # Flat-list form.
     (enums / "priority.yaml").write_text(
-        yaml.safe_dump(["low", "medium", "high"]),
+        yaml.safe_dump(
+            {
+                "name": "priority",
+                "values": [
+                    {"id": "low"},
+                    {"id": "medium"},
+                    {"id": "high"},
+                ],
+            }
+        ),
         encoding="utf-8",
     )
     return proj
@@ -64,7 +72,7 @@ class TestGetEnum:
         # colour preserved
         assert body["values"][0]["color"] == "#888"
 
-    def test_flat_list_form(self, enum_client, enum_project_id):
+    def test_dict_form_with_id_keys(self, enum_client, enum_project_id):
         r = enum_client.get(f"/api/projects/{enum_project_id}/enums/priority")
         assert r.status_code == 200
         body = r.json()

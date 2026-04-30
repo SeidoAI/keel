@@ -63,7 +63,7 @@ from tripwire.core.store import (
     load_project,
 )
 from tripwire.models.comment import Comment
-from tripwire.models.enums import IssueStatus, SessionStatus
+from tripwire.models.enums import SessionStatus
 from tripwire.models.issue import Issue
 from tripwire.models.manifest import ArtifactManifest
 from tripwire.models.node import ConceptNode
@@ -1229,77 +1229,11 @@ def check_manifest_phase_ownership_consistent(
     return results
 
 
-# Statuses that mean "this session is terminal-success and must have shipped
-# its required artifacts." v1 baseline: just COMPLETED. If a future release
-# splits "merged" from "merged + post-merge cleanup applied" into two
-# statuses, add the later one here so check_artifact_presence enforces both.
-MERGED_STATUSES: frozenset[SessionStatus] = frozenset({SessionStatus.COMPLETED})
-
-
-def check_session_status_in_enum(ctx: ValidationContext) -> list[CheckResult]:
-    """Belt-and-suspenders: every session.status must be a SessionStatus member.
-
-    The project-side ``enums/session_status.yaml`` is the runtime enum
-    source for ``check_enum_values``. If a project's YAML drifts from the
-    upstream Python ``SessionStatus`` (e.g. carries a legacy ``done``
-    value), the project enum check still passes but the session is
-    actually in an invalid state per the package's contract. This rule
-    catches that drift independent of the project YAML.
-    """
-    valid = {s.value for s in SessionStatus}
-    results: list[CheckResult] = []
-    for entity in ctx.sessions:
-        session: AgentSession = entity.model
-        status = str(session.status)
-        if status not in valid:
-            results.append(
-                CheckResult(
-                    code="status/invalid_enum",
-                    severity="error",
-                    file=entity.rel_path,
-                    field="status",
-                    message=(
-                        f"session.status {status!r} is not a member of "
-                        f"the upstream SessionStatus enum."
-                    ),
-                    fix_hint=f"Set status to one of: {sorted(valid)}",
-                )
-            )
-    return results
-
-
-def check_issue_status_in_enum(ctx: ValidationContext) -> list[CheckResult]:
-    """Belt-and-suspenders: every issue.status must be an IssueStatus member.
-
-    See ``check_session_status_in_enum`` — same pattern, applied to issues.
-    """
-    valid = {s.value for s in IssueStatus}
-    results: list[CheckResult] = []
-    for entity in ctx.issues:
-        issue: Issue = entity.model
-        status = str(issue.status)
-        if status not in valid:
-            results.append(
-                CheckResult(
-                    code="status/invalid_enum",
-                    severity="error",
-                    file=entity.rel_path,
-                    field="status",
-                    message=(
-                        f"issue.status {status!r} is not a member of "
-                        f"the upstream IssueStatus enum."
-                    ),
-                    fix_hint=f"Set status to one of: {sorted(valid)}",
-                )
-            )
-    return results
-
-
 def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
-    """Sessions in a terminal-success status must have all required artifacts.
+    """Sessions at status=completed must have all required artifacts.
 
-    Gated by ``MERGED_STATUSES`` so the set of statuses that requires
-    artifact presence stays in one place.
+    The terminal-success state is `completed`. If a future release adds a
+    distinct post-merge state, extend the predicate below.
     """
     manifest, _ = _load_manifest(ctx)
     if manifest is None:
@@ -1309,7 +1243,7 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     results: list[CheckResult] = []
     for entity in ctx.sessions:
         session: AgentSession = entity.model
-        if session.status not in MERGED_STATUSES:
+        if session.status != SessionStatus.COMPLETED:
             continue
         artifacts_dir = paths.session_artifacts_dir(ctx.project_dir, session.id)
         for artifact_file in required_files:
@@ -1719,44 +1653,8 @@ def _filter_none(items: list[Any]) -> list[Any]:
 
 
 # ============================================================================
-# v0.2 checks — UUID v4 + coverage heuristics
+# v0.2 checks — coverage heuristics
 # ============================================================================
-
-
-def check_uuid_v4_version(ctx: ValidationContext) -> list[CheckResult]:
-    """Check that UUIDs have RFC 4122 version 4 bits set."""
-    results: list[CheckResult] = []
-    for _bucket_name, bucket in [
-        ("issue", ctx.issues),
-        ("node", ctx.nodes),
-        ("session", ctx.sessions),
-    ]:
-        for entity in bucket:
-            uid = entity.raw_frontmatter.get("uuid")
-            if uid is None:
-                continue
-            uid_str = str(uid).replace("-", "")
-            if len(uid_str) != 32:
-                continue
-            # Version nibble (char 12, 0-indexed) must be '4'
-            version_char = uid_str[12]
-            # Variant nibble (char 16) must be 8, 9, a, or b
-            variant_char = uid_str[16]
-            if version_char != "4" or variant_char not in "89ab":
-                results.append(
-                    CheckResult(
-                        code="uuid/not_v4",
-                        severity="error",
-                        file=entity.rel_path,
-                        field="uuid",
-                        message=(
-                            f"UUID {uid} is not a valid RFC 4122 v4 UUID. "
-                            f"Use `tripwire uuid` to generate real UUIDs."
-                        ),
-                        fix_hint="Run `tripwire uuid` and replace the value.",
-                    )
-                )
-    return results
 
 
 def check_coverage_heuristics(ctx: ValidationContext) -> list[CheckResult]:
@@ -2170,14 +2068,14 @@ def check_quality_consistency(ctx: ValidationContext) -> list[CheckResult]:
 #                    `coherence/issue_status_lags_session` (error).
 #
 # Spec §6.4 table:
-#   planning     → warn on later
+#   planned      → warn on later
 #   in_progress  → warn on later
 #   in_review    → error on earlier
 #   verified     → error on earlier
 #   done         → error on anything else
 
 _SESSION_STATUS_TO_PHASE: dict[str, str] = {
-    "planning": "planning",
+    "planned": "planned",
     # Working states (queued waiting to launch, executing locally, active
     # in orchestrator) all represent the in_progress phase.
     "queued": "in_progress",
@@ -2192,7 +2090,7 @@ _SESSION_STATUS_TO_PHASE: dict[str, str] = {
 }
 
 _COHERENCE_MATRIX: dict[str, dict[str, str]] = {
-    "planning": {
+    "planned": {
         "backlog": "ok",
         "todo": "ok",
         "in_progress": "ahead_warn",
@@ -2354,12 +2252,6 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
 # Imported at the bottom of this module to avoid a circular dependency
 # (lint rules import ``CheckResult`` / ``ValidationContext`` from here).
 from tripwire.core.validator.lint import LINT_CHECKS  # noqa: E402
-from tripwire.core.validator.lint.done_implies_artifacts_on_main import (  # noqa: E402, F401
-    # Backwards-compat re-export so existing
-    # ``from tripwire.core.validator import check_done_implies_artifacts_on_main``
-    # imports still resolve.
-    check as check_done_implies_artifacts_on_main,
-)
 
 
 def check_pm_response_covers_self_review(
@@ -2389,7 +2281,7 @@ def check_pm_response_covers_self_review(
         sdir = ctx.project_dir / "sessions" / sid
         sr_path = sdir / "self-review.md"
         if not sr_path.is_file():
-            # Presence is enforced by done_implies_artifacts_on_main.
+            # Presence is enforced by check_artifact_presence.
             continue
 
         try:
@@ -2522,11 +2414,8 @@ def check_pm_response_followups_resolve(
 
 ALL_CHECKS = [
     check_uuid_present,
-    check_uuid_v4_version,
     check_id_format,
     check_enum_values,
-    check_session_status_in_enum,
-    check_issue_status_in_enum,
     check_reference_integrity,
     check_bidirectional_related,
     check_issue_body_structure,

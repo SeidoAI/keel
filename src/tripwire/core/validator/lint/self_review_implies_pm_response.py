@@ -10,9 +10,8 @@ contract on the *local* working tree (so missing pm-response.yaml is
 caught pre-merge); this rule is the post-merge mirror — we want main
 itself to never carry an unanswered self-review.
 
-Same offline-degradation pattern as
-``done_implies_artifacts_on_main``: emit one ``main_unavailable``
-warning if origin/main is unreadable and skip per-session checks.
+Offline-degradation pattern: emit one ``main_unavailable`` warning if
+origin/main is unreadable and skip per-session checks.
 """
 
 from __future__ import annotations

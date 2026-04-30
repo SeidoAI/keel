@@ -14,7 +14,7 @@ import {
   UNASSIGNED_STAGE_ID,
 } from "@/components/ui/session-stage-row";
 import { Stamp } from "@/components/ui/stamp";
-import { type InboxItem, useInbox, useResolveInbox } from "@/lib/api/endpoints/inbox";
+import { useInbox, useResolveInbox } from "@/lib/api/endpoints/inbox";
 import type { IssueSummary } from "@/lib/api/endpoints/issues";
 import { type ProjectDetail, useProject } from "@/lib/api/endpoints/project";
 import type { SessionSummary } from "@/lib/api/endpoints/sessions";
@@ -77,31 +77,11 @@ export function ProjectDashboard() {
   };
 
   const issues = stats.issues;
-  // Real inbox data — backed by /api/projects/<pid>/inbox. Demo
-  // items still surface via useDemoInboxItems below so we can
-  // iterate the UI on a project that has no real entries yet.
   const realInbox = useInbox(projectId);
   const resolveInbox = useResolveInbox(projectId);
-  const inboxItems = mergeInboxItems(realInbox.data ?? [], useDemoInboxItems());
-  const handleResolveInbox = (id: string) => {
-    // Demo items have no backend representation — short-circuit.
-    if (id.startsWith("inb-demo")) return;
-    resolveInbox.mutate({ id });
-  };
-  // ?demo=critical_path injects a 4-deep mock chain AND seven mock
-  // sessions (the chain itself + off-chain unlocks) into the
-  // session list so the spine click → blocker filter actually
-  // resolves to visible rows; ?demo=off_track inflates the
-  // off-track stage card so the alert treatment can be previewed
-  // against an empty project. Both hooks short-circuit to a no-op
-  // when the corresponding `?demo=<flag>` URL param is absent
-  // (see `hasDemoFlag` and the per-hook gate inside each useDemo*
-  // wrapper) — they are safe in production and deliberately stay
-  // shipped so a screenshare or design review can pull up the
-  // mock content without spinning up fixture sessions.
-  const sessions = sortSessionsByStageFlow(
-    useDemoOffTrackSessions(useDemoSessions(stats.sessions)),
-  );
+  const inboxItems = realInbox.data ?? [];
+  const handleResolveInbox = (id: string) => resolveInbox.mutate({ id });
+  const sessions = sortSessionsByStageFlow(stats.sessions);
   const criticalPath = computeCriticalPath(sessions);
   // Buckets are computed from the (possibly demo-augmented) session
   // list — counts and the right-column filter share one source of
@@ -180,11 +160,6 @@ export function ProjectDashboard() {
         projectId={projectId}
         entryId={selectedInboxId}
         onClose={() => setSelectedInboxId(null)}
-        prefetchedItem={
-          selectedInboxId?.startsWith("inb-demo")
-            ? (inboxItems.find((i) => i.id === selectedInboxId) ?? null)
-            : null
-        }
       />
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr]">
@@ -204,194 +179,6 @@ export function ProjectDashboard() {
       </div>
     </div>
   );
-}
-
-/** True if the URL has `?demo=<flag>` (or chained with `&demo=<flag>`).
- *  Used by the dev-only mock hooks below. */
-function hasDemoFlag(flag: string): boolean {
-  if (typeof window === "undefined") return false;
-  const params = new URLSearchParams(window.location.search);
-  return params.getAll("demo").includes(flag);
-}
-
-/** Demo-only: when the URL has `?demo=attention_queue`, return a
- *  set of fake inbox items so the left column has visible content
- *  to iterate against. Returns an empty list otherwise — the
- *  real inbox primitive arrives in phase D. */
-function useDemoInboxItems(): InboxItem[] {
-  if (!hasDemoFlag("attention_queue")) return [];
-  const fake = (
-    id: string,
-    bucket: "blocked" | "fyi",
-    title: string,
-    body: string,
-    references: InboxItem["references"] = [],
-    created_at = "2026-04-27T10:00:00Z",
-  ): InboxItem => ({
-    id: `inb-demo-${id}`,
-    bucket,
-    title,
-    body,
-    author: "pm-agent",
-    created_at,
-    references,
-    escalation_reason: null,
-    resolved: false,
-    resolved_at: null,
-    resolved_by: null,
-  });
-  return [
-    fake(
-      "blocked-1",
-      "blocked",
-      "Should SEI-42 be split into 3 issues?",
-      "Scope crept during execution; spans auth + storage + api.\nPM recommends splitting before re-engagement.\n\nOptions:\n- Split into SEI-42a (auth), SEI-42b (storage), SEI-42c (api)\n- Extend the existing session\n",
-      [{ issue: "SEI-42" }, { node: "auth-token-endpoint", version: "v3" }],
-      "2026-04-27T15:42:00Z",
-    ),
-    fake(
-      "blocked-2",
-      "blocked",
-      "session-A paused awaiting scope clarity",
-      "Agent flagged ambiguity in plan.md step 3 — needs your call before continuing.",
-      [{ session: "session-a" }],
-      "2026-04-27T14:10:00Z",
-    ),
-    fake(
-      "blocked-3",
-      "blocked",
-      "PR #88 has unresolved review comment",
-      "Sean asked about the migration ordering — PM agent can't decide alone.",
-      [{ pr: "SeidoAI/tripwire/88" }],
-      "2026-04-27T11:05:00Z",
-    ),
-    fake(
-      "fyi-1",
-      "fyi",
-      "session-tripwires-primitive merged",
-      "Cost: $42 · 1 re-engagement cycle · validator clean.",
-      [{ session: "tripwires-primitive" }],
-      "2026-04-27T10:30:00Z",
-    ),
-    fake(
-      "fyi-2",
-      "fyi",
-      "Validator clean after artifact backfill",
-      "0 errors, 0 warnings on full project.",
-      [],
-      "2026-04-27T08:15:00Z",
-    ),
-    fake(
-      "fyi-3",
-      "fyi",
-      "PM closed SEI-37 as superseded",
-      "Replaced by SEI-91 (cleaner scope after the v0.7.9 retrospective).",
-      [{ issue: "SEI-37" }, { issue: "SEI-91" }],
-      "2026-04-26T22:48:00Z",
-    ),
-    fake(
-      "fyi-4",
-      "fyi",
-      "3 issues closed this week",
-      "+2 issues opened. Net: -1 (project converging).",
-      [],
-      "2026-04-26T17:00:00Z",
-    ),
-  ];
-}
-
-/** Combine real + demo items, demos first. Demo ids are prefixed
- *  ``inb-demo-`` so the resolve handler can short-circuit them
- *  without hitting the backend. */
-function mergeInboxItems(real: InboxItem[], demo: InboxItem[]): InboxItem[] {
-  return [...demo, ...real];
-}
-
-/** Demo-only: when the URL has `?demo=off_track`, inject 2 fake
- *  off-track sessions so both the stage card AND the right-column
- *  list surface them with the alert chrome. Without this the
- *  card would show a count from real data with no actual rows
- *  to back it up. */
-function useDemoOffTrackSessions(real: SessionSummary[]): SessionSummary[] {
-  if (!hasDemoFlag("off_track")) return real;
-  const fake = (id: string, status: string, name: string): SessionSummary => ({
-    id,
-    name,
-    agent: "demo-agent",
-    status,
-    issues: [],
-    estimated_size: null,
-    blocked_by_sessions: [],
-    repos: [],
-    current_state: null,
-    re_engagement_count: 0,
-    task_progress: { done: 0, total: 0 },
-    cost_usd: 0,
-  });
-  return [
-    ...real,
-    fake("demo-failed-export", "failed", "Failed: nightly CSV export job"),
-    fake("demo-paused-migration", "paused", "Paused: 0042_user_schema migration"),
-  ];
-}
-
-/** Demo-only: when the URL has `?demo=critical_path`, append a
- *  realistic mock dependency graph into the session list. The
- *  spine derives its chain + badges from these via
- *  `computeCriticalPath`, so the badge counts and the right-column
- *  blocker-filter results stay in lockstep by construction.
- *
- *  IDs are prefixed `demo-` so they never collide with real
- *  project sessions (which use `v08-*` names) — without the
- *  prefix the filter would also match real sessions sharing the
- *  same id, inflating counts past what the badge shows. */
-function useDemoSessions(real: SessionSummary[]): SessionSummary[] {
-  if (!hasDemoFlag("critical_path")) return real;
-  const fake = (
-    id: string,
-    status: string,
-    blockedBy: string[] = [],
-    name?: string,
-  ): SessionSummary => ({
-    id,
-    name: name ?? id,
-    agent: "demo-agent",
-    status,
-    issues: [],
-    estimated_size: null,
-    blocked_by_sessions: blockedBy,
-    repos: [],
-    current_state: null,
-    re_engagement_count: 0,
-    task_progress: { done: 0, total: 0 },
-    cost_usd: 0,
-  });
-  const demo: SessionSummary[] = [
-    // 4-deep chain: foundations → tripwires → workflow → board.
-    // computeCriticalPath picks this as the longest in-flight path.
-    fake("demo-foundations-dashboard", "in_review", []),
-    fake("demo-tripwires-primitive", "executing", ["demo-foundations-dashboard"]),
-    fake("demo-workflow-api", "executing", ["demo-tripwires-primitive"]),
-    fake("demo-board-screen", "queued", ["demo-workflow-api"]),
-    // 3 off-chain blocked by foundations
-    // → foundations badge: 4 (tripwires + 3 off-chain)
-    fake("demo-board-detail", "queued", ["demo-foundations-dashboard"]),
-    fake("demo-issue-form", "planned", ["demo-foundations-dashboard"]),
-    fake("demo-session-detail", "planned", ["demo-foundations-dashboard"]),
-    // 1 off-chain blocked by tripwires
-    // → tripwires badge: 2 (workflow + 1 off-chain)
-    fake("demo-tripwire-rules", "planned", ["demo-tripwires-primitive"]),
-    // → workflow badge: 1 (board only)
-    // 2 off-chain blocked by board
-    // → board badge: 2 (only off-chain — board is the chain tail)
-    fake("demo-keyboard-shortcuts", "planned", ["demo-board-screen"]),
-    fake("demo-onboarding-flow", "planned", ["demo-board-screen"]),
-    // 1 off-track session — surfaces both in the off-track stage
-    // card AND at the top of the right-column list with the
-    // alert chrome.
-    fake("demo-flaky-export-pipeline", "failed", []),
-  ];
-  return [...real, ...demo];
 }
 
 /** Lifecycle stage order for the right-column session list. Off-

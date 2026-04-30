@@ -44,7 +44,7 @@ def workspace_with_auth(fresh_workspace):
         fresh_workspace(ws_dir, slug="ws")
         (workspace_nodes_dir(ws_dir) / "auth-system.yaml").write_text(
             """---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: auth-system
 type: system
 name: Auth System
@@ -82,7 +82,7 @@ class TestStaleWorkspaceNodes:
         # Advance the workspace by making a new commit.
         (workspace_nodes_dir(ws_dir) / "auth-system.yaml").write_text(
             """---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: auth-system
 type: system
 name: Auth System

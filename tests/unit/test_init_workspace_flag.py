@@ -65,7 +65,7 @@ def workspace_with_node(fresh_workspace):
         fresh_workspace(ws_dir, slug="ws")
         (workspace_nodes_dir(ws_dir) / f"{node_id}.yaml").write_text(
             f"""---
-uuid: 00000000-0000-0000-0000-000000000001
+uuid: 00000000-0000-4000-8000-000000000001
 id: {node_id}
 type: system
 name: Auth System

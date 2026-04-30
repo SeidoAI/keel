@@ -2,7 +2,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { createMemoryRouter, Navigate, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Placeholder } from "@/app/Placeholder";
 import { ProjectShell } from "@/app/ProjectShell";
 import { __resetProjectWebSocketsForTests } from "@/lib/realtime/useProjectWebSocket";
 
@@ -20,19 +19,21 @@ afterEach(() => {
   __resetProjectWebSocketsForTests();
 });
 
+function Stub({ name }: { name: string }) {
+  return <div>{name}</div>;
+}
+
 function renderRoute(path: string) {
   const routes = [
-    { path: "/projects", element: <Placeholder name="ProjectList" /> },
     {
       path: "/p/:projectId",
       element: <ProjectShell />,
       children: [
         { index: true, element: <Navigate to="board" replace /> },
-        { path: "board", element: <Placeholder name="Board" /> },
-        { path: "graph", element: <Placeholder name="ConceptGraph" /> },
-        { path: "sessions", element: <Placeholder name="SessionList" /> },
-        { path: "workflow", element: <Placeholder name="WorkflowMap" /> },
-        { path: "tripwires", element: <Placeholder name="TripwireLog" /> },
+        { path: "board", element: <Stub name="Board" /> },
+        { path: "graph", element: <Stub name="ConceptGraph" /> },
+        { path: "sessions", element: <Stub name="SessionList" /> },
+        { path: "workflow", element: <Stub name="WorkflowMap" /> },
       ],
     },
   ];
@@ -46,18 +47,12 @@ function renderRoute(path: string) {
 }
 
 describe("Router", () => {
-  it("renders ProjectList placeholder at /projects", () => {
-    renderRoute("/projects");
-    expect(screen.getByText("ProjectList")).toBeDefined();
-    expect(screen.getByText("Coming in a later issue.")).toBeDefined();
-  });
-
   it("renders ProjectShell with breadcrumb project id at /p/:projectId/board", () => {
     renderRoute("/p/proj-1/board");
     // ScreenShell breadcrumb + project chip both render the project id
     // ("Workspace / proj-1" + the chip in the side rail).
     expect(screen.getAllByText("proj-1").length).toBeGreaterThan(0);
-    // Board placeholder renders inside the outlet
+    // Board stub renders inside the outlet
     expect(screen.getByText("Board")).toBeDefined();
   });
 
@@ -69,16 +64,10 @@ describe("Router", () => {
     expect(screen.getByRole("link", { name: /workflow/ })).toBeDefined();
     expect(screen.getByRole("link", { name: /concepts/ })).toBeDefined();
     expect(screen.getByRole("link", { name: /sessions/ })).toBeDefined();
-    expect(screen.getByRole("link", { name: /tripwires/ })).toBeDefined();
   });
 
-  it("renders the workflow placeholder at /workflow", () => {
+  it("renders the workflow stub at /workflow", () => {
     renderRoute("/p/proj-1/workflow");
     expect(screen.getByText("WorkflowMap")).toBeDefined();
-  });
-
-  it("renders the tripwire log placeholder at /tripwires", () => {
-    renderRoute("/p/proj-1/tripwires");
-    expect(screen.getByText("TripwireLog")).toBeDefined();
   });
 });

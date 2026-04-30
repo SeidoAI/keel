@@ -81,7 +81,7 @@ class OrchestrationInfo:
 
 @dataclass
 class ScaffoldData:
-    """Structured result of `scaffold-for-creation`.
+    """Structured result of `brief`.
 
     Mirrors the text-output sections one-for-one. The JSON output is this
     dataclass run through `asdict`; the text output is rendered by
@@ -228,7 +228,7 @@ def _collect_skill_examples(project_dir: Path) -> list[str]:
 
 
 def collect_scaffold(project_dir: Path) -> ScaffoldData:
-    """Collect everything `scaffold-for-creation` needs to output.
+    """Collect everything `brief` needs to output.
 
     Raises:
         ProjectNotFoundError: if `project.yaml` is missing.
@@ -314,7 +314,7 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
 def _render_text(data: ScaffoldData) -> str:
     """Render the scaffold data as human-readable text.
 
-    The output shape matches the spec's example in the "scaffold-for-creation"
+    The output shape matches the spec's example in the "brief"
     section of `tripwire-plan.md` in the tripwire-workspace repo
     (https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/tripwire-plan.md)
     — the same output an agent reads when it runs this command as its first
@@ -452,7 +452,7 @@ def _render_json(data: ScaffoldData) -> str:
 
 
 def _scaffold_impl(project_dir: Path, output_format: str) -> None:
-    """Shared implementation for `brief` and its `scaffold-for-creation` alias."""
+    """Shared implementation for `brief` and its `brief` alias."""
     resolved = project_dir.expanduser().resolve()
     try:
         data = collect_scaffold(resolved)
@@ -488,29 +488,5 @@ def brief_cmd(project_dir: Path, output_format: str) -> None:
     orchestration pattern, templates, skill examples, the validation gate
     command, and ID allocation rules. The PM skill runs this at the start
     of every workflow to load project state.
-    """
-    _scaffold_impl(project_dir, output_format)
-
-
-@click.command(name="scaffold-for-creation", hidden=True)
-@click.option(
-    "--project-dir",
-    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
-    default=".",
-    show_default=True,
-    help="Path to the project root (contains project.yaml).",
-)
-@click.option(
-    "--format",
-    "output_format",
-    type=click.Choice(["text", "json"]),
-    default="text",
-    show_default=True,
-    help="Output format.",
-)
-def scaffold_cmd(project_dir: Path, output_format: str) -> None:
-    """Hidden alias for `brief` — kept for backward compatibility.
-
-    New code and documentation should use `tripwire brief`.
     """
     _scaffold_impl(project_dir, output_format)

@@ -2,17 +2,19 @@
 
 An issue carries both a `uuid` (canonical identity, never changes) and an
 `id` (human-readable sequential key like `SEI-42`, may be renamed during
-collision resolution). The Pydantic model uses `str` for enum-typed fields
-so projects can customise enums via `<project>/enums/*.yaml` without forking
-the package; validation against the active enums happens in the validator.
+collision resolution). Per KUI-158 the `status` field is typed as the
+upstream `IssueStatus` enum so Pydantic enforces the contract at
+model_validate time; project-side `enums/issue_status.yaml` is for UI
+labels/colours, not for adding new statuses.
 """
 
 import re
 import uuid as _uuid
 from datetime import datetime
-from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, field_validator
+
+from tripwire.models.enums import IssueStatus
 
 ISSUE_ID_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*-\d+$")
 
@@ -27,14 +29,14 @@ class Issue(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     # Canonical identity (never changes)
-    uuid: UUID = Field(default_factory=_uuid.uuid4)
+    uuid: UUID4 = Field(default_factory=_uuid.uuid4)
 
     # Human-readable sequential key (e.g. SEI-42). May be renamed during
     # collision resolution; the `uuid` is the stable handle.
     id: str
 
     title: str
-    status: str
+    status: IssueStatus = IssueStatus.BACKLOG
     priority: str
     executor: str
     verifier: str

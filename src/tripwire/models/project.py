@@ -142,7 +142,7 @@ class ArtifactManifestRequirements(BaseModel):
 
     Lists the files that MUST exist on the merged-main snapshot of the PT
     repo whenever a session or issue reaches ``status: done``. Validated
-    by the ``done_implies_artifacts_on_main`` rule. Defaults match
+    by the ``done_implies_issue_artifacts_on_main`` rule. Defaults match
     spec §A1.
     """
 
@@ -197,7 +197,7 @@ class ProjectConfig(BaseModel):
 
     # v0.7.9 (§A1): the correctness contract. Required artifacts that
     # must exist on merged main for any session/issue with status==done.
-    # Enforced by validator rule `done_implies_artifacts_on_main`.
+    # Enforced by validator rule `done_implies_issue_artifacts_on_main`.
     artifact_manifest: ArtifactManifestRequirements = Field(
         default_factory=ArtifactManifestRequirements
     )

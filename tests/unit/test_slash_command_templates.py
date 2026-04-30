@@ -9,8 +9,7 @@ Tests verify:
 - Every expected file exists
 - Frontmatter is valid YAML and contains the required fields
 - The `name` field matches the filename stem
-- No command references the old `agent-project` CLI name or
-  `scaffold-for-creation`
+- No command references the old `agent-project` CLI name
 """
 
 from __future__ import annotations
@@ -54,11 +53,6 @@ EXPECTED_COMMANDS: tuple[str, ...] = (
     "pm-session-review",
     # v0.7b session complete:
     "pm-session-complete",
-    # Deprecated forwarders (still shipped, removed in v0.7):
-    "pm-close",
-    "pm-handoff",
-    "pm-plan",
-    "pm-update",
 )
 
 REQUIRED_FRONTMATTER_FIELDS: tuple[str, ...] = ("name", "description", "argument-hint")
@@ -127,9 +121,6 @@ def test_command_body_references_tripwire_not_agent_project(command_name: str) -
     _, body = _parse_frontmatter(path)
     assert "agent-project" not in body, (
         f"{command_name}: body references old `agent-project` name"
-    )
-    assert "scaffold-for-creation" not in body, (
-        f"{command_name}: body references old `scaffold-for-creation` name"
     )
 
 

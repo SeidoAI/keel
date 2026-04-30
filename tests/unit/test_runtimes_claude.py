@@ -64,10 +64,10 @@ def test_start_invokes_popen_with_expected_argv(tmp_path):
     fake_proc.pid = 12345
 
     with (
+        patch("tripwire.runtimes.base._sp.Popen", return_value=fake_proc) as mock_popen,
         patch(
-            "tripwire.runtimes.claude._sp.Popen", return_value=fake_proc
-        ) as mock_popen,
-        patch("tripwire.runtimes.claude.spawn_monitor_runner", return_value=None),
+            "tripwire.runtimes.monitor_runner.spawn_monitor_runner", return_value=None
+        ),
     ):
         result = ClaudeRuntime().start(prepped)
 
@@ -98,10 +98,10 @@ def test_start_with_resume_uses_resume_flag_not_session_id(tmp_path):
     fake_proc.pid = 67890
 
     with (
+        patch("tripwire.runtimes.base._sp.Popen", return_value=fake_proc) as mock_popen,
         patch(
-            "tripwire.runtimes.claude._sp.Popen", return_value=fake_proc
-        ) as mock_popen,
-        patch("tripwire.runtimes.claude.spawn_monitor_runner", return_value=None),
+            "tripwire.runtimes.monitor_runner.spawn_monitor_runner", return_value=None
+        ),
     ):
         ClaudeRuntime().start(prepped)
 
@@ -120,9 +120,9 @@ def test_start_spawns_monitor_runner_with_agent_pid(tmp_path):
     fake_proc.pid = 4242
 
     with (
-        patch("tripwire.runtimes.claude._sp.Popen", return_value=fake_proc),
+        patch("tripwire.runtimes.base._sp.Popen", return_value=fake_proc),
         patch(
-            "tripwire.runtimes.claude.spawn_monitor_runner",
+            "tripwire.runtimes.monitor_runner.spawn_monitor_runner",
             return_value=9999,
         ) as mock_spawn_monitor,
     ):
@@ -146,9 +146,9 @@ def test_start_skips_monitor_when_disabled_in_invocation(tmp_path):
     fake_proc = MagicMock()
     fake_proc.pid = 1
     with (
-        patch("tripwire.runtimes.claude._sp.Popen", return_value=fake_proc),
+        patch("tripwire.runtimes.base._sp.Popen", return_value=fake_proc),
         patch(
-            "tripwire.runtimes.claude.spawn_monitor_runner",
+            "tripwire.runtimes.monitor_runner.spawn_monitor_runner",
             return_value=None,
         ) as mock_spawn_monitor,
     ):
@@ -168,11 +168,11 @@ def test_pause_sigterms_live_pid(tmp_path):
     # dead → return cleanly.
     with (
         patch(
-            "tripwire.runtimes.claude.is_alive",
+            "tripwire.runtimes.base.is_alive",
             side_effect=[True, False],
         ),
-        patch("tripwire.runtimes.claude.send_sigterm") as mock_sigterm,
-        patch("tripwire.runtimes.claude.time.sleep"),
+        patch("tripwire.runtimes.base.send_sigterm") as mock_sigterm,
+        patch("tripwire.runtimes.base.time.sleep"),
     ):
         ClaudeRuntime().pause(session)
 
@@ -187,8 +187,8 @@ def test_pause_noop_on_dead_pid():
         runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
     )
     with (
-        patch("tripwire.runtimes.claude.is_alive", return_value=False),
-        patch("tripwire.runtimes.claude.send_sigterm") as mock_sigterm,
+        patch("tripwire.runtimes.base.is_alive", return_value=False),
+        patch("tripwire.runtimes.base.send_sigterm") as mock_sigterm,
     ):
         ClaudeRuntime().pause(session)
 
@@ -209,11 +209,11 @@ def test_pause_waits_for_exit():
     alive_iter = iter([True, True, True, False])
     with (
         patch(
-            "tripwire.runtimes.claude.is_alive",
+            "tripwire.runtimes.base.is_alive",
             side_effect=lambda _pid: next(alive_iter),
         ),
-        patch("tripwire.runtimes.claude.send_sigterm"),
-        patch("tripwire.runtimes.claude.time.sleep") as mock_sleep,
+        patch("tripwire.runtimes.base.send_sigterm"),
+        patch("tripwire.runtimes.base.time.sleep") as mock_sleep,
     ):
         ClaudeRuntime().pause(session)
 
@@ -238,11 +238,11 @@ def test_pause_raises_when_sigterm_ignored():
     # past the 2s window so the loop exits with the process still alive.
     times = iter([0.0, 0.1, 3.0, 3.0])
     with (
-        patch("tripwire.runtimes.claude.is_alive", return_value=True),
-        patch("tripwire.runtimes.claude.send_sigterm"),
-        patch("tripwire.runtimes.claude.time.sleep"),
+        patch("tripwire.runtimes.base.is_alive", return_value=True),
+        patch("tripwire.runtimes.base.send_sigterm"),
+        patch("tripwire.runtimes.base.time.sleep"),
         patch(
-            "tripwire.runtimes.claude.time.monotonic",
+            "tripwire.runtimes.base.time.monotonic",
             side_effect=lambda: next(times),
         ),
     ):
@@ -257,10 +257,10 @@ def test_status_reflects_is_alive():
         agent="a",
         runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
     )
-    with patch("tripwire.runtimes.claude.is_alive", return_value=True):
+    with patch("tripwire.runtimes.base.is_alive", return_value=True):
         assert ClaudeRuntime().status(session) == "running"
 
-    with patch("tripwire.runtimes.claude.is_alive", return_value=False):
+    with patch("tripwire.runtimes.base.is_alive", return_value=False):
         assert ClaudeRuntime().status(session) == "exited"
 
 
@@ -278,9 +278,9 @@ def test_abandon_sigkills_stubborn_process():
     )
     # is_alive returns True the whole way → forces the SIGKILL branch.
     with (
-        patch("tripwire.runtimes.claude.is_alive", return_value=True),
-        patch("tripwire.runtimes.claude.send_sigterm"),
-        patch("tripwire.runtimes.claude.time.sleep"),
+        patch("tripwire.runtimes.base.is_alive", return_value=True),
+        patch("tripwire.runtimes.base.send_sigterm"),
+        patch("tripwire.runtimes.base.time.sleep"),
         patch("os.kill") as mock_os_kill,
     ):
         ClaudeRuntime().abandon(session)

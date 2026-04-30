@@ -25,13 +25,12 @@ describe("sessionStageId", () => {
   });
 
   it("collapses richer enum states into the canonical 6", () => {
-    // The backend enum has 14 values; the dashboard groups them.
+    // The backend enum has 13 values; the dashboard groups them.
     expect(sessionStageId("active")).toBe("executing");
     expect(sessionStageId("waiting_for_ci")).toBe("executing");
     expect(sessionStageId("waiting_for_review")).toBe("executing");
     expect(sessionStageId("waiting_for_deploy")).toBe("executing");
     expect(sessionStageId("re_engaged")).toBe("in_review");
-    expect(sessionStageId("done")).toBe("completed");
   });
 
   it("collapses failed/paused/abandoned into the off_track stage", () => {
@@ -61,7 +60,6 @@ describe("sessionStageColor", () => {
     // executing colour — keeps the right-column pill consistent
     // with the top card's stripe.
     expect(sessionStageColor("active")).toBe(sessionStageColor("executing"));
-    expect(sessionStageColor("done")).toBe(sessionStageColor("completed"));
   });
 
   it("returns the off-track ochre for failed/paused/abandoned", () => {

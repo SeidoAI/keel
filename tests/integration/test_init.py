@@ -310,11 +310,6 @@ class TestInitBasics:
             "pm-session-review.md",
             # v0.7b session complete:
             "pm-session-complete.md",
-            # Deprecated forwarders (removed in v0.7):
-            "pm-close.md",
-            "pm-handoff.md",
-            "pm-plan.md",
-            "pm-update.md",
         }
         actual = {p.name for p in commands_dir.glob("*.md")}
         assert expected == actual, (

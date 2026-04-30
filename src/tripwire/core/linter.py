@@ -84,9 +84,12 @@ class Linter:
 
 
 def exit_code_for(findings: list[LintFinding]) -> int:
-    """Map findings to an exit code: 0 (info-only), 1 (warning), 2 (error)."""
+    """Map findings to an exit code: 0 (info-only or warnings-only), 2 (error).
+
+    Warnings are advisory — they don't fail CI. The lint output still
+    surfaces them in the human-readable report, and operators can grep
+    by severity to triage. Errors are the only thing that exits non-zero.
+    """
     if any(f.severity == "error" for f in findings):
         return 2
-    if any(f.severity == "warning" for f in findings):
-        return 1
     return 0

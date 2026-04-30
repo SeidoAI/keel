@@ -314,7 +314,7 @@ class TestUpdateIssueFields:
     def test_immutable_field_rejected_at_dto_validation(self):
         """IssuePatch forbids extra fields, protecting uuid/id/created_at."""
         with pytest.raises(ValidationError):
-            IssuePatch.model_validate({"uuid": "00000000-0000-0000-0000-000000000000"})
+            IssuePatch.model_validate({"uuid": "00000000-0000-4000-8000-000000000000"})
         with pytest.raises(ValidationError):
             IssuePatch.model_validate({"id": "OTHER-1"})
         with pytest.raises(ValidationError):

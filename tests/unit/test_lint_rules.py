@@ -70,7 +70,7 @@ class TestBranchConvention:
         sess = tmp_path_project / "sessions" / "session-x"
         (sess / "handoff.yaml").write_text(
             """---
-uuid: 11111111-1111-1111-1111-111111111111
+uuid: 11111111-1111-4111-8111-111111111111
 session_id: session-x
 handoff_at: 2026-04-15T00:00:00Z
 handed_off_by: pm

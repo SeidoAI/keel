@@ -8,17 +8,11 @@ import pytest
 from pydantic import ValidationError
 
 from tripwire.ui.events import (
-    ApprovalPendingEvent,
     ArtifactUpdatedEvent,
-    ContainerStatusEvent,
     Event,
     FileChangedEvent,
-    GitHubEvent,
-    MessageReceivedEvent,
     PingEvent,
-    PmReviewCompletedEvent,
     PongEvent,
-    StatusUpdateEvent,
     TripwireUiEvent,  # noqa: F401 — imported to assert it is exported
     ValidationCompletedEvent,
     parse_event,
@@ -140,91 +134,6 @@ class TestPingPong:
 
 
 # ---------------------------------------------------------------------------
-# v2 — declared-but-never-emitted
-# ---------------------------------------------------------------------------
-
-
-class TestV2Stubs:
-    def test_container_status_required(self):
-        ev = ContainerStatusEvent(
-            project_id="p",
-            session_id="s",
-            container_id="c",
-            status="running",
-            exit_code=None,
-            cpu_percent="12.5",
-            memory_usage="128MiB",
-        )
-        assert ev.type == "container_status"
-        assert ev.exit_code is None
-
-    def test_container_status_exit_code_required_key(self):
-        # exit_code is required (may be None, but must be present).
-        with pytest.raises(ValidationError):
-            ContainerStatusEvent(  # type: ignore[call-arg]
-                project_id="p",
-                session_id="s",
-                container_id="c",
-                status="exited",
-                cpu_percent="0",
-                memory_usage="0",
-            )
-
-    def test_message_received(self):
-        ev = MessageReceivedEvent(
-            project_id="p",
-            session_id="s",
-            message_id="m",
-            direction="agent_to_human",
-            msg_type="plan_approval",
-            priority="blocking",
-            author="pm",
-            preview="…",
-        )
-        assert ev.type == "message_received"
-        assert ev.project_id == "p"
-
-    def test_github_event(self):
-        ev = GitHubEvent(
-            project_id="p",
-            event_type="checks_completed",
-            repo="SeidoAI/tripwire",
-            pr_number=42,
-            details={"conclusion": "success"},
-        )
-        assert ev.type == "github_event"
-        assert ev.details["conclusion"] == "success"
-
-    def test_status_update(self):
-        ev = StatusUpdateEvent(
-            project_id="p",
-            session_id="s",
-            state="implementing",
-            summary="writing tests",
-        )
-        assert ev.type == "status_update"
-
-    def test_pm_review_completed(self):
-        ev = PmReviewCompletedEvent(
-            project_id="p",
-            repo="SeidoAI/tripwire",
-            pr_number=7,
-            passed=False,
-            failed_checks=["verification_checklist"],
-        )
-        assert ev.type == "pm_review_completed"
-
-    def test_approval_pending(self):
-        ev = ApprovalPendingEvent(
-            project_id="p",
-            session_id="s",
-            artifact_name="plan",
-            agent="pm",
-        )
-        assert ev.type == "approval_pending"
-
-
-# ---------------------------------------------------------------------------
 # Discriminator dispatch + parse_event helper
 # ---------------------------------------------------------------------------
 
@@ -284,51 +193,6 @@ class TestRoundTrip:
             ),
             PingEvent(),
             PongEvent(),
-            ContainerStatusEvent(
-                project_id="p",
-                session_id="s",
-                container_id="c",
-                status="running",
-                exit_code=None,
-                cpu_percent="1",
-                memory_usage="1",
-            ),
-            MessageReceivedEvent(
-                project_id="p",
-                session_id="s",
-                message_id="m",
-                direction="agent_to_human",
-                msg_type="plan_approval",
-                priority="blocking",
-                author="pm",
-                preview="…",
-            ),
-            GitHubEvent(
-                project_id="p",
-                event_type="pr_merged",
-                repo="r",
-                pr_number=1,
-                details={},
-            ),
-            StatusUpdateEvent(
-                project_id="p",
-                session_id="s",
-                state="implementing",
-                summary="x",
-            ),
-            PmReviewCompletedEvent(
-                project_id="p",
-                repo="r",
-                pr_number=1,
-                passed=True,
-                failed_checks=[],
-            ),
-            ApprovalPendingEvent(
-                project_id="p",
-                session_id="s",
-                artifact_name="plan",
-                agent="pm",
-            ),
         ],
     )
     def test_to_json_parse_to_json(self, event: Event):

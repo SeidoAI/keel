@@ -3,7 +3,7 @@
 Gates session close-out behind: (a) session in a completable status,
 (b) every worktree branch has a merged PR, (c) every required issue
 artifact present, (d) most recent review exit_code ≤ 1. Then closes
-issues, transitions the session to `done`, and removes worktrees.
+issues, transitions the session to `completed`, and removes worktrees.
 
 v0.7.9 §A4: every gate is mandatory. There are no bypass flags. A
 session that can't pass these gates should be `tripwire session
