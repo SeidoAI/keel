@@ -144,3 +144,65 @@ def test_build_workflow_includes_artifacts(tmp_path: Path) -> None:
     for a in artifacts:
         for k in ("id", "label", "produced_by"):
             assert k in a
+
+
+# ---------------------------------------------------------------------------
+# KUI-125 — workflow.yaml-derived workflows surface on /api/workflow
+# ---------------------------------------------------------------------------
+
+
+def test_build_workflow_surfaces_workflow_yaml_definitions(tmp_path: Path) -> None:
+    """When workflow.yaml is present the response carries a typed
+    ``workflows`` field with stations + next-spec + ref lists."""
+    from textwrap import dedent
+
+    project_dir = _write_project(tmp_path)
+    (project_dir / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                stations:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    terminal: true
+              pm-review:
+                actor: pm-agent
+                trigger: session.handover
+                stations:
+                  - id: review
+                    next:
+                      - if: pm_review.outcome == auto-merge
+                        then: auto_merge
+                      - else: request_changes
+                  - id: auto_merge
+                    terminal: true
+                  - id: request_changes
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    graph = build_workflow(project_dir, project_id="abc", is_pm_role=False)
+    workflows = graph.get("workflows")
+    assert isinstance(workflows, list)
+    by_id = {wf["id"]: wf for wf in workflows}
+    assert set(by_id) == {"coding-session", "pm-review"}
+    assert by_id["pm-review"]["actor"] == "pm-agent"
+    assert by_id["pm-review"]["trigger"] == "session.handover"
+    review = by_id["pm-review"]["stations"][0]
+    assert review["id"] == "review"
+    assert review["next"]["kind"] == "conditional"
+    branches = review["next"]["branches"]
+    assert {"else": "request_changes"} in branches
+    assert any("if" in b for b in branches)
+
+
+def test_build_workflow_workflows_empty_when_yaml_missing(tmp_path: Path) -> None:
+    """No workflow.yaml → workflows is an empty list, not absent."""
+    project_dir = _write_project(tmp_path)
+    graph = build_workflow(project_dir, project_id="abc", is_pm_role=False)
+    assert graph["workflows"] == []
