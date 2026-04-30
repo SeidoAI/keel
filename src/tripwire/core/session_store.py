@@ -63,12 +63,17 @@ def save_session(
     session: AgentSession,
     *,
     emitter: EventEmitter | None = None,
+    update_cache: bool = True,
 ) -> None:
     """Serialise an AgentSession to `sessions/<id>/session.yaml`.
 
     Creates the session directory if missing. Sets `updated_at` to now
-    if it is unset. Does not invalidate the graph cache (sessions are
-    not tracked in the concept graph).
+    if it is unset. As of v0.9 (KUI-132 / A7), sessions are first-class
+    nodes in the unified entity graph and emit `refs` edges to issues
+    they touch — so the graph cache must be invalidated after a write,
+    matching `save_issue`'s pattern. Batch writers that invalidate
+    explicitly at the end of a transaction should pass
+    `update_cache=False`.
 
     If *emitter* is supplied and the session's previously-persisted
     `status` differs from the new value, one ``status_transition`` event
@@ -89,6 +94,11 @@ def save_session(
         data.pop("version", None)
     text = serialize_frontmatter_body(data, session.body)
     path.write_text(text, encoding="utf-8")
+
+    if update_cache:
+        from tripwire.core.graph_cache import update_cache_for_file
+
+        update_cache_for_file(project_dir, str(path.relative_to(project_dir)))
 
     if emitter is None:
         emitter = NullEmitter()

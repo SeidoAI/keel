@@ -613,9 +613,22 @@ def _rebuild_derived_tables(cache: GraphIndex, project_dir: Path) -> None:
     for entries in by_type.values():
         entries.sort()
 
-    # `referenced_by` is the inverse of all `references` and `blocked_by` edges.
+    # `referenced_by` is the inverse of every "this references that" edge —
+    # legacy on-disk strings ("references", "blocked_by", "related") AND the
+    # canonical v0.9 EdgeKind values ("refs", "depends_on") emitted by
+    # session/comment resolvers. Without "refs"/"depends_on" here, sessions
+    # or comments that reference an issue or node would be invisible to
+    # consumers that read `cache.referenced_by` (reverse-ref counts, "is
+    # this node referenced anywhere?" lookups).
+    _REFERENCING_EDGE_TYPES = (
+        "references",
+        "blocked_by",
+        "related",
+        "refs",
+        "depends_on",
+    )
     for edge in cache.edges:
-        if edge.type in ("references", "blocked_by", "related"):
+        if edge.type in _REFERENCING_EDGE_TYPES:
             referenced_by.setdefault(edge.to_id, []).append(edge.from_id)
 
     for entries in referenced_by.values():
