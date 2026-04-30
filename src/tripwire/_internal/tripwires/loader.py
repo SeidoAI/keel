@@ -118,7 +118,26 @@ def _instantiate(entry: dict, *, project_dir: Path) -> Tripwire:
         raise TypeError(f"{cls!r} is not a Tripwire subclass")
 
     instance = cls()
+    _register_station(instance)
     return instance
+
+
+def _register_station(instance: Tripwire) -> None:
+    """If the Tripwire declares ``at = (workflow, station)``, record the
+    mapping with the workflow station registry (KUI-121).
+
+    Tripwires without ``at`` are silently skipped — they're legacy /
+    not yet migrated, not an error.
+    """
+    pair = getattr(instance.__class__, "at", ())
+    if not isinstance(pair, tuple) or len(pair) != 2:
+        return
+    workflow, station = pair
+    if not isinstance(workflow, str) or not isinstance(station, str):
+        return
+    from tripwire.core.workflow.registry import register_tripwire_station
+
+    register_tripwire_station(instance.id, workflow, station)
 
 
 def _find_tripwire_class(module: Any, declared_id: str | None) -> type[Tripwire]:

@@ -17,6 +17,7 @@ from tripwire.cli.ci import ci_cmd
 from tripwire.cli.completion import completion_cmd
 from tripwire.cli.drift import drift_cmd
 from tripwire.cli.enums import enums_cmd
+from tripwire.cli.events import events_cmd
 from tripwire.cli.graph import graph_cmd
 from tripwire.cli.hooks import hook_cmd, hooks_cmd
 from tripwire.cli.inbox import inbox_cmd
@@ -35,6 +36,7 @@ from tripwire.cli.scaffold import brief_cmd
 from tripwire.cli.session import session_cmd
 from tripwire.cli.status import status_cmd
 from tripwire.cli.templates import templates_cmd
+from tripwire.cli.transition import transition_cmd
 from tripwire.cli.tripwires import tripwires_cmd
 from tripwire.cli.ui import ui_cmd
 from tripwire.cli.uuid_cmd import uuid_cmd
@@ -119,6 +121,9 @@ cli.add_command(ui_cmd)
 cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
 cli.add_command(tripwires_cmd)
+cli.add_command(events_cmd)
+cli.add_command(transition_cmd)
+cli.add_command(drift_cmd)
 
 
 if __name__ == "__main__":

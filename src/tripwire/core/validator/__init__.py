@@ -110,6 +110,7 @@ from tripwire.core.validator.checks.structure import (
     check_issue_body_structure,
     check_status_transitions,
 )
+from tripwire.core.validator.checks.workflow import check_workflow_well_formed
 from tripwire.models.comment import Comment
 from tripwire.models.issue import Issue
 from tripwire.models.node import ConceptNode
@@ -780,6 +781,12 @@ def _emit_check_result(
     returns ten findings emits one `validator_fail`, not ten. The
     validator id mirrors `workflow_service`: `v_<slug>` where `<slug>` is
     the function name with the `check_` prefix stripped.
+
+    Reads ``check_fn.__tripwire_workflow_station__`` (set by
+    :func:`tripwire.core.workflow.registry.registers_at`) so the
+    payload carries the (workflow, station) the check is registered
+    against — the runtime gates and drift report consume this. KUI-120
+    is the registry-consume contract.
     """
     if isinstance(emitter, NullEmitter):
         return
@@ -788,6 +795,7 @@ def _emit_check_result(
     fired_at = _isoformat_z(datetime.now(timezone.utc))
     kind = "validator_fail" if has_error else "validator_pass"
     event_id = f"evt-{fired_at}-{kind}-{slug}-{session_id}"
+    pair = getattr(check_fn, "__tripwire_workflow_station__", None)
     payload: dict[str, Any] = {
         "id": event_id,
         "kind": kind,
@@ -796,11 +804,55 @@ def _emit_check_result(
         "validator_id": f"v_{slug}",
         "findings": [r.to_json() for r in results],
     }
+    if pair is not None:
+        payload["workflow"] = pair[0]
+        payload["station"] = pair[1]
     try:
         emitter.emit("validator_runs", payload)
     except Exception:
         # Emission must never sink the validator run — log and continue.
         logger.exception("validator emission failed for %s", slug)
+
+
+def _emit_workflow_event(
+    *,
+    project_dir: Path,
+    check_fn: Any,
+    results: list[CheckResult],
+    session_id: str,
+) -> None:
+    """Append one ``validator.run`` row to the workflow events log
+    (KUI-123) for *check_fn*.
+
+    Skipped silently if the check has no ``__tripwire_workflow_station__``
+    attribute (legacy / unregistered) — the workflow log demands
+    ``workflow`` + ``station``. Failures are logged and swallowed; the
+    log is best-effort, not load-bearing.
+    """
+    pair = getattr(check_fn, "__tripwire_workflow_station__", None)
+    if pair is None:
+        return
+    workflow, station = pair
+    slug = check_fn.__name__.removeprefix("check_")
+    has_error = any(r.severity == "error" for r in results)
+    outcome = "fail" if has_error else "pass"
+    try:
+        from tripwire.core.events.log import emit_event
+
+        emit_event(
+            project_dir,
+            workflow=workflow,
+            instance=session_id,
+            station=station,
+            event="validator.run",
+            details={
+                "id": f"v_{slug}",
+                "outcome": outcome,
+                "findings": len(results),
+            },
+        )
+    except Exception:
+        logger.exception("workflow events emission failed for %s", slug)
 
 
 def validate_project(
@@ -879,6 +931,12 @@ def validate_project(
         )
         _emit_check_result(
             emitter=emitter,
+            check_fn=check,
+            results=results,
+            session_id=sid,
+        )
+        _emit_workflow_event(
+            project_dir=project_dir,
             check_fn=check,
             results=results,
             session_id=sid,
@@ -974,6 +1032,7 @@ __all__ = [
     "check_status_transitions",
     "check_timestamps",
     "check_uuid_present",
+    "check_workflow_well_formed",
     "load_context",
     "validate_project",
 ]
