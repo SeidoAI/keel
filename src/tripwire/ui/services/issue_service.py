@@ -25,7 +25,12 @@ logger = logging.getLogger("tripwire.ui.services.issue_service")
 
 # Statuses that mean an upstream dependency is "clear" — an issue whose
 # blockers are all in these states is NOT blocked.
-_CLEAR_STATUSES: frozenset[str] = frozenset({"done", "ready", "updating"})
+# v0.9.4: canonical "completed" + legacy aliases for back-compat.
+# "ready"/"updating" are non-canonical blocker-clear states some projects
+# extend the enum with — accepted on read.
+_CLEAR_STATUSES: frozenset[str] = frozenset(
+    {"completed", "abandoned", "done", "canceled", "ready", "updating"}
+)
 
 _EPIC_LABEL = "type/epic"
 

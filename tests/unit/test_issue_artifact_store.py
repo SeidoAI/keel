@@ -26,9 +26,9 @@ def test_load_default_manifest(tmp_path_project: Path):
 def test_status_at_or_past_default_order():
     assert status_at_or_past("in_review", "in_review") is True
     assert status_at_or_past("verified", "in_review") is True
-    assert status_at_or_past("in_progress", "in_review") is False
-    assert status_at_or_past("done", "verified") is True
-    assert status_at_or_past("backlog", "todo") is False
+    assert status_at_or_past("executing", "in_review") is False
+    assert status_at_or_past("completed", "verified") is True
+    assert status_at_or_past("planned", "queued") is False
 
 
 def test_status_at_or_past_unknown_returns_false():
@@ -45,7 +45,7 @@ def test_project_override_appends(tmp_path_project: Path):
             "file": "security-audit.md",
             "template": "security-audit.md.j2",
             "produced_by": "execution-agent",
-            "required_at_status": "done",
+            "required_at_status": "completed",
         }
     ]
     project_yaml.write_text(yaml.safe_dump(data), encoding="utf-8")

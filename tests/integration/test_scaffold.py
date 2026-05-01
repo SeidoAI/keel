@@ -118,9 +118,9 @@ class TestScaffoldText:
         _init_project(runner, target)
         result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         # A few representative values
-        assert "backlog" in result.output
-        assert "in_progress" in result.output
-        assert "done" in result.output
+        assert "planned" in result.output
+        assert "executing" in result.output
+        assert "completed" in result.output
 
     def test_init_project_has_shipped_templates(
         self, runner: CliRunner, tmp_path: Path
@@ -139,7 +139,8 @@ class TestScaffoldText:
         assert "(no skill examples shipped yet" not in result.output
         # Manifest entries visible
         assert "plan.md (planning, required)" in result.output
-        assert "task-checklist.md (in_progress, required)" in result.output
+        # v0.9.4: artifact_phase canonical name is "executing".
+        assert "task-checklist.md (executing, required)" in result.output
         # Template file paths visible
         assert "issue_templates/default.yaml.j2" in result.output
         # Step 10 skill examples visible
@@ -270,7 +271,7 @@ class TestScaffoldJson:
         data = json.loads(result.output)
         assert "issue_status" in data["enums"]
         assert isinstance(data["enums"]["issue_status"], list)
-        assert "todo" in data["enums"]["issue_status"]
+        assert "queued" in data["enums"]["issue_status"]
 
     def test_json_next_issue_key_uses_prefix(
         self, runner: CliRunner, tmp_path: Path

@@ -75,7 +75,7 @@ def _write_project(repo: Path, name: str = "fixture", key_prefix: str = "FIX") -
     (artifacts / "manifest.yaml").write_text("artifacts: []\n", encoding="utf-8")
 
 
-def _save_issue(repo: Path, key: str, status: str = "todo") -> None:
+def _save_issue(repo: Path, key: str, status: str = "queued") -> None:
     from tripwire.core.store import save_issue
     from tripwire.models import Issue
 
@@ -221,15 +221,15 @@ def test_compute_records_per_status_counts(repo_two_states):
 
     # Base: 1 todo, 1 in_progress, 1 done.
     assert summary.issues.base_counts == {
-        "todo": 1,
-        "in_progress": 1,
-        "done": 1,
+        "queued": 1,
+        "executing": 1,
+        "completed": 1,
     }
     # Head: FIX-1 in_progress, FIX-2 done, FIX-3 done, FIX-4 todo
     assert summary.issues.head_counts == {
-        "in_progress": 1,
-        "done": 2,
-        "todo": 1,
+        "executing": 1,
+        "completed": 2,
+        "queued": 1,
     }
 
 
@@ -264,7 +264,7 @@ def test_compute_handles_base_with_no_project(tmp_path: Path):
 
     summary = compute_pr_summary(repo, base_sha=base_sha, head_sha=head_sha)
     assert summary.issues.base_counts == {}
-    assert summary.issues.head_counts == {"todo": 1}
+    assert summary.issues.head_counts == {"queued": 1}
     by_id = {c.id: c for c in summary.issues.changes}
     assert by_id["FIX-1"].from_status == "—"
 

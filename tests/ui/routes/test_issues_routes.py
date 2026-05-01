@@ -19,12 +19,12 @@ def rich_project(tmp_path: Path) -> Path:
     return make_project(
         tmp_path / "proj",
         extra={
-            "statuses": ["todo", "in_progress", "in_review", "done"],
+            "statuses": ["queued", "executing", "in_review", "completed"],
             "status_transitions": {
-                "todo": ["in_progress"],
-                "in_progress": ["in_review", "todo"],
-                "in_review": ["done", "in_progress"],
-                "done": [],
+                "queued": ["executing"],
+                "executing": ["in_review", "queued"],
+                "in_review": ["completed", "executing"],
+                "completed": [],
             },
             "label_categories": {
                 "executor": [],
@@ -80,7 +80,7 @@ class TestListIssues:
     def test_filter_by_status(self, client_with_rich, rich_project_id):
         r = client_with_rich.get(
             f"/api/projects/{rich_project_id}/issues",
-            params={"status": "todo"},
+            params={"status": "queued"},
         )
         assert r.status_code == 200
         body = r.json()
@@ -149,7 +149,7 @@ class TestPatchIssue:
         os.environ["TRIPWIRE_LOG_DIR"] = str(tmp_path / "audit-logs")
         r = client_with_rich.patch(
             f"/api/projects/{rich_project_id}/issues/KUI-1",
-            json={"status": "in_progress"},
+            json={"status": "executing"},
         )
         assert r.status_code == 200
         assert r.json()["status"] == "executing"
@@ -166,17 +166,17 @@ class TestPatchIssue:
         # `todo -> done` is not in the allowed transitions map.
         r = client_with_rich.patch(
             f"/api/projects/{rich_project_id}/issues/KUI-1",
-            json={"status": "done"},
+            json={"status": "completed"},
         )
         assert r.status_code == 409
         body = r.json()
         assert body["code"] == "issue/invalid_transition"
-        assert "todo" in body["detail"] and "done" in body["detail"]
+        assert "queued" in body["detail"] and "completed" in body["detail"]
 
     def test_unknown_key_returns_404(self, client_with_rich, rich_project_id):
         r = client_with_rich.patch(
             f"/api/projects/{rich_project_id}/issues/KUI-999",
-            json={"status": "in_progress"},
+            json={"status": "executing"},
         )
         assert r.status_code == 404
         assert r.json()["code"] == "issue/not_found"
@@ -184,7 +184,7 @@ class TestPatchIssue:
     def test_malformed_key_returns_400(self, client_with_rich, rich_project_id):
         r = client_with_rich.patch(
             f"/api/projects/{rich_project_id}/issues/nope",
-            json={"status": "in_progress"},
+            json={"status": "executing"},
         )
         assert r.status_code == 400
 

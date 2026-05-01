@@ -372,7 +372,7 @@ class TestFinalizeSession:
     def test_updates_status_and_timestamp(
         self, tmp_path_project: Path, save_test_session
     ):
-        save_test_session(tmp_path_project, "s1", status="active")
+        save_test_session(tmp_path_project, "s1", status="executing")
         result = finalize_session(tmp_path_project, "s1")
 
         assert isinstance(result, SessionResult)
@@ -392,7 +392,7 @@ class TestFinalizeSession:
         save_test_session(
             tmp_path_project,
             "s1",
-            status="active",
+            status="executing",
             engagements=[
                 {
                     "started_at": datetime(2026, 4, 14, 10, 0, 0).isoformat(),
@@ -428,14 +428,14 @@ class TestFinalizeSession:
             finalize_session(tmp_path_project, "nope")
 
     def test_audit_entry_written(self, tmp_path_project: Path, save_test_session):
-        save_test_session(tmp_path_project, "s1", status="active")
+        save_test_session(tmp_path_project, "s1", status="executing")
         finalize_session(tmp_path_project, "s1")
 
         log_path = audit_log_path(tmp_path_project)
         record = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
         assert record["action"] == "actions.finalize_session"
         assert record["extras"]["session_id"] == "s1"
-        assert record["before_state_snippet"] == {"status": "active"}
+        assert record["before_state_snippet"] == {"status": "executing"}
 
     def test_changed_at_is_tz_aware_utc(
         self, tmp_path_project: Path, save_test_session
@@ -450,7 +450,7 @@ class TestFinalizeSession:
         """
         from datetime import timezone
 
-        save_test_session(tmp_path_project, "s1", status="active")
+        save_test_session(tmp_path_project, "s1", status="executing")
         result = finalize_session(tmp_path_project, "s1")
 
         assert result.changed_at.tzinfo is not None

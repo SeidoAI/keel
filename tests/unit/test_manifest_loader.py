@@ -17,10 +17,10 @@ def test_load_enum_falls_back_to_packaged_template(tmp_path):
     """Without a project override, tripwire's shipped template is used."""
     values = load_enum(tmp_path, "artifact_phase")
     assert "planning" in values
-    assert "in_progress" in values
+    assert "executing" in values
     assert "in_review" in values
     assert "verified" in values
-    assert "done" in values
+    assert "completed" in values
 
 
 def test_load_enum_project_override_wins(tmp_path):
