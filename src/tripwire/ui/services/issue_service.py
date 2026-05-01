@@ -33,9 +33,7 @@ logger = logging.getLogger("tripwire.ui.services.issue_service")
 # to False would hide a real workflow signal.
 # "ready"/"updating" are non-canonical extensions some projects layer
 # on top of the default issue-status enum — accepted on read.
-_CLEAR_STATUSES: frozenset[str] = frozenset(
-    {"completed", "done", "ready", "updating"}
-)
+_CLEAR_STATUSES: frozenset[str] = frozenset({"completed", "done", "ready", "updating"})
 
 _EPIC_LABEL = "type/epic"
 
