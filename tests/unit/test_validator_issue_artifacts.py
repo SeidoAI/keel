@@ -40,7 +40,7 @@ def test_issue_at_verified_missing_verified_errors(
 
 
 def test_issue_at_todo_no_artifacts_required(tmp_path_project: Path, save_test_issue):
-    save_test_issue(tmp_path_project, "TMP-1", status="todo")
+    save_test_issue(tmp_path_project, "TMP-1", status="queued")
     report = validate_project(tmp_path_project)
     codes = [f.code for f in report.findings]
     assert "issue_artifact/missing" not in codes
@@ -65,7 +65,7 @@ def test_issue_at_in_review_with_developer_present_passes(
 
 def test_issue_at_done_requires_both(tmp_path_project: Path, save_test_issue):
     """Status `done` is past `in_review` and `verified`, so both are required."""
-    save_test_issue(tmp_path_project, "TMP-1", status="done")
+    save_test_issue(tmp_path_project, "TMP-1", status="completed")
     report = validate_project(tmp_path_project)
     messages = [
         f.message for f in report.findings if f.code == "issue_artifact/missing"

@@ -44,7 +44,7 @@ class Issue(BaseModel):
     contract_changed_at: int | None = None
 
     title: str
-    status: IssueStatus = IssueStatus.BACKLOG
+    status: IssueStatus = IssueStatus.PLANNED
     priority: str
     executor: str
     verifier: str

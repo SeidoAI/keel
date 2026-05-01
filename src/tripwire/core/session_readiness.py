@@ -84,7 +84,7 @@ def check_readiness(
         # downstream work if not promoted to `todo`. Severity=warning
         # so this doesn't block `session queue`; the fix hint points at
         # the --promote-issues flag that flips them in one shot.
-        if issue.status == "backlog":
+        if issue.status in ("planned", "backlog"):  # v0.9.4 alias-aware
             items.append(
                 ReadinessItem(
                     label=f"issue {issue_key} status=backlog",
@@ -113,7 +113,7 @@ def check_readiness(
                     )
                 )
                 continue
-            if blocker.status != "done":
+            if blocker.status not in ("completed", "done"):  # v0.9.4 alias-aware
                 items.append(
                     ReadinessItem(
                         label=f"blocker: {blocker_key} ({blocker.status})",

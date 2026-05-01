@@ -69,7 +69,7 @@ def _seed_two_state_repo(tmp_path: Path) -> tuple[Path, str, str]:
             {
                 "id": "CLI-1",
                 "title": "First",
-                "status": "todo",
+                "status": "queued",
                 "priority": "medium",
                 "executor": "ai",
                 "verifier": "required",
@@ -89,7 +89,7 @@ def _seed_two_state_repo(tmp_path: Path) -> tuple[Path, str, str]:
             {
                 "id": "CLI-1",
                 "title": "First",
-                "status": "done",
+                "status": "completed",
                 "priority": "medium",
                 "executor": "ai",
                 "verifier": "required",
@@ -175,7 +175,8 @@ def test_cli_surfaces_issue_status_change(two_state_repo):
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "`CLI-1`: todo → done" in result.output
+    # v0.9.4 canonical names.
+    assert "`CLI-1`: queued → completed" in result.output
 
 
 def test_cli_json_format_returns_parseable_json(two_state_repo):
@@ -200,7 +201,9 @@ def test_cli_json_format_returns_parseable_json(two_state_repo):
     assert data["base_sha"] == base_sha
     assert data["head_sha"] == head_sha
     assert any(
-        c["id"] == "CLI-1" and c["from_status"] == "todo" and c["to_status"] == "done"
+        c["id"] == "CLI-1"
+        and c["from_status"] == "queued"
+        and c["to_status"] == "completed"
         for c in data["issues"]["changes"]
     )
 

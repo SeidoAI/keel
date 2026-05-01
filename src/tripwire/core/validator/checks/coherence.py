@@ -31,63 +31,80 @@ from tripwire.models.session import AgentSession
 #   verified     → error on earlier
 #   done         → error on anything else
 
+# v0.9.4: keys here are canonical session-status values (post-rename).
+# Pre-v0.9.4 names ("active", "waiting_for_*", "re_engaged") normalise via
+# ``SessionStatus.__missing__`` before reaching this lookup.
 _SESSION_STATUS_TO_PHASE: dict[str, str] = {
     "planned": "planned",
-    # Working states (queued waiting to launch, executing locally, active
-    # in orchestrator) all represent the in_progress phase.
-    "queued": "in_progress",
-    "executing": "in_progress",
-    "active": "in_progress",
+    "queued": "executing",
+    "executing": "executing",
     "in_review": "in_review",
     "verified": "verified",
-    # completed = tripwire session's terminal state = phase `done`.
-    "completed": "done",
-    # Off-lifecycle statuses (failed, paused, abandoned, re_engaged,
-    # waiting_for_*) deliberately omitted — coherence is meaningless there.
+    "completed": "completed",
+    # Off-lifecycle statuses (failed, paused, abandoned) are deliberately
+    # omitted — coherence is meaningless there.
 }
 
+# v0.9.4: phase keys + issue-state keys are canonical (planned, queued,
+# executing, in_review, verified, completed). Legacy issue names
+# (backlog, todo, in_progress, done) are accepted via ``_resolve_issue_state``
+# below so callers don't need to pre-normalise.
 _COHERENCE_MATRIX: dict[str, dict[str, str]] = {
     "planned": {
-        "backlog": "ok",
-        "todo": "ok",
-        "in_progress": "ahead_warn",
+        "planned": "ok",
+        "queued": "ok",
+        "executing": "ahead_warn",
         "in_review": "ahead_warn",
         "verified": "ahead_warn",
-        "done": "ahead_warn",
+        "completed": "ahead_warn",
     },
-    "in_progress": {
-        "backlog": "behind_error",
-        "todo": "ok",
-        "in_progress": "ok",
+    "executing": {
+        "planned": "behind_error",
+        "queued": "ok",
+        "executing": "ok",
         "in_review": "ok",
         "verified": "ahead_warn",
-        "done": "ahead_warn",
+        "completed": "ahead_warn",
     },
     "in_review": {
-        "backlog": "behind_error",
-        "todo": "behind_error",
-        "in_progress": "behind_error",
+        "planned": "behind_error",
+        "queued": "behind_error",
+        "executing": "behind_error",
         "in_review": "ok",
         "verified": "ok",
-        "done": "ok",
+        "completed": "ok",
     },
     "verified": {
-        "backlog": "behind_error",
-        "todo": "behind_error",
-        "in_progress": "behind_error",
+        "planned": "behind_error",
+        "queued": "behind_error",
+        "executing": "behind_error",
         "in_review": "behind_error",
         "verified": "ok",
-        "done": "ok",
+        "completed": "ok",
     },
-    "done": {
-        "backlog": "behind_error",
-        "todo": "behind_error",
-        "in_progress": "behind_error",
+    "completed": {
+        "planned": "behind_error",
+        "queued": "behind_error",
+        "executing": "behind_error",
         "in_review": "behind_error",
         "verified": "behind_error",
-        "done": "ok",
+        "completed": "ok",
     },
 }
+
+
+def _resolve_issue_state(value: str) -> str:
+    """Map legacy / alias issue-status strings to canonical for matrix lookup."""
+    from tripwire.core.status_contract import normalize_issue_status
+
+    return normalize_issue_status(value)
+
+
+def _resolve_session_state(value: str) -> str:
+    """Map legacy / alias session-status strings to canonical for matrix lookup."""
+    from tripwire.core.status_contract import normalize_session_status
+
+    return normalize_session_status(value)
 
 
 @registers_at("coding-session", "executing")
@@ -180,7 +197,7 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
     issues_by_key = {entity.model.id: entity.model for entity in ctx.issues}
     for entity in ctx.sessions:
         session: AgentSession = entity.model
-        phase = _SESSION_STATUS_TO_PHASE.get(session.status)
+        phase = _SESSION_STATUS_TO_PHASE.get(_resolve_session_state(session.status))
         if phase is None:
             continue
         session_row = _COHERENCE_MATRIX[phase]
@@ -188,7 +205,7 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
             issue = issues_by_key.get(issue_key)
             if issue is None:
                 continue
-            verdict = session_row.get(issue.status, "ok")
+            verdict = session_row.get(_resolve_issue_state(issue.status), "ok")
             if verdict == "ok":
                 continue
             if verdict == "behind_error":
@@ -215,6 +232,128 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
                     ),
                 )
             )
+    return results
+
+
+# v0.9.4 — issue ↔ session status contract checks. Both check the same
+# invariant from different angles:
+#   * ``check_issue_session_status_compatibility`` (error): for each
+#     session, every member issue's status must be in the allowed set
+#     for the session's state, per
+#     ``status_contract.ALLOWED_ISSUE_STATES_BY_SESSION_STATE``.
+#   * ``check_done_implies_session_completed`` (warn): an issue at
+#     ``completed`` belongs to at least one ``completed`` session — flags
+#     "orphan completion" cases where the closeout sweep didn't run.
+
+
+@registers_at("coding-session", "executing")
+def check_issue_session_status_compatibility(
+    ctx: ValidationContext,
+) -> list[CheckResult]:
+    """v0.9.4 contract: every member issue's status must be in the set
+    allowed for its session's status. Catches contract violations on write.
+    """
+    from tripwire.core.status_contract import (
+        ALLOWED_ISSUE_STATES_BY_SESSION_STATE,
+        is_issue_state_compatible_with_session_state,
+        normalize_session_status,
+    )
+
+    results: list[CheckResult] = []
+    issues_by_key = {entity.model.id: entity for entity in ctx.issues}
+    for session_entity in ctx.sessions:
+        session = session_entity.model
+        s_state = normalize_session_status(str(session.status))
+        if s_state not in ALLOWED_ISSUE_STATES_BY_SESSION_STATE:
+            # Unknown session state — not our problem here. Other checks
+            # cover unknown enum values.
+            continue
+        for issue_key in session.issues:
+            issue_entity = issues_by_key.get(issue_key)
+            if issue_entity is None:
+                continue
+            issue = issue_entity.model
+            if not is_issue_state_compatible_with_session_state(
+                str(session.status), str(issue.status)
+            ):
+                allowed = sorted(ALLOWED_ISSUE_STATES_BY_SESSION_STATE[s_state])
+                results.append(
+                    CheckResult(
+                        code="contract/issue_session_state_incompatible",
+                        severity="error",
+                        file=session_entity.rel_path,
+                        field="status",
+                        message=(
+                            f"Session {session.id!r} ({session.status}) has "
+                            f"issue {issue_key!r} at {issue.status!r} — "
+                            f"not in the allowed set for session state "
+                            f"{s_state!r}: {allowed}."
+                        ),
+                        fix_hint=(
+                            "Sweep the session forward via "
+                            "`tripwire session transition --sweep-issues`, "
+                            "or advance the issue status to match the "
+                            "contract."
+                        ),
+                    )
+                )
+    return results
+
+
+@registers_at("coding-session", "executing")
+def check_done_implies_session_completed(
+    ctx: ValidationContext,
+) -> list[CheckResult]:
+    """v0.9.4 warning: an issue at ``completed`` should belong to at
+    least one session that's also ``completed`` (or no session at all).
+
+    Catches "orphan completion" cases where an issue was flipped to
+    completed manually without the session being walked through to its
+    own terminal state.
+    """
+    from tripwire.core.status_contract import (
+        normalize_issue_status,
+        normalize_session_status,
+    )
+
+    results: list[CheckResult] = []
+    sessions_by_issue: dict[str, list[str]] = {}
+    for session_entity in ctx.sessions:
+        session = session_entity.model
+        s_state = normalize_session_status(str(session.status))
+        for issue_key in session.issues:
+            sessions_by_issue.setdefault(issue_key, []).append(s_state)
+
+    for entity in ctx.issues:
+        issue = entity.model
+        i_state = normalize_issue_status(str(issue.status))
+        if i_state != "completed":
+            continue
+        owning_states = sessions_by_issue.get(issue.id, [])
+        if not owning_states:
+            # Issue has no sessions claiming it — orphan-completion is
+            # still legitimate (e.g. closed without ever being session-owned).
+            continue
+        if "completed" in owning_states or "abandoned" in owning_states:
+            continue
+        results.append(
+            CheckResult(
+                code="contract/done_implies_session_completed",
+                severity="warning",
+                file=entity.rel_path,
+                field="status",
+                message=(
+                    f"Issue {issue.id!r} is at 'completed' but no owning "
+                    f"session is in {{completed, abandoned}}. "
+                    f"Owning session states: {sorted(owning_states)}."
+                ),
+                fix_hint=(
+                    "Walk the owning session through its terminal "
+                    "transition, or move the issue back if the session "
+                    "isn't actually done."
+                ),
+            )
+        )
     return results
 
 

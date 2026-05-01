@@ -1,18 +1,18 @@
 name: IssueStatus
-description: Issue lifecycle states (v0.7b 6-stage flow)
+description: Issue lifecycle states (v0.9.4 canonical — aligned with SessionStatus)
 values:
-  - id: backlog
-    label: Backlog
+  - id: planned
+    label: Planned
     color: gray
-    description: Captured but not triaged
-  - id: todo
-    label: To Do
+    description: Captured but not yet promoted to active work
+  - id: queued
+    label: Queued
     color: blue
-    description: Triaged, ready for pickup
-  - id: in_progress
-    label: In Progress
+    description: Triaged, ready for pickup (issue equivalent of session "queued")
+  - id: executing
+    label: Executing
     color: yellow
-    description: Execution agent working
+    description: Agent actively working this issue
   - id: in_review
     label: In Review
     color: purple
@@ -21,11 +21,15 @@ values:
     label: Verified
     color: green
     description: PR merged, acceptance tests passed (QA/PM)
-  - id: done
-    label: Done
+  - id: completed
+    label: Completed
     color: lime
     description: Closed — concept nodes reconciled, followups logged
-  - id: canceled
-    label: Canceled
+  - id: abandoned
+    label: Abandoned
     color: red
-    description: Won't do
+    description: Closed without completing (replaced by another issue or dropped)
+  - id: deferred
+    label: Deferred
+    color: gray
+    description: Consciously skipped within a session — carries forward through phase transitions

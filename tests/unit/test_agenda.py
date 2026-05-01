@@ -19,12 +19,13 @@ def write_project_yaml(project_dir: Path) -> None:
         "key_prefix": "TST",
         "base_branch": "main",
         "repos": {},
-        "statuses": ["backlog", "todo", "in_progress", "done"],
+        # v0.9.4 canonical statuses + transitions.
+        "statuses": ["planned", "queued", "executing", "completed"],
         "status_transitions": {
-            "backlog": ["todo"],
-            "todo": ["in_progress"],
-            "in_progress": ["done"],
-            "done": [],
+            "planned": ["queued"],
+            "queued": ["executing"],
+            "executing": ["completed"],
+            "completed": [],
         },
         "next_issue_number": 1,
         "next_session_number": 1,
@@ -41,7 +42,7 @@ def write_issue(project_dir: Path, key: str, **overrides: object) -> None:
         "uuid": str(uuid.uuid4()),
         "id": key,
         "title": f"Test {key}",
-        "status": "todo",
+        "status": "queued",
         "priority": "medium",
         "executor": "ai",
         "verifier": "required",
@@ -70,14 +71,16 @@ class TestAgendaCollection:
         assert result.groups == []
 
     def test_groups_by_status(self, project: Path) -> None:
-        write_issue(project, "TST-1", status="todo")
-        write_issue(project, "TST-2", status="todo")
-        write_issue(project, "TST-3", status="in_progress")
+        write_issue(project, "TST-1", status="queued")
+        write_issue(project, "TST-2", status="queued")
+        write_issue(project, "TST-3", status="executing")
         result = _collect_agenda(project, "status", None)
         assert result.total_issues == 3
         assert len(result.groups) == 2
         group_keys = {g.key for g in result.groups}
-        assert group_keys == {"todo", "in_progress"}
+        # v0.9.4: canonical names; group keys come from issue.status enum
+        # values which are canonical.
+        assert group_keys == {"queued", "executing"}
 
     def test_groups_by_executor(self, project: Path) -> None:
         write_issue(project, "TST-1", executor="ai")
@@ -87,16 +90,16 @@ class TestAgendaCollection:
         assert group_keys == {"ai", "human"}
 
     def test_filter(self, project: Path) -> None:
-        write_issue(project, "TST-1", status="todo")
-        write_issue(project, "TST-2", status="in_progress")
-        result = _collect_agenda(project, "status", "status:todo")
+        write_issue(project, "TST-1", status="queued")
+        write_issue(project, "TST-2", status="executing")
+        result = _collect_agenda(project, "status", "status:queued")
         assert result.total_issues == 1
-        assert result.groups[0].key == "todo"
+        assert result.groups[0].key == "queued"
         assert len(result.groups[0].items) == 1
 
     def test_blocked_detection(self, project: Path) -> None:
-        write_issue(project, "TST-1", status="todo")
-        write_issue(project, "TST-2", status="todo", blocked_by=["TST-1"])
+        write_issue(project, "TST-1", status="queued")
+        write_issue(project, "TST-2", status="queued", blocked_by=["TST-1"])
         result = _collect_agenda(project, "status", None)
         assert result.blocked_count == 1
         blocked_items = [
@@ -104,6 +107,22 @@ class TestAgendaCollection:
         ]
         assert len(blocked_items) == 1
         assert blocked_items[0].id == "TST-2"
+
+    def test_completed_blocker_does_not_mark_dependent_blocked(
+        self, project: Path
+    ) -> None:
+        """v0.9.4 regression test: a `completed` blocker (canonical) must
+        clear the dependent. Pre-v0.9.4 the check used `!= "done"` which
+        spuriously flagged completed blockers as in-flight. Canonical
+        "completed" + legacy "done" alias both clear."""
+        write_issue(project, "TST-1", status="completed")  # canonical
+        write_issue(project, "TST-2", status="queued", blocked_by=["TST-1"])
+        result = _collect_agenda(project, "status", None)
+        assert result.blocked_count == 0
+        blocked_items = [
+            item for g in result.groups for item in g.items if item.is_blocked
+        ]
+        assert blocked_items == []
 
     def test_json_serializable(self, project: Path) -> None:
         write_issue(project, "TST-1")

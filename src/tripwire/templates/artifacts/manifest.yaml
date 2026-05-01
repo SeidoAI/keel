@@ -31,7 +31,7 @@ artifacts:
   - name: task-checklist
     file: task-checklist.md
     template: task-checklist.md.j2
-    produced_at: in_progress
+    produced_at: executing
     produced_by: execution-agent
     owned_by: execution-agent
     required: true
@@ -49,7 +49,7 @@ artifacts:
   - name: recommended-testing-plan
     file: recommended-testing-plan.md
     template: recommended-testing-plan.md.j2
-    produced_at: done
+    produced_at: completed
     produced_by: execution-agent
     owned_by: execution-agent
     required: true
@@ -58,7 +58,7 @@ artifacts:
   - name: post-completion-comments
     file: post-completion-comments.md
     template: post-completion-comments.md.j2
-    produced_at: done
+    produced_at: completed
     produced_by: execution-agent
     owned_by: execution-agent
     required: true
@@ -70,7 +70,7 @@ artifacts:
   - name: self-review
     file: self-review.md
     template: self-review.md.j2
-    produced_at: done
+    produced_at: completed
     produced_by: execution-agent
     owned_by: execution-agent
     required: true
@@ -83,7 +83,7 @@ artifacts:
   - name: pm-response
     file: pm-response.yaml
     template: pm-response.yaml.j2
-    produced_at: done
+    produced_at: completed
     produced_by: pm
     owned_by: pm
     required: true

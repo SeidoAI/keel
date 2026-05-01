@@ -502,6 +502,7 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
         )
 
     if promote_issues:
+        from tripwire.core.status_contract import normalize_issue_status
         from tripwire.core.store import load_issue, save_issue
 
         promoted = 0
@@ -511,13 +512,16 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
             except FileNotFoundError:
                 click.echo(f"  ! issue {issue_key} not found — skipping")
                 continue
-            if issue.status == "backlog":
-                issue.status = "todo"
+            # v0.9.4: accept both canonical "planned" and legacy "backlog"
+            # on the source side; emit canonical "queued" on the sink side.
+            if normalize_issue_status(str(issue.status)) == "planned":
+                old_status = issue.status
+                issue.status = "queued"
                 save_issue(resolved, issue)
-                click.echo(f"  {issue_key}: backlog → todo")
+                click.echo(f"  {issue_key}: {old_status} → queued")
                 promoted += 1
         if promoted == 0:
-            click.echo("  (no issues in backlog to promote)")
+            click.echo("  (no issues at 'planned' to promote)")
 
     report = check_readiness(resolved, session_id, kind="queue")
     if not report.ready:
@@ -866,6 +870,12 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 }
 
 
+# Default-on sweep: when transitioning into one of these states, also
+# advance member issues to the matching issue state via the v0.9.4
+# status contract (sweep_issues). User can override with --no-sweep-issues.
+_DEFAULT_SWEEP_ON_TRANSITION = frozenset({"in_review", "verified", "completed"})
+
+
 @session_cmd.command("transition")
 @click.argument("session_id")
 @click.argument("target_status")
@@ -875,8 +885,20 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     default=".",
     show_default=True,
 )
+@click.option(
+    "--sweep-issues/--no-sweep-issues",
+    default=None,
+    help=(
+        "Sweep member issues to the implied issue state for the target "
+        "session state (v0.9.4 status contract). Defaults to ON for "
+        "transitions into in_review / verified / completed; OFF otherwise."
+    ),
+)
 def session_transition_cmd(
-    session_id: str, target_status: str, project_dir: Path
+    session_id: str,
+    target_status: str,
+    project_dir: Path,
+    sweep_issues: bool | None,
 ) -> None:
     """Transition a session's status. Strict: rejects unknown statuses
     and disallowed jumps.
@@ -886,7 +908,12 @@ def session_transition_cmd(
     this is what unblocks ``tripwire session complete``. Other allowed
     flips cover the resume/review/abandon happy paths; everything else
     requires a direct yaml edit.
+
+    v0.9.4: ``--sweep-issues`` (default-on for in_review/verified/completed)
+    advances member issues to the matching issue state per the status
+    contract.
     """
+    from tripwire.core.status_contract import sweep_issues as _sweep_issues_fn
     from tripwire.models.enums import SessionStatus
 
     resolved = project_dir.expanduser().resolve()
@@ -911,10 +938,39 @@ def session_transition_cmd(
             f"allowed targets from {session.status!r}: {sorted(allowed) or '<none>'}"
         )
 
-    session.status = SessionStatus(target_status)
+    # Decide whether to sweep. Explicit user choice wins; fall back to the
+    # default-on set if not specified.
+    do_sweep = (
+        sweep_issues
+        if sweep_issues is not None
+        else target_status in _DEFAULT_SWEEP_ON_TRANSITION
+    )
+
+    # v0.9.4 (codex P2): sweep BEFORE saving the session. If the sweep
+    # raises, the session status stays at its old value so the operator
+    # can fix the underlying issue and retry — as opposed to leaving the
+    # session at the new status with member issues stranded behind.
+    new_status = SessionStatus(target_status)
+    pending_session_status = session.status
+    session.status = new_status  # local-only mutation for sweep_issues to read
+
+    swept: list[str] = []
+    if do_sweep:
+        try:
+            swept = _sweep_issues_fn(resolved, session, target_status)
+        except Exception:
+            # Roll back the local mutation so caller sees consistent state
+            # if they catch this exception in a higher harness.
+            session.status = pending_session_status
+            raise
+
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
     click.echo(f"Session '{session_id}' → {target_status}")
+    if swept:
+        click.echo(f"  swept {len(swept)} issue(s) → matching state:")
+        for k in swept:
+            click.echo(f"    {k}")
 
 
 @session_cmd.command("abandon")
