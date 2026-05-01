@@ -108,6 +108,22 @@ class TestAgendaCollection:
         assert len(blocked_items) == 1
         assert blocked_items[0].id == "TST-2"
 
+    def test_completed_blocker_does_not_mark_dependent_blocked(
+        self, project: Path
+    ) -> None:
+        """v0.9.4 regression test: a `completed` blocker (canonical) must
+        clear the dependent. Pre-v0.9.4 the check used `!= "done"` which
+        spuriously flagged completed blockers as in-flight. Canonical
+        "completed" + legacy "done" alias both clear."""
+        write_issue(project, "TST-1", status="completed")  # canonical
+        write_issue(project, "TST-2", status="queued", blocked_by=["TST-1"])
+        result = _collect_agenda(project, "status", None)
+        assert result.blocked_count == 0
+        blocked_items = [
+            item for g in result.groups for item in g.items if item.is_blocked
+        ]
+        assert blocked_items == []
+
     def test_json_serializable(self, project: Path) -> None:
         write_issue(project, "TST-1")
         result = _collect_agenda(project, "status", None)
