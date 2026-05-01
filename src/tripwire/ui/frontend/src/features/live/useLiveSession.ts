@@ -13,7 +13,7 @@ import { useSession } from "@/lib/api/endpoints/sessions";
  *
  * Aggregates the three independent data flows the page needs:
  * - the session detail (for status, cost ticker, current_state)
- * - the per-session process-event stream (tripwire fires, status
+ * - the per-session process-event stream (JIT prompt fires, status
  *   transitions used as engagement-boundary markers)
  * - the open `cost-approval` inbox entry (when one exists for this
  *   session — the PM agent's "system" version of INTERVENE)
@@ -34,9 +34,9 @@ export interface UseLiveSessionResult {
   isLoading: boolean;
   error: unknown;
   isOffTrack: boolean;
-  /** Process events of kind `tripwire_fire` scoped to this session,
+  /** Process events of kind `jit_prompt_fire` scoped to this session,
    *  newest first. Empty when KUI-99 / KUI-100 haven't shipped. */
-  tripwireFires: ProcessEvent[];
+  jitPromptFires: ProcessEvent[];
   /** Process events of kind `status_transition` scoped to this
    *  session, oldest first. Used to render engagement-boundary
    *  dividers in the turn stream. */
@@ -62,10 +62,10 @@ export function useLiveSession(projectId: string, sessionId: string): UseLiveSes
     return sessionStageId(session.status) === "off_track";
   }, [session]);
 
-  const tripwireFires = useMemo(() => {
+  const jitPromptFires = useMemo(() => {
     const all = eventsQuery.data?.events ?? [];
     return all
-      .filter((e) => e.kind === "tripwire_fire" && e.session_id === sessionId)
+      .filter((e) => e.kind === "jit_prompt_fire" && e.session_id === sessionId)
       .sort((a, b) => new Date(b.fired_at).getTime() - new Date(a.fired_at).getTime());
   }, [eventsQuery.data, sessionId]);
 
@@ -91,7 +91,7 @@ export function useLiveSession(projectId: string, sessionId: string): UseLiveSes
     isLoading: sessionQuery.isLoading,
     error: sessionQuery.error,
     isOffTrack,
-    tripwireFires,
+    jitPromptFires,
     statusTransitions,
     costApprovalEntry,
   };

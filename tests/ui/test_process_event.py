@@ -15,7 +15,7 @@ def test_process_event_round_trips() -> None:
     ev = ProcessEvent(
         project_id="proj-x",
         event_id="evt-001",
-        kind="tripwire_fire",
+        kind="jit_prompt_fire",
         session_id="v0710-routing",
         fired_at="2026-04-26T14:32:18Z",
     )
@@ -23,7 +23,7 @@ def test_process_event_round_trips() -> None:
     assert payload["type"] == "process_event"
     assert payload["project_id"] == "proj-x"
     assert payload["event_id"] == "evt-001"
-    assert payload["kind"] == "tripwire_fire"
+    assert payload["kind"] == "jit_prompt_fire"
     assert payload["session_id"] == "v0710-routing"
     assert payload["fired_at"] == "2026-04-26T14:32:18Z"
 

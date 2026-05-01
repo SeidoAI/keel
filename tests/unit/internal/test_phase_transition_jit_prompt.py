@@ -1,4 +1,4 @@
-"""Tests for the phase-transition tripwire (KUI-138 / B4).
+"""Tests for the phase-transition JIT prompt (KUI-138 / B4).
 
 Fires on ``session.complete`` when ``project.yaml.phase`` is past
 ``executing`` but issues labelled with the previous phase are still
@@ -14,11 +14,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tripwire._internal.tripwires import TripwireContext
-from tripwire._internal.tripwires.phase_transition import (
+from tripwire._internal.jit_prompts import JitPromptContext
+from tripwire._internal.jit_prompts.phase_transition import (
     _VARIATIONS,
     PREVIOUS_PHASE,
-    PhaseTransitionTripwire,
+    PhaseTransitionJitPrompt,
 )
 
 
@@ -62,8 +62,8 @@ def _seed_project(
         )
 
 
-def _ctx(tmp_path: Path) -> TripwireContext:
-    return TripwireContext(
+def _ctx(tmp_path: Path) -> JitPromptContext:
+    return JitPromptContext(
         project_dir=tmp_path,
         session_id="alpha",
         project_id="demo",
@@ -71,7 +71,7 @@ def _ctx(tmp_path: Path) -> TripwireContext:
 
 
 def test_phase_transition_class_attrs() -> None:
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     assert tw.id == "phase-transition"
     assert tw.fires_on == "session.complete"
     assert tw.blocks is True
@@ -94,7 +94,7 @@ def test_three_variations_present() -> None:
 
 
 def test_fire_returns_one_of_the_variations(tmp_path: Path) -> None:
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     prompt = tw.fire(_ctx(tmp_path))
     assert prompt in _VARIATIONS
 
@@ -110,7 +110,7 @@ def test_should_fire_clean_transition(tmp_path: Path) -> None:
             ("DEM-3", "verified", ["phase:executing"]),
         ],
     )
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -124,7 +124,7 @@ def test_should_fire_open_prev_phase_issue(tmp_path: Path) -> None:
             ("DEM-2", "in_progress", ["phase:executing"]),
         ],
     )
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is True
 
 
@@ -137,7 +137,7 @@ def test_should_fire_silent_at_scoping(tmp_path: Path) -> None:
             ("DEM-1", "in_progress", ["phase:scoping"]),
         ],
     )
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -151,12 +151,12 @@ def test_should_fire_ignores_unrelated_phase_label(tmp_path: Path) -> None:
             ("DEM-2", "in_progress", []),  # no phase label
         ],
     )
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
 def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     ctx = _ctx(tmp_path)
     marker = ctx.ack_path("phase-transition")
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -165,7 +165,7 @@ def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
 
 
 def test_acknowledged_with_declared_no_findings(tmp_path: Path) -> None:
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     ctx = _ctx(tmp_path)
     marker = ctx.ack_path("phase-transition")
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -174,7 +174,7 @@ def test_acknowledged_with_declared_no_findings(tmp_path: Path) -> None:
 
 
 def test_acknowledged_empty_marker_rejected(tmp_path: Path) -> None:
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     ctx = _ctx(tmp_path)
     marker = ctx.ack_path("phase-transition")
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -183,7 +183,7 @@ def test_acknowledged_empty_marker_rejected(tmp_path: Path) -> None:
 
 
 def test_acknowledged_no_marker(tmp_path: Path) -> None:
-    tw = PhaseTransitionTripwire()
+    tw = PhaseTransitionJitPrompt()
     ctx = _ctx(tmp_path)
     assert tw.is_acknowledged(ctx) is False
 

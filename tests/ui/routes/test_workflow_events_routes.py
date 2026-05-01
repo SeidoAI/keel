@@ -44,7 +44,7 @@ def _seed_workflow_events(pd: Path) -> None:
         workflow="coding-session",
         instance="sess-2",
         station="executing",
-        event="tripwire.fired",
+        event="jit_prompt.fired",
         details={"id": "tw_self_review", "session_id": "sess-2"},
     )
 
@@ -112,7 +112,7 @@ def test_workflow_stats_returns_aggregate_counts(
     by_kind = body["by_kind"]
     assert by_kind["validator.run"] == 2
     assert by_kind["transition.completed"] == 1
-    assert by_kind["tripwire.fired"] == 1
+    assert by_kind["jit_prompt.fired"] == 1
     by_instance = body["by_instance"]
     assert by_instance["sess-1"] == 3
     assert by_instance["sess-2"] == 1

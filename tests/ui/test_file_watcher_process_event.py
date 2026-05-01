@@ -18,7 +18,7 @@ def test_should_not_ignore_event_files(tmp_path: Path) -> None:
     """Event files MUST survive the ignore filter even though `.tripwire/`
     starts with a dot — the rest of `.tripwire/` (locks, cache files,
     etc.) still gets ignored, but `events/` is whitelisted."""
-    event_path = tmp_path / ".tripwire" / "events" / "firings" / "s1" / "0001.json"
+    event_path = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "s1" / "0001.json"
     assert _should_ignore(event_path, tmp_path) is False
 
 
@@ -29,11 +29,11 @@ def test_should_still_ignore_other_dot_tripwire_paths(tmp_path: Path) -> None:
 
 
 def test_classify_process_event_round_trip(tmp_path: Path) -> None:
-    sid_dir = tmp_path / ".tripwire" / "events" / "firings" / "v0710-routing"
+    sid_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "v0710-routing"
     sid_dir.mkdir(parents=True)
     body = {
         "id": "evt-fire-1",
-        "kind": "tripwire_fire",
+        "kind": "jit_prompt_fire",
         "session_id": "v0710-routing",
         "fired_at": "2026-04-26T14:32:18Z",
     }
@@ -45,10 +45,10 @@ def test_classify_process_event_round_trip(tmp_path: Path) -> None:
     ev = classify_process_event("proj-x", tmp_path, target)
     assert isinstance(ev, ProcessEvent)
     assert ev.project_id == "proj-x"
-    assert ev.kind == "tripwire_fire"
+    assert ev.kind == "jit_prompt_fire"
     assert ev.session_id == "v0710-routing"
     assert ev.fired_at == "2026-04-26T14:32:18Z"
-    assert ev.event_id == "firings/v0710-routing/1"
+    assert ev.event_id == "jit_prompt_firings/v0710-routing/1"
 
 
 def test_classify_process_event_returns_none_for_non_event_path(
@@ -62,7 +62,7 @@ def test_classify_process_event_returns_none_for_non_event_path(
 def test_classify_process_event_returns_none_for_unreadable(
     tmp_path: Path,
 ) -> None:
-    sid_dir = tmp_path / ".tripwire" / "events" / "firings" / "s1"
+    sid_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "s1"
     sid_dir.mkdir(parents=True)
     target = sid_dir / "0001.json"
     target.write_text("not valid json", encoding="utf-8")
@@ -70,7 +70,7 @@ def test_classify_process_event_returns_none_for_unreadable(
 
 
 def test_classify_process_event_ignores_temp_files(tmp_path: Path) -> None:
-    sid_dir = tmp_path / ".tripwire" / "events" / "firings" / "s1"
+    sid_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "s1"
     sid_dir.mkdir(parents=True)
     target = sid_dir / "0001.json.tmp"
     target.write_text("{}", encoding="utf-8")

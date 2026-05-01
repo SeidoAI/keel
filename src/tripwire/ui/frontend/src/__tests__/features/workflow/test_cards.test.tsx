@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ArtifactCard } from "@/features/workflow/ArtifactCard";
 import { ConnectorCurve } from "@/features/workflow/ConnectorCurve";
+import { JitPromptCard } from "@/features/workflow/JitPromptCard";
 import { StationCard } from "@/features/workflow/StationCard";
-import { TripwireCard } from "@/features/workflow/TripwireCard";
 import { ValidatorCard } from "@/features/workflow/ValidatorCard";
 
 function renderInSvg(node: React.ReactNode) {
@@ -78,15 +78,15 @@ describe("ValidatorCard", () => {
   });
 });
 
-describe("TripwireCard", () => {
+describe("JitPromptCard", () => {
   afterEach(cleanup);
 
-  it("renders the TRIPWIRE stamp + name + 'fires on' copy + 'agent must ack'", () => {
+  it("renders the JIT PROMPT stamp + name + 'fires on' copy + 'agent must ack'", () => {
     renderInSvg(
-      <TripwireCard
-        tripwire={{
+      <JitPromptCard
+        jitPrompt={{
           id: "t1",
-          kind: "tripwire",
+          kind: "jit_prompt",
           name: "stale-context",
           fires_on_station: "in_review",
           fires_on_event: "session.complete",
@@ -97,7 +97,7 @@ describe("TripwireCard", () => {
         onClick={() => {}}
       />,
     );
-    expect(screen.getByText("TRIPWIRE")).toBeTruthy();
+    expect(screen.getByText("JIT PROMPT")).toBeTruthy();
     expect(screen.getByText("stale-context")).toBeTruthy();
     expect(screen.getByText(/fires on/i)).toBeTruthy();
     expect(screen.getByText(/agent must ack/i)).toBeTruthy();

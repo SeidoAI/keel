@@ -1,13 +1,13 @@
-"""``tripwire test-tripwire <id>`` — fire one tripwire against a fixture context.
+"""``tripwire test-jit-prompt <id>`` — fire one JIT prompt against a fixture context.
 
-Authoring tooling for project-team tripwire authors (KUI-136 / B2).
-The command loads the project's tripwire registry, finds the named
-tripwire, instantiates a synthetic :class:`TripwireContext`, and
+Authoring tooling for project-team JIT prompt authors (KUI-136 / B2).
+The command loads the project's JIT prompt registry, finds the named
+prompt, instantiates a synthetic :class:`JitPromptContext`, and
 prints the prompt that ``fire()`` would return. With ``--ack``, it
 writes the standard substantive ack marker so the next run sees the
 ack path resolved.
 
-PM-only by the same role marker as ``tripwire tripwires`` — the
+PM-only by the same role marker as ``tripwire jit-prompts`` — the
 authoring loop is meant for the team designing process, not for
 agents.
 """
@@ -23,7 +23,7 @@ from tripwire.cli._utils import require_project as _require_project
 
 
 def _is_pm() -> bool:
-    """Mirror of ``cli/tripwires.py:_is_pm`` so we don't pull a circular import."""
+    """Mirror of ``cli/jit_prompts.py:_is_pm`` to avoid a circular import."""
     env_role = os.environ.get("TRIPWIRE_ROLE", "").strip().lower()
     if env_role == "pm":
         return True
@@ -41,22 +41,22 @@ def _is_pm() -> bool:
 def _require_pm() -> None:
     if not _is_pm():
         raise click.ClickException(
-            "`tripwire test-tripwire` is PM-only. Set `TRIPWIRE_ROLE=pm` "
+            "`tripwire test-jit-prompt` is PM-only. Set `TRIPWIRE_ROLE=pm` "
             "or write `pm` to `~/.tripwire/role` (or `$TRIPWIRE_HOME/role`) "
             "and re-run."
         )
 
 
 _DEFAULT_SESSION_ID = "_test"
-"""Default session id for ``test-tripwire``. Underscored so it can't
+"""Default session id for ``test-jit-prompt``. Underscored so it can't
 collide with a real session id (real ids never start with ``_``) and
 filesystem-safe on Windows (the ack-marker filename is
-``<tripwire-id>-<session-id>.json`` — angle brackets are invalid on
+``<jit-prompt-id>-<session-id>.json``; angle brackets are invalid on
 NTFS)."""
 
 
-@click.command("test-tripwire")
-@click.argument("tripwire_id")
+@click.command("test-jit-prompt")
+@click.argument("jit_prompt_id")
 @click.option(
     "--session",
     "session_id",
@@ -77,54 +77,58 @@ NTFS)."""
     default=".",
     show_default=True,
 )
-def test_tripwire_cmd(
-    tripwire_id: str,
+def test_jit_prompt_cmd(
+    jit_prompt_id: str,
     session_id: str,
     write_ack: bool,
     project_dir: Path,
 ) -> None:
-    """Fire ``TRIPWIRE_ID`` against a synthetic context and print the prompt.
+    """Fire ``JIT_PROMPT_ID`` against a synthetic context and print the prompt.
 
     Useful for iterating on prompt copy without spawning a real
     session. With ``--ack`` the command also writes the substantive
     ack marker (``fix_commits=["<test>"]``) so the ack path is
     exercised end-to-end.
     """
-    from tripwire._internal.tripwires import TripwireContext
-    from tripwire._internal.tripwires.loader import load_registry
+    from tripwire._internal.jit_prompts import JitPromptContext
+    from tripwire._internal.jit_prompts.loader import load_jit_prompt_registry
+    from tripwire.core.jit_prompt_state import write_jit_prompt_ack_marker
     from tripwire.core.store import load_project
-    from tripwire.core.tripwire_state import write_ack_marker
 
     _require_pm()
 
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
-    registry = load_registry(resolved)
-    by_id = {tw.id: (event, tw) for event, tws in registry.items() for tw in tws}
-    if tripwire_id not in by_id:
+    registry = load_jit_prompt_registry(resolved)
+    by_id = {
+        prompt.id: (event, prompt)
+        for event, prompts in registry.items()
+        for prompt in prompts
+    }
+    if jit_prompt_id not in by_id:
         known = ", ".join(sorted(by_id.keys())) or "(empty)"
         raise click.ClickException(
-            f"unknown tripwire id {tripwire_id!r}; known: {known}"
+            f"unknown JIT prompt id {jit_prompt_id!r}; known: {known}"
         )
 
     project = load_project(resolved)
     project_slug = project.name.lower().replace(" ", "-")
-    ctx = TripwireContext(
+    ctx = JitPromptContext(
         project_dir=resolved,
         session_id=session_id,
         project_id=project_slug,
     )
 
-    _event, tripwire = by_id[tripwire_id]
-    prompt = tripwire.fire(ctx)
+    _event, jit_prompt = by_id[jit_prompt_id]
+    prompt = jit_prompt.fire(ctx)
     click.echo(prompt)
 
     if write_ack:
-        marker = write_ack_marker(
+        marker = write_jit_prompt_ack_marker(
             project_dir=resolved,
             session_id=session_id,
-            tripwire_id=tripwire_id,
+            jit_prompt_id=jit_prompt_id,
             fix_commits=["<test>"],
             declared_no_findings=False,
         )

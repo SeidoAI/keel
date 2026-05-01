@@ -1,11 +1,11 @@
-"""Tests for the tripwire integration in `tripwire session complete`.
+"""Tests for the JIT prompt integration in `tripwire session complete`.
 
 Spec: `docs/specs/2026-04-21-v08-tripwires-as-primitive.md` §6 + KUI-99
 issue ACs.
 
 The CLI semantics:
 
-  * First call (no marker, tripwires enabled) → returns the tripwire
+  * First call (no marker, JIT prompts enabled) → returns the JIT prompt
     prompt on stdout, exits 1, does NOT run the close-out gates.
   * `--ack` writes the marker (substantive: ≥1 fix-commit SHA OR
     ``declared_no_findings: true``) and exits 0 without running the
@@ -13,7 +13,7 @@ The CLI semantics:
     ``is_acknowledged()`` return True.
   * Second call without ``--ack`` (marker present) → runs the
     close-out gates as before.
-  * ``--no-tripwires`` bypasses the registry call entirely (records
+  * ``--no-jit-prompts`` bypasses the registry call entirely (records
     an audit-log entry) and runs the close-out gates.
 """
 
@@ -25,11 +25,11 @@ from pathlib import Path
 import yaml
 from click.testing import CliRunner
 
-from tripwire._internal.tripwires import TripwireContext
+from tripwire._internal.jit_prompts import JitPromptContext
 from tripwire.cli.main import cli
 
 
-def _project(tmp_path: Path, tripwires: dict | None = None) -> None:
+def _project(tmp_path: Path, jit_prompts: dict | None = None) -> None:
     body: dict = {
         "name": "fixture",
         "key_prefix": "FIX",
@@ -38,8 +38,8 @@ def _project(tmp_path: Path, tripwires: dict | None = None) -> None:
         "next_session_number": 1,
         "phase": "scoping",
     }
-    if tripwires is not None:
-        body["tripwires"] = tripwires
+    if jit_prompts is not None:
+        body["jit_prompts"] = jit_prompts
     (tmp_path / "project.yaml").write_text(yaml.safe_dump(body), encoding="utf-8")
 
 
@@ -63,15 +63,15 @@ def test_first_complete_writes_event_file(tmp_path: Path) -> None:
         cli,
         ["session", "complete", "fixture-1", "--project-dir", str(tmp_path)],
     )
-    fire_dir = tmp_path / ".tripwire" / "events" / "firings" / "fixture-1"
+    fire_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "fixture-1"
     assert fire_dir.is_dir()
     assert (fire_dir / "0001.json").is_file()
 
 
-def test_ack_with_tripwire_id_targets_specific_marker(tmp_path: Path) -> None:
-    """`--ack --tripwire-id <id>` writes the marker for the named
-    tripwire, not just `self-review`. Required for the v0.9 deviation
-    tripwires (phase-transition, followups-not-filed, stopped-to-ask,
+def test_ack_with_jit_prompt_id_targets_specific_marker(tmp_path: Path) -> None:
+    """`--ack --jit-prompt-id <id>` writes the marker for the named
+    JIT prompt, not just `self-review`. Required for the v0.9 deviation
+    prompts (phase-transition, followups-not-filed, stopped-to-ask,
     write-count, cost-ceiling) which all fire on `session.complete`
     alongside self-review (codex P1 #2 on PR #79)."""
     _project(tmp_path)
@@ -85,7 +85,7 @@ def test_ack_with_tripwire_id_targets_specific_marker(tmp_path: Path) -> None:
             "--project-dir",
             str(tmp_path),
             "--ack",
-            "--tripwire-id",
+            "--jit-prompt-id",
             "phase-transition",
             "--declared-no-findings",
         ],
@@ -95,12 +95,12 @@ def test_ack_with_tripwire_id_targets_specific_marker(tmp_path: Path) -> None:
     assert target.is_file(), "phase-transition marker missing"
     self_review_marker = tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json"
     assert not self_review_marker.exists(), (
-        "self-review marker leaked when --tripwire-id targeted phase-transition"
+        "self-review marker leaked when --jit-prompt-id targeted phase-transition"
     )
 
 
-def test_ack_default_tripwire_id_remains_self_review(tmp_path: Path) -> None:
-    """Backward compat: omitting `--tripwire-id` defaults to
+def test_ack_default_jit_prompt_id_remains_self_review(tmp_path: Path) -> None:
+    """Backward compat: omitting `--jit-prompt-id` defaults to
     `self-review` so existing workflows keep working."""
     _project(tmp_path)
     runner = CliRunner()
@@ -189,7 +189,7 @@ def test_ack_without_substance_rejected(tmp_path: Path) -> None:
     )
 
 
-def test_no_tripwires_bypass_skips_fire(tmp_path: Path) -> None:
+def test_no_jit_prompts_bypass_skips_fire(tmp_path: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
@@ -200,14 +200,14 @@ def test_no_tripwires_bypass_skips_fire(tmp_path: Path) -> None:
             "fixture-1",
             "--project-dir",
             str(tmp_path),
-            "--no-tripwires",
+            "--no-jit-prompts",
         ],
     )
-    # The tripwire is bypassed but the underlying close-out gates run
+    # The JIT prompt is bypassed but the underlying close-out gates run
     # and will fail on a fixture session that has no PRs / artifacts.
     # We assert the bypass audit-log entry exists, which is the gate
     # we're testing here.
-    audit = tmp_path / ".tripwire" / "audit" / "tripwire_bypass.log"
+    audit = tmp_path / ".tripwire" / "audit" / "jit_prompt_bypass.log"
     assert audit.is_file()
     body = audit.read_text(encoding="utf-8")
     assert "fixture-1" in body
@@ -225,10 +225,10 @@ def test_project_disabled_skips_fire(tmp_path: Path) -> None:
         ["session", "complete", "fixture-1", "--project-dir", str(tmp_path)],
     )
     # No fire event written.
-    fire_dir = tmp_path / ".tripwire" / "events" / "firings" / "fixture-1"
+    fire_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "fixture-1"
     assert not fire_dir.exists()
     # No bypass audit either — the tripwire was disabled, not bypassed.
-    audit = tmp_path / ".tripwire" / "audit" / "tripwire_bypass.log"
+    audit = tmp_path / ".tripwire" / "audit" / "jit_prompt_bypass.log"
     assert not audit.exists()
     del result
 
@@ -254,7 +254,7 @@ def test_ack_after_fire_unblocks_next_call(tmp_path: Path) -> None:
         ],
     )
     # Now is_acknowledged returns True for the marker.
-    ctx = TripwireContext(
+    ctx = JitPromptContext(
         project_dir=tmp_path, session_id="fixture-1", project_id="fixture"
     )
     marker = ctx.ack_path("self-review")

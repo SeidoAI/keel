@@ -23,6 +23,7 @@ from tripwire.cli.hooks import hook_cmd, hooks_cmd
 from tripwire.cli.inbox import inbox_cmd
 from tripwire.cli.init import init_cmd
 from tripwire.cli.issue import issue_cmd
+from tripwire.cli.jit_prompts import jit_prompts_cmd
 from tripwire.cli.lint import lint_cmd
 from tripwire.cli.next_key import next_key_cmd
 from tripwire.cli.node import node_cmd
@@ -37,9 +38,8 @@ from tripwire.cli.scaffold import brief_cmd
 from tripwire.cli.session import session_cmd
 from tripwire.cli.status import status_cmd
 from tripwire.cli.templates import templates_cmd
-from tripwire.cli.test_tripwire import test_tripwire_cmd
+from tripwire.cli.test_jit_prompt import test_jit_prompt_cmd
 from tripwire.cli.transition import transition_cmd
-from tripwire.cli.tripwires import tripwires_cmd
 from tripwire.cli.ui import ui_cmd
 from tripwire.cli.uuid_cmd import uuid_cmd
 from tripwire.cli.validate import validate_cmd
@@ -123,8 +123,8 @@ cli.add_command(completion_cmd)
 cli.add_command(ui_cmd)
 cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
-cli.add_command(tripwires_cmd)
-cli.add_command(test_tripwire_cmd)
+cli.add_command(jit_prompts_cmd)
+cli.add_command(test_jit_prompt_cmd)
 cli.add_command(events_cmd)
 cli.add_command(transition_cmd)
 cli.add_command(drift_cmd)

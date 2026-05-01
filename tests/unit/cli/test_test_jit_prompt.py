@@ -1,4 +1,4 @@
-"""KUI-136 (B2) — `tripwire test-tripwire <id>` CLI."""
+"""KUI-136 (B2) — `tripwire test-jit-prompt <id>` CLI."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from click.testing import CliRunner
 from tripwire.cli.main import cli
 
 
-def _project(tmp_path: Path, tripwires: dict | None = None) -> None:
+def _project(tmp_path: Path, jit_prompts: dict | None = None) -> None:
     body: dict = {
         "name": "fixture",
         "key_prefix": "FIX",
@@ -20,8 +20,8 @@ def _project(tmp_path: Path, tripwires: dict | None = None) -> None:
         "next_session_number": 1,
         "phase": "scoping",
     }
-    if tripwires is not None:
-        body["tripwires"] = tripwires
+    if jit_prompts is not None:
+        body["jit_prompts"] = jit_prompts
     (tmp_path / "project.yaml").write_text(yaml.safe_dump(body), encoding="utf-8")
 
 
@@ -34,30 +34,30 @@ def pm_role(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return role_dir
 
 
-def test_test_tripwire_prints_prompt(tmp_path: Path, pm_role: Path) -> None:
+def test_test_jit_prompt_prints_prompt(tmp_path: Path, pm_role: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
-        cli, ["test-tripwire", "self-review", "--project-dir", str(tmp_path)]
+        cli, ["test-jit-prompt", "self-review", "--project-dir", str(tmp_path)]
     )
     assert result.exit_code == 0, result.output
     # The self-review prompt mentions --ack regardless of variation.
     assert "--ack" in result.output
 
 
-def test_test_tripwire_unknown_id_exits_nonzero(tmp_path: Path, pm_role: Path) -> None:
+def test_test_jit_prompt_unknown_id_exits_nonzero(tmp_path: Path, pm_role: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         cli,
-        ["test-tripwire", "no-such-tripwire", "--project-dir", str(tmp_path)],
+        ["test-jit-prompt", "no-such-jit-prompt", "--project-dir", str(tmp_path)],
     )
     assert result.exit_code != 0
     # Surfaces the registry contents so the author sees what IS available.
     assert "self-review" in result.output
 
 
-def test_test_tripwire_session_overrides_variation_seed(
+def test_test_jit_prompt_session_overrides_variation_seed(
     tmp_path: Path, pm_role: Path
 ) -> None:
     """Different --session ids must produce a deterministic prompt each."""
@@ -66,7 +66,7 @@ def test_test_tripwire_session_overrides_variation_seed(
     a = runner.invoke(
         cli,
         [
-            "test-tripwire",
+            "test-jit-prompt",
             "self-review",
             "--session",
             "seed-a",
@@ -77,7 +77,7 @@ def test_test_tripwire_session_overrides_variation_seed(
     b = runner.invoke(
         cli,
         [
-            "test-tripwire",
+            "test-jit-prompt",
             "self-review",
             "--session",
             "seed-a",
@@ -90,19 +90,19 @@ def test_test_tripwire_session_overrides_variation_seed(
     assert a.output == b.output
 
 
-def test_test_tripwire_default_session_is_filesystem_safe(
+def test_test_jit_prompt_default_session_is_filesystem_safe(
     tmp_path: Path, pm_role: Path
 ) -> None:
     """codex P2: default --session value must not contain Windows-invalid
     filename characters (`<`, `>`, `:`, `\"`, `/`, `\\`, `|`, `?`, `*`).
-    The marker filename is `<tripwire-id>-<session-id>.json`, so an
+    The marker filename is `<jit-prompt-id>-<session-id>.json`, so an
     unsafe default crashes the --ack path on Windows."""
     _project(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         cli,
         [
-            "test-tripwire",
+            "test-jit-prompt",
             "self-review",
             "--ack",
             "--project-dir",
@@ -120,13 +120,13 @@ def test_test_tripwire_default_session_is_filesystem_safe(
         )
 
 
-def test_test_tripwire_ack_writes_marker(tmp_path: Path, pm_role: Path) -> None:
+def test_test_jit_prompt_ack_writes_marker(tmp_path: Path, pm_role: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         cli,
         [
-            "test-tripwire",
+            "test-jit-prompt",
             "self-review",
             "--session",
             "sess-1",
@@ -140,7 +140,7 @@ def test_test_tripwire_ack_writes_marker(tmp_path: Path, pm_role: Path) -> None:
     assert marker.is_file()
 
 
-def test_test_tripwire_requires_pm_role(
+def test_test_jit_prompt_requires_pm_role(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _project(tmp_path)
@@ -150,7 +150,7 @@ def test_test_tripwire_requires_pm_role(
     monkeypatch.delenv("TRIPWIRE_ROLE", raising=False)
     runner = CliRunner()
     result = runner.invoke(
-        cli, ["test-tripwire", "self-review", "--project-dir", str(tmp_path)]
+        cli, ["test-jit-prompt", "self-review", "--project-dir", str(tmp_path)]
     )
     assert result.exit_code != 0
     assert "pm" in result.output.lower() or "role" in result.output.lower()

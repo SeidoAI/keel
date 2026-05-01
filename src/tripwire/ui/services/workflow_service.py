@@ -5,19 +5,18 @@ The Workflow Map UI consumes this — see
 the layout-hint contract (no absolute coordinates; each entity carries
 the station it attaches to so the UI can lay it out).
 
-The `validators` and `tripwires` lists are derived from real registries:
+The `validators` and `jit_prompts` lists are derived from real registries:
 - validators: `tripwire.core.validator.ALL_CHECKS`
-- tripwires: `tripwire.core.session_check._TRIPWIRES` (strict pre-spawn
-  checks) plus a small static list for the system-level tripwires that
-  don't live in code yet (`self-review`, `pm-response-coverage`).
+- jit_prompts: the system JIT prompts surfaced to agents at lifecycle
+  events. Detector-style validation tripwires stay out of this prompt lane.
 
 Lifecycle stations come from `project.config.statuses` if set, otherwise
 from `DEFAULT_LIFECYCLE_STATIONS` below — matching the canonical set in
 the spec example.
 
 PM-mode redaction lives at the entry point: `build_workflow(...,
-is_pm_role=True)` returns the unredacted prompt body inside each
-tripwire's `prompt_revealed` field; otherwise that field is `None`.
+is_pm_role=True)` returns the unredacted prompt body inside each JIT
+prompt's `prompt_revealed` field; otherwise that field is `None`.
 """
 
 from __future__ import annotations
@@ -26,11 +25,11 @@ import inspect
 from pathlib import Path
 from typing import Any, TypedDict
 
-from tripwire.core import session_check, validator
+from tripwire.core import validator
 from tripwire.core.store import ProjectNotFoundError, load_project
 from tripwire.ui.services.role_gate import (
     PROMPT_REDACTED_PLACEHOLDER,
-    redact_tripwire_prompt,
+    redact_jit_prompt,
 )
 
 
@@ -61,11 +60,9 @@ DEFAULT_LIFECYCLE_STATIONS: list[StationDef] = [
 ]
 
 
-# Static catalogue of system-level tripwires. Each entry's `prompt` is the
-# canonical instruction the tripwire would surface when fired; PM-mode
-# unhides it. New tripwires authored as session_check functions are
-# enumerated dynamically and don't need to be added here.
-_SYSTEM_TRIPWIRES: list[dict[str, Any]] = [
+# Static catalogue of system-level JIT prompts. Each entry's `prompt` is the
+# canonical instruction the prompt would surface when fired; PM-mode unhides it.
+_SYSTEM_JIT_PROMPTS: list[dict[str, Any]] = [
     {
         "id": "self-review",
         "name": "self-review",
@@ -87,7 +84,7 @@ _SYSTEM_TRIPWIRES: list[dict[str, Any]] = [
         "prompt": (
             "PM response must enumerate every self-review finding with an "
             "explicit accept / reject / followup. Silent dismissal is what "
-            "this tripwire fires on."
+            "this JIT prompt fires on."
         ),
     },
     {
@@ -137,7 +134,7 @@ _SYSTEM_TRIPWIRES: list[dict[str, Any]] = [
         "blocks": True,
         "prompt": (
             "File-edit tool calls in this session crossed the configured "
-            "threshold without an intervening tripwire validate run. "
+            "threshold without an intervening `tripwire validate` run. "
             "Run validate now and walk the findings."
         ),
     },
@@ -235,19 +232,19 @@ def build_workflow(
 ) -> dict[str, Any]:
     """Build the full `/api/workflow` response for *project_dir*.
 
-    `is_pm_role` controls whether tripwire prompts are revealed. The
+    `is_pm_role` controls whether JIT prompt bodies are revealed. The
     `project_id` is echoed back into the payload so frontends can
     correlate without a second round trip.
 
     The response shape carries two views:
 
-    - **legacy** (``lifecycle``, ``validators``, ``tripwires``,
+    - **legacy** (``lifecycle``, ``validators``, ``jit_prompts``,
       ``connectors``, ``artifacts``) — the introspection-derived
       shape from v0.8 the existing Workflow Map UI consumes.
     - **workflows** (KUI-125) — the parsed workflow.yaml tree, one
       entry per declared workflow. Carries stations with their
       ``next:`` shape (single / conditional / terminal) and the
-      validators/tripwires/prompt-checks each station references.
+      validators/JIT prompts/prompt-checks each station references.
       The Workflow Map renders this directly so a project can
       define new workflows (pm-review, future inbox-handling,
       issue-lifecycle) without extending the backend.
@@ -257,7 +254,7 @@ def build_workflow(
         "project_id": project_id,
         "lifecycle": {"stations": stations},
         "validators": _build_validators(),
-        "tripwires": _build_tripwires(is_pm_role=is_pm_role),
+        "jit_prompts": _build_jit_prompts(is_pm_role=is_pm_role),
         "connectors": _CONNECTORS,
         "artifacts": _LIFECYCLE_ARTIFACTS,
         "workflows": _build_workflows(project_dir),
@@ -285,7 +282,7 @@ def _build_workflows(project_dir: Path) -> list[dict[str, Any]]:
                     "id": station.id,
                     "next": _next_spec_to_dict(station.next),
                     "validators": list(station.validators),
-                    "tripwires": list(station.tripwires),
+                    "jit_prompts": list(station.jit_prompts),
                     "prompt_checks": list(station.prompt_checks),
                 }
             )
@@ -387,43 +384,21 @@ def _build_validators() -> list[dict[str, Any]]:
     return out
 
 
-def _build_tripwires(*, is_pm_role: bool) -> list[dict[str, Any]]:
-    """Strict-spawn tripwires + system tripwires, prompts redacted as needed."""
+def _build_jit_prompts(*, is_pm_role: bool) -> list[dict[str, Any]]:
+    """System JIT prompts with prompt bodies redacted as needed."""
     out: list[dict[str, Any]] = []
-    for fn in session_check._TRIPWIRES:
-        slug = fn.__name__.removeprefix("_check_")
-        prompt_body = _first_paragraph(inspect.getdoc(fn) or "") or (
-            f"Strict pre-spawn check `{slug}` must pass before the session "
-            f"is allowed to spawn."
-        )
-        revealed, redacted = redact_tripwire_prompt(
-            prompt=prompt_body, is_pm_role=is_pm_role
+    for prompt in _SYSTEM_JIT_PROMPTS:
+        revealed, redacted = redact_jit_prompt(
+            prompt=prompt["prompt"], is_pm_role=is_pm_role
         )
         out.append(
             {
-                "id": f"tw_strict_{slug}",
-                "kind": "tripwire",
-                "name": slug.replace("_", " "),
-                "fires_on_event": "session.spawn",
-                "blocks": True,
-                "fires_on_station": "queued",
-                "prompt_revealed": revealed,
-                "prompt_redacted": redacted or PROMPT_REDACTED_PLACEHOLDER,
-            }
-        )
-
-    for tw in _SYSTEM_TRIPWIRES:
-        revealed, redacted = redact_tripwire_prompt(
-            prompt=tw["prompt"], is_pm_role=is_pm_role
-        )
-        out.append(
-            {
-                "id": tw["id"],
-                "kind": "tripwire",
-                "name": tw["name"],
-                "fires_on_event": tw["fires_on_event"],
-                "blocks": tw["blocks"],
-                "fires_on_station": tw["fires_on_station"],
+                "id": prompt["id"],
+                "kind": "jit_prompt",
+                "name": prompt["name"],
+                "fires_on_event": prompt["fires_on_event"],
+                "blocks": prompt["blocks"],
+                "fires_on_station": prompt["fires_on_station"],
                 "prompt_revealed": revealed,
                 "prompt_redacted": redacted or PROMPT_REDACTED_PLACEHOLDER,
             }

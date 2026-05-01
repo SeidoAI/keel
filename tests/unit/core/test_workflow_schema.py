@@ -131,7 +131,7 @@ def test_loader_parses_prompt_checks_validators_tripwires(tmp_path: Path) -> Non
                     next: s2
                     prompt_checks: [pm-session-launch]
                     validators: [schema-valid, refs-resolved]
-                    tripwires: [cost-ceiling]
+                    jit_prompts: [cost-ceiling]
                   - id: s2
                     terminal: true
             """
@@ -141,7 +141,7 @@ def test_loader_parses_prompt_checks_validators_tripwires(tmp_path: Path) -> Non
     s1 = load_workflows(tmp_path).workflows["w"].stations[0]
     assert s1.prompt_checks == ["pm-session-launch"]
     assert s1.validators == ["schema-valid", "refs-resolved"]
-    assert s1.tripwires == ["cost-ceiling"]
+    assert s1.jit_prompts == ["cost-ceiling"]
 
 
 def test_loader_supports_multiple_workflows(tmp_path: Path) -> None:
@@ -224,7 +224,7 @@ def test_validator_rejects_unreferenced_station_in_next(tmp_path: Path) -> None:
     findings = validate_workflow_spec(
         spec,
         known_validators=set(),
-        known_tripwires=set(),
+        known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
@@ -253,7 +253,7 @@ def test_validator_rejects_undeclared_validator_ref(tmp_path: Path) -> None:
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
         known_validators={"schema-valid"},
-        known_tripwires=set(),
+        known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
@@ -273,7 +273,7 @@ def test_validator_rejects_undeclared_tripwire_ref(tmp_path: Path) -> None:
                 trigger: t
                 stations:
                   - id: s1
-                    tripwires: [unknown-tw]
+                    jit_prompts: [unknown-tw]
                     terminal: true
             """
         ),
@@ -282,11 +282,11 @@ def test_validator_rejects_undeclared_tripwire_ref(tmp_path: Path) -> None:
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
         known_validators=set(),
-        known_tripwires={"self-review"},
+        known_jit_prompts={"self-review"},
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
-    assert "workflow/unknown_tripwire" in codes
+    assert "workflow/unknown_jit_prompt" in codes
 
 
 def test_validator_rejects_undeclared_prompt_check_ref(tmp_path: Path) -> None:
@@ -311,7 +311,7 @@ def test_validator_rejects_undeclared_prompt_check_ref(tmp_path: Path) -> None:
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
         known_validators=set(),
-        known_tripwires=set(),
+        known_jit_prompts=set(),
         known_prompt_checks={"pm-session-launch"},
     )
     codes = [f.code for f in findings]
@@ -345,7 +345,7 @@ def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
         known_validators=set(),
-        known_tripwires=set(),
+        known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
@@ -375,7 +375,7 @@ def test_validator_rejects_duplicate_station_ids(tmp_path: Path) -> None:
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
         known_validators=set(),
-        known_tripwires=set(),
+        known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
@@ -406,7 +406,7 @@ def test_validator_rejects_no_terminal_station(tmp_path: Path) -> None:
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
         known_validators=set(),
-        known_tripwires=set(),
+        known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
@@ -430,7 +430,7 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
                     prompt_checks: [pm-session-launch]
                   - id: executing
                     validators: [schema-valid]
-                    tripwires: [cost-ceiling]
+                    jit_prompts: [cost-ceiling]
                     next:
                       - if: agent.role == frontend
                         then: review-frontend
@@ -448,7 +448,7 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
         known_validators={"schema-valid"},
-        known_tripwires={"cost-ceiling"},
+        known_jit_prompts={"cost-ceiling"},
         known_prompt_checks={"pm-session-launch"},
     )
     assert findings == []

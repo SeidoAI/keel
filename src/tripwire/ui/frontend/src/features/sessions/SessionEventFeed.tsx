@@ -33,7 +33,7 @@ interface KindBucket {
 }
 
 const KIND_BUCKETS: KindBucket[] = [
-  { id: "firings", label: "firings", kinds: ["tripwire_fire"] },
+  { id: "jit_prompt_firings", label: "JIT prompt fires", kinds: ["jit_prompt_fire"] },
   {
     id: "validator_runs",
     label: "validator runs",
@@ -132,7 +132,7 @@ export function SessionEventFeed({ projectId, sessionId, className }: SessionEve
 }
 
 function EventRow({ event, onExpand }: { event: ProcessEvent; onExpand: () => void }) {
-  const isFireOrFail = event.kind === "tripwire_fire" || event.kind === "validator_fail";
+  const isFireOrFail = event.kind === "jit_prompt_fire" || event.kind === "validator_fail";
   return (
     <div
       className={cn(
@@ -170,7 +170,7 @@ function EventDetailBody({ event }: { event: ProcessEvent }) {
   // happen to be present rather than switching on `kind`.
   return (
     <dl className="flex flex-col gap-3 font-mono text-[12px]">
-      {event.tripwire_id ? <DetailRow term="tripwire" value={event.tripwire_id} /> : null}
+      {event.jit_prompt_id ? <DetailRow term="JIT prompt" value={event.jit_prompt_id} /> : null}
       {event.validator_id ? <DetailRow term="validator" value={event.validator_id} /> : null}
       {event.from_status ? <DetailRow term="from status" value={event.from_status} /> : null}
       {event.to_status ? <DetailRow term="to status" value={event.to_status} /> : null}
@@ -201,7 +201,7 @@ function eventLabel(event: ProcessEvent): string {
   if (event.kind === "status_transition" && event.from_status && event.to_status) {
     return `${event.from_status} → ${event.to_status}`;
   }
-  if (event.tripwire_id) return event.tripwire_id;
+  if (event.jit_prompt_id) return event.jit_prompt_id;
   if (event.validator_id) return event.validator_id;
   if (event.artifact) return event.artifact;
   if (event.event) return event.event;
@@ -216,7 +216,7 @@ function eventTitle(event: ProcessEvent): string {
 
 function kindToTone(kind: ProcessEventKind): StampTone {
   switch (kind) {
-    case "tripwire_fire":
+    case "jit_prompt_fire":
     case "validator_fail":
       return "rule";
     case "validator_pass":

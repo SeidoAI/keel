@@ -1,10 +1,10 @@
-"""Cost-ceiling tripwire — KUI-142 / B8.
+"""Cost-ceiling JIT prompt — KUI-142 / B8.
 
 Fires on ``session.complete`` when the session's cumulative cost
 (computed from the claude stream-json log via the existing
 ``tripwire.core.session_cost.compute_session_cost``) exceeds a
 threshold (default $5.00). Per-project override:
-``project.yaml.tripwires.extra`` for an entry with ``id:
+``project.yaml.jit_prompts.extra`` for an entry with ``id:
 cost-ceiling`` and ``params: {ceiling_usd: N}``.
 
 The pattern this catches: long sessions that quietly burn API
@@ -20,7 +20,7 @@ from typing import ClassVar
 
 import yaml
 
-from tripwire._internal.tripwires import Tripwire, TripwireContext
+from tripwire._internal.jit_prompts import JitPrompt, JitPromptContext
 from tripwire.core.session_cost import compute_session_cost
 
 DEFAULT_COST_CEILING_USD = 5.0
@@ -29,7 +29,7 @@ DEFAULT_COST_CEILING_USD = 5.0
 _VARIATIONS: tuple[str, ...] = (
     """\
 This session has crossed the cost-ceiling threshold. The pattern this
-tripwire catches is the "long-tail spend" — sessions that quietly
+JIT prompt catches is the "long-tail spend" — sessions that quietly
 burn API credits while the agent grinds on a sub-problem the PM
 didn't expect to be expensive.
 
@@ -55,7 +55,7 @@ Concretely:
 
   - `tripwire session cost <sid>` → walk the per-category split.
   - If the spend is justified (long review, large codebase), update
-    `project.yaml.tripwires.extra` for `id: cost-ceiling` with
+    `project.yaml.jit_prompts.extra` for `id: cost-ceiling` with
     `params: {ceiling_usd: N}` to a calibrated value AND note the
     rationale in `decisions.md`.
   - If the spend is symptomatic of a runaway, do a post-mortem
@@ -74,7 +74,7 @@ Pick one:
 
   Path A — Justify and recalibrate. The spend was correct for what
   the work needed. Update the per-project ceiling in
-  `project.yaml.tripwires.extra` (`params: {ceiling_usd: N}`) and
+  `project.yaml.jit_prompts.extra` (`params: {ceiling_usd: N}`) and
   document the new floor in `decisions.md`.
   Path B — Diagnose the runaway. The spend was symptomatic. In
   `sessions/<sid>/self-review.md`, name the runaway, propose a
@@ -86,24 +86,24 @@ Re-run with `--ack`. The marker requires SHAs OR `declared_no_findings: true`.
 )
 
 
-class CostCeilingTripwire(Tripwire):
+class CostCeilingJitPrompt(JitPrompt):
     """Block when cumulative session cost crosses the configured ceiling."""
 
     id: ClassVar[str] = "cost-ceiling"
     fires_on: ClassVar[str] = "session.complete"
     blocks: ClassVar[bool] = True
 
-    def fire(self, ctx: TripwireContext) -> str:
+    def fire(self, ctx: JitPromptContext) -> str:
         idx = ctx.variation_index(len(_VARIATIONS))
         return _VARIATIONS[idx]
 
-    def is_acknowledged(self, ctx: TripwireContext) -> bool:
+    def is_acknowledged(self, ctx: JitPromptContext) -> bool:
         marker = ctx.ack_path(self.id)
         if not marker.is_file():
             return False
         return _marker_substantive(marker)
 
-    def should_fire(self, ctx: TripwireContext) -> bool:
+    def should_fire(self, ctx: JitPromptContext) -> bool:
         ceiling = _read_ceiling(ctx.project_dir)
         try:
             breakdown = compute_session_cost(ctx.project_dir, ctx.session_id)
@@ -123,16 +123,16 @@ def _read_ceiling(project_dir: Path) -> float:
         return DEFAULT_COST_CEILING_USD
     if not isinstance(data, dict):
         return DEFAULT_COST_CEILING_USD
-    tripwires = data.get("tripwires")
-    if not isinstance(tripwires, dict):
+    jit_prompts = data.get("jit_prompts")
+    if not isinstance(jit_prompts, dict):
         return DEFAULT_COST_CEILING_USD
-    extras = tripwires.get("extra") or []
+    extras = jit_prompts.get("extra") or []
     if not isinstance(extras, list):
         return DEFAULT_COST_CEILING_USD
     for entry in extras:
         if not isinstance(entry, dict):
             continue
-        if entry.get("id") != CostCeilingTripwire.id:
+        if entry.get("id") != CostCeilingJitPrompt.id:
             continue
         params = entry.get("params") or {}
         if not isinstance(params, dict):
@@ -158,4 +158,4 @@ def _marker_substantive(marker_path: Path) -> bool:
     return bool(has_commits or declared is True)
 
 
-__all__ = ["DEFAULT_COST_CEILING_USD", "CostCeilingTripwire"]
+__all__ = ["DEFAULT_COST_CEILING_USD", "CostCeilingJitPrompt"]

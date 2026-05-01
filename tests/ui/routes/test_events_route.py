@@ -37,12 +37,12 @@ def test_list_events_returns_newest_first(
 ) -> None:
     _write_event(
         project_dir,
-        "firings",
+        "jit_prompt_firings",
         "s1",
         1,
         {
             "id": "evt-old",
-            "kind": "tripwire_fire",
+            "kind": "jit_prompt_fire",
             "session_id": "s1",
             "fired_at": "2026-04-26T10:00:00Z",
         },
@@ -70,24 +70,24 @@ def test_list_events_filter_by_session_id(
 ) -> None:
     _write_event(
         project_dir,
-        "firings",
+        "jit_prompt_firings",
         "alpha",
         1,
         {
             "id": "evt-a",
-            "kind": "tripwire_fire",
+            "kind": "jit_prompt_fire",
             "session_id": "alpha",
             "fired_at": "2026-04-26T10:00:00Z",
         },
     )
     _write_event(
         project_dir,
-        "firings",
+        "jit_prompt_firings",
         "beta",
         1,
         {
             "id": "evt-b",
-            "kind": "tripwire_fire",
+            "kind": "jit_prompt_fire",
             "session_id": "beta",
             "fired_at": "2026-04-26T11:00:00Z",
         },
@@ -104,12 +104,12 @@ def test_list_events_filter_by_kind_multi(
 ) -> None:
     _write_event(
         project_dir,
-        "firings",
+        "jit_prompt_firings",
         "s1",
         1,
         {
             "id": "evt-fire",
-            "kind": "tripwire_fire",
+            "kind": "jit_prompt_fire",
             "session_id": "s1",
             "fired_at": "2026-04-26T10:00:00Z",
         },
@@ -128,7 +128,7 @@ def test_list_events_filter_by_kind_multi(
     )
     resp = seeded_client.get(
         f"/api/projects/{project_id}/events",
-        params=[("kind", "tripwire_fire"), ("kind", "validator_pass")],
+        params=[("kind", "jit_prompt_fire"), ("kind", "validator_pass")],
     )
     body = resp.json()
     assert sorted(e["id"] for e in body["events"]) == ["evt-fire", "evt-pass"]
@@ -161,29 +161,29 @@ def test_get_event_detail(
 ) -> None:
     _write_event(
         project_dir,
-        "firings",
+        "jit_prompt_firings",
         "s1",
         7,
         {
             "id": "evt-fire-7",
-            "kind": "tripwire_fire",
+            "kind": "jit_prompt_fire",
             "session_id": "s1",
             "fired_at": "2026-04-26T10:00:00Z",
-            "tripwire_id": "self-review",
+            "jit_prompt_id": "self-review",
             "blocks": True,
         },
     )
-    encoded = encode_event_id("firings", "s1", 7)
+    encoded = encode_event_id("jit_prompt_firings", "s1", 7)
     resp = seeded_client.get(f"/api/projects/{project_id}/events/{encoded}")
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["id"] == "evt-fire-7"
-    assert body["tripwire_id"] == "self-review"
+    assert body["jit_prompt_id"] == "self-review"
     assert body["blocks"] is True
 
 
 def test_get_event_404_when_missing(seeded_client: TestClient, project_id: str) -> None:
-    encoded = encode_event_id("firings", "s1", 999)
+    encoded = encode_event_id("jit_prompt_firings", "s1", 999)
     resp = seeded_client.get(f"/api/projects/{project_id}/events/{encoded}")
     assert resp.status_code == 404, resp.text
     body = resp.json()
@@ -196,7 +196,7 @@ def test_get_event_404_for_path_traversal(
     # `/` inside the encoded id is structural, but `..` segments must not
     # escape the events root.
     resp = seeded_client.get(
-        f"/api/projects/{project_id}/events/firings/..%2Fetc%2Fpasswd/1",
+        f"/api/projects/{project_id}/events/jit_prompt_firings/..%2Fetc%2Fpasswd/1",
     )
     assert resp.status_code in {404, 400}, resp.text
 

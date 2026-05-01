@@ -5,9 +5,10 @@ Single endpoint:
     GET  /api/projects/{project_id}/workflow
 
 Returns the full orchestration graph (lifecycle stations, validators,
-tripwires, connectors, artifacts) for the Workflow Map UI. PM-mode
-header (`X-Tripwire-Role: pm`) controls whether tripwire `prompt_revealed`
-fields are populated. See `docs/specs/2026-04-26-v08-handoff.md` §2.1.
+JIT prompts, connectors, artifacts) for the Workflow Map UI. PM-mode
+header (`X-Tripwire-Role: pm`) controls whether JIT prompt
+`prompt_revealed` fields are populated. See
+`docs/specs/2026-04-26-v08-handoff.md` §2.1.
 """
 
 from __future__ import annotations

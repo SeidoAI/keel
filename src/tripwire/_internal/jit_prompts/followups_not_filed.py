@@ -1,4 +1,4 @@
-"""Followups-not-filed tripwire — KUI-139 / B5.
+"""Followups-not-filed JIT prompt — KUI-139 / B5.
 
 Fires on ``session.complete`` when a session's ``pm-response.yaml``
 declares ``decision: deferred`` items with ``follow_up: KUI-XXX`` but
@@ -20,7 +20,7 @@ from typing import ClassVar
 
 import yaml
 
-from tripwire._internal.tripwires import Tripwire, TripwireContext
+from tripwire._internal.jit_prompts import JitPrompt, JitPromptContext
 
 _PM_RESPONSE_REL = Path("artifacts") / "pm-response.yaml"
 
@@ -80,24 +80,24 @@ fix-commit SHAs and does not declare `declared_no_findings: true`.
 )
 
 
-class FollowupsNotFiledTripwire(Tripwire):
+class FollowupsNotFiledJitPrompt(JitPrompt):
     """Block when pm-response declares follow-ups that aren't on disk."""
 
     id: ClassVar[str] = "followups-not-filed"
     fires_on: ClassVar[str] = "session.complete"
     blocks: ClassVar[bool] = True
 
-    def fire(self, ctx: TripwireContext) -> str:
+    def fire(self, ctx: JitPromptContext) -> str:
         idx = ctx.variation_index(len(_VARIATIONS))
         return _VARIATIONS[idx]
 
-    def is_acknowledged(self, ctx: TripwireContext) -> bool:
+    def is_acknowledged(self, ctx: JitPromptContext) -> bool:
         marker = ctx.ack_path(self.id)
         if not marker.is_file():
             return False
         return _marker_substantive(marker)
 
-    def should_fire(self, ctx: TripwireContext) -> bool:
+    def should_fire(self, ctx: JitPromptContext) -> bool:
         return bool(_missing_followups(ctx.project_dir, ctx.session_id))
 
 
@@ -156,4 +156,4 @@ def _marker_substantive(marker_path: Path) -> bool:
     return bool(has_commits or declared is True)
 
 
-__all__ = ["FollowupsNotFiledTripwire"]
+__all__ = ["FollowupsNotFiledJitPrompt"]

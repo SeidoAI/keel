@@ -1,4 +1,4 @@
-"""Tests for the followups-not-filed tripwire (KUI-139 / B5).
+"""Tests for the followups-not-filed JIT prompt (KUI-139 / B5).
 
 Fires on ``session.complete`` when the session's ``pm-response.yaml``
 declares ``decision: deferred`` items with ``follow_up: KUI-XXX`` but
@@ -13,10 +13,10 @@ from pathlib import Path
 
 import yaml
 
-from tripwire._internal.tripwires import TripwireContext
-from tripwire._internal.tripwires.followups_not_filed import (
+from tripwire._internal.jit_prompts import JitPromptContext
+from tripwire._internal.jit_prompts.followups_not_filed import (
     _VARIATIONS,
-    FollowupsNotFiledTripwire,
+    FollowupsNotFiledJitPrompt,
     _missing_followups,
 )
 
@@ -84,8 +84,8 @@ def _seed_pm_response(
     )
 
 
-def _ctx(tmp_path: Path, session_id: str = "alpha") -> TripwireContext:
-    return TripwireContext(
+def _ctx(tmp_path: Path, session_id: str = "alpha") -> JitPromptContext:
+    return JitPromptContext(
         project_dir=tmp_path,
         session_id=session_id,
         project_id="demo",
@@ -93,7 +93,7 @@ def _ctx(tmp_path: Path, session_id: str = "alpha") -> TripwireContext:
 
 
 def test_class_attrs() -> None:
-    tw = FollowupsNotFiledTripwire()
+    tw = FollowupsNotFiledJitPrompt()
     assert tw.id == "followups-not-filed"
     assert tw.fires_on == "session.complete"
     assert tw.blocks is True
@@ -110,7 +110,7 @@ def test_silent_when_pm_response_absent(tmp_path: Path) -> None:
     """No pm-response.yaml → silent (PM hasn't responded yet)."""
     _seed_project(tmp_path)
     _seed_session(tmp_path, "alpha")
-    tw = FollowupsNotFiledTripwire()
+    tw = FollowupsNotFiledJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -125,7 +125,7 @@ def test_silent_when_no_deferred_items(tmp_path: Path) -> None:
             {"quote_excerpt": "x", "decision": "accepted", "note": "noted"},
         ],
     )
-    tw = FollowupsNotFiledTripwire()
+    tw = FollowupsNotFiledJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -146,7 +146,7 @@ def test_silent_when_followup_issue_exists(tmp_path: Path) -> None:
             },
         ],
     )
-    tw = FollowupsNotFiledTripwire()
+    tw = FollowupsNotFiledJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -166,7 +166,7 @@ def test_fires_when_followup_issue_missing(tmp_path: Path) -> None:
             },
         ],
     )
-    tw = FollowupsNotFiledTripwire()
+    tw = FollowupsNotFiledJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is True
 
 
@@ -206,18 +206,18 @@ def test_missing_followups_lists_unfiled_ids(tmp_path: Path) -> None:
 def test_silent_when_session_dir_missing(tmp_path: Path) -> None:
     """Unknown session id → silent (no spurious fire)."""
     _seed_project(tmp_path)
-    tw = FollowupsNotFiledTripwire()
+    tw = FollowupsNotFiledJitPrompt()
     assert tw.should_fire(_ctx(tmp_path, session_id="ghost")) is False
 
 
 def test_fire_returns_one_of_the_variations(tmp_path: Path) -> None:
-    tw = FollowupsNotFiledTripwire()
+    tw = FollowupsNotFiledJitPrompt()
     prompt = tw.fire(_ctx(tmp_path))
     assert prompt in _VARIATIONS
 
 
 def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
-    tw = FollowupsNotFiledTripwire()
+    tw = FollowupsNotFiledJitPrompt()
     ctx = _ctx(tmp_path)
     marker = ctx.ack_path("followups-not-filed")
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -226,7 +226,7 @@ def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
 
 
 def test_acknowledged_empty_marker_rejected(tmp_path: Path) -> None:
-    tw = FollowupsNotFiledTripwire()
+    tw = FollowupsNotFiledJitPrompt()
     ctx = _ctx(tmp_path)
     marker = ctx.ack_path("followups-not-filed")
     marker.parent.mkdir(parents=True, exist_ok=True)

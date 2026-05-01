@@ -68,7 +68,7 @@ class Event:
 # kind they like — these are the well-known ones consumed by the drift
 # detector (KUI-124).
 EVENT_VALIDATOR_RUN = "validator.run"
-EVENT_TRIPWIRE_FIRED = "tripwire.fired"
+EVENT_JIT_PROMPT_FIRED = "jit_prompt.fired"
 EVENT_PROMPT_CHECK_INVOKED = "prompt_check.invoked"
 EVENT_TRANSITION_REQUESTED = "transition.requested"
 EVENT_TRANSITION_COMPLETED = "transition.completed"
@@ -76,11 +76,11 @@ EVENT_TRANSITION_REJECTED = "transition.rejected"
 
 
 __all__ = [
+    "EVENT_JIT_PROMPT_FIRED",
     "EVENT_PROMPT_CHECK_INVOKED",
     "EVENT_TRANSITION_COMPLETED",
     "EVENT_TRANSITION_REJECTED",
     "EVENT_TRANSITION_REQUESTED",
-    "EVENT_TRIPWIRE_FIRED",
     "EVENT_VALIDATOR_RUN",
     "Event",
 ]

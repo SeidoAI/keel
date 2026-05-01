@@ -1,33 +1,34 @@
-# Authoring tripwires (KUI-135)
+# Authoring JIT prompts (KUI-135)
 
-A **tripwire** is a hidden prompt registered against a lifecycle
-event. The agent doesn't see it until the event fires, at which point
-the CLI returns the prompt as command output and blocks the lifecycle
-transition until the agent acknowledges it.
+A **JIT prompt** is an instruction prompt registered against a lifecycle
+event. Some prompts are hidden until the event fires; others reinforce
+known workflow requirements at the moment they matter. The CLI returns
+the prompt as command output and blocks the lifecycle transition until
+the agent acknowledges it.
 
-This guide is for project-team authors who want to add a tripwire on
-top of the built-ins. The package ships built-in tripwires under
-`tripwire._internal.tripwires.*` (the `self-review` tripwire is a
-worked example); your tripwire lives in your project repo and is
-registered via `project.yaml.tripwires.extra`.
+This guide is for project-team authors who want to add a JIT prompt on
+top of the built-ins. The package ships built-in prompts under
+`tripwire._internal.jit_prompts.*` (the `self-review` prompt is a
+worked example); your prompt lives in your project repo and is
+registered via `project.yaml.jit_prompts.extra`.
 
-## When to write a tripwire
+## When to write a JIT prompt
 
-Write a tripwire when there's a deeply-engrained workflow step the
+Write a JIT prompt when there's a deeply-engrained workflow step the
 team keeps forgetting AND that step has an objective acknowledgement
-path (file produced, comment posted, command run). Tripwires are a
+path (file produced, comment posted, command run). JIT prompts are a
 ceiling on agent autonomy — the prompt is invisible until the moment
 of truth, and the agent can't skip it. That property is the entire
-value, but it also means a noisy tripwire actively hurts.
+value, but it also means a noisy JIT prompt actively hurts.
 
-Bad tripwire candidates:
+Bad JIT prompt candidates:
 
 - Style preferences ("use snake_case"). Lint rule territory.
 - Anything you'd rather discuss in PR review. Code review territory.
 - Anything the agent should obviously do without prompting. Just put
-  it in the agent's persistent skill, not behind a tripwire.
+  it in the agent's persistent skill, not behind a JIT prompt.
 
-Good tripwire candidates:
+Good JIT prompt candidates:
 
 - "Run the data migration before merging" — the team forgets, and
   there's a CLI to run.
@@ -37,34 +38,34 @@ Good tripwire candidates:
 
 ## Anatomy
 
-A tripwire is a Python class subclassing
-`tripwire._internal.tripwires.Tripwire`. Three class attributes plus
+A JIT prompt is a Python class subclassing
+`tripwire._internal.jit_prompts.JitPrompt`. Three class attributes plus
 two methods:
 
 ```python
 from typing import ClassVar
-from tripwire._internal.tripwires import Tripwire, TripwireContext
+from tripwire._internal.jit_prompts import JitPrompt, JitPromptContext
 
 
-class ChangelogTripwire(Tripwire):
+class ChangelogJitPrompt(JitPrompt):
     id: ClassVar[str] = "changelog-updated"
     fires_on: ClassVar[str] = "session.complete"
     blocks: ClassVar[bool] = True
 
     # Optional, but recommended. The (workflow, station) pair this
-    # tripwire registers at — the workflow.yaml well-formedness
+    # prompt registers at — the workflow.yaml well-formedness
     # validator uses this to make sure the workflow references a real
-    # tripwire and vice versa.
+    # JIT prompt and vice versa.
     at: ClassVar[tuple[str, str]] = ("coding-session", "in_review")
 
-    def fire(self, ctx: TripwireContext) -> str:
+    def fire(self, ctx: JitPromptContext) -> str:
         return (
             "Before this session can complete, confirm you've updated "
             "CHANGELOG.md with a one-line entry naming the visible "
             "change. Edit the file, then re-run with `--ack`."
         )
 
-    def is_acknowledged(self, ctx: TripwireContext) -> bool:
+    def is_acknowledged(self, ctx: JitPromptContext) -> bool:
         marker = ctx.ack_path(self.id)
         return marker.is_file()
 ```
@@ -88,12 +89,12 @@ Must be one of the events the registry knows about. v0.9 ships:
 
 `True` is almost always what you want. `False` means the prompt is
 delivered as info, but the lifecycle event proceeds anyway. Use
-`False` only for advisory tripwires (rare).
+`False` only for advisory JIT prompts (rare).
 
 ### `at` — the workflow station (optional but recommended)
 
 If your project uses `workflow.yaml` (v0.9+), declare the
-`(workflow, station)` pair the tripwire fires at. The well-formedness
+`(workflow, station)` pair the JIT prompt fires at. The well-formedness
 validator catches typos and dead references this way.
 
 ### `fire(ctx) -> str`
@@ -109,7 +110,7 @@ instruction.
 Return `True` once the agent has done what the prompt asked. Most
 implementations check for an ack-marker file at
 `ctx.ack_path(self.id)`. The CLI's `--ack` flag writes that marker
-via `tripwire.core.tripwire_state.write_ack_marker`, which validates
+via `tripwire.core.jit_prompt_state.write_jit_prompt_ack_marker`, which validates
 that the ack carries either `fix_commits` (≥1 SHA) or
 `declared_no_findings: true`. That substantiveness check is what
 keeps the ack from becoming "click-through" behaviour.
@@ -118,36 +119,36 @@ If the ack should require something more than the marker (e.g. a
 specific file in the repo), implement that check here directly. The
 CLI will keep delivering the prompt until this method returns True.
 
-## Testing your tripwire
+## Testing your JIT prompt
 
-Use `tripwire test-tripwire <id>` (KUI-136) to fire your tripwire
+Use `tripwire test-jit-prompt <id>` (KUI-136) to fire your JIT prompt
 against a synthetic context without going through the lifecycle:
 
 ```sh
-tripwire test-tripwire changelog-updated
+tripwire test-jit-prompt changelog-updated
 # Prints the prompt your `fire()` would return.
 
-tripwire test-tripwire changelog-updated --session sess-42
+tripwire test-jit-prompt changelog-updated --session sess-42
 # Same, but with a specific session id (affects variation_index).
 
-tripwire test-tripwire changelog-updated --ack
+tripwire test-jit-prompt changelog-updated --ack
 # Writes a substantive ack marker so subsequent fires don't block.
 ```
 
 This lets you iterate on the prompt copy without spawning a real
 session.
 
-## Registering the tripwire
+## Registering the JIT prompt
 
-Add it to `project.yaml.tripwires.extra`:
+Add it to `project.yaml.jit_prompts.extra`:
 
 ```yaml
-tripwires:
+jit_prompts:
   enabled: true
   extra:
     - id: changelog-updated
       fires_on: session.complete
-      class: my_project.tripwires.ChangelogTripwire
+      class: my_project.jit_prompts.ChangelogJitPrompt
 ```
 
 The `class` field is a dotted Python path resolvable from the project
@@ -157,12 +158,12 @@ file:
 ```yaml
     - id: changelog-updated
       fires_on: session.complete
-      module: tripwires/changelog.py
+      module: jit_prompts/changelog.py
 ```
 
 The module-path form is resolved relative to `project_dir` and loaded
 by `importlib.util.spec_from_file_location`. The loader auto-detects
-the single `Tripwire` subclass in the module; ambiguity raises at
+the single `JitPrompt` subclass in the module; ambiguity raises at
 load time.
 
 ## After substantial rework — `--reset-acks` (KUI-137)
@@ -170,7 +171,7 @@ load time.
 When a session reopens after PR-review feedback or plan changes, the
 existing acks may no longer be substantive (they describe finished
 work, not the rework). Pass `--reset-acks` to `session reopen` to
-wipe the per-session ack markers so each tripwire fires fresh:
+wipe the per-session ack markers so each JIT prompt fires fresh:
 
 ```sh
 tripwire session reopen sess-42 --reason "PR comments to address" \
@@ -183,7 +184,7 @@ shows the rework boundary.
 ## Common pitfalls
 
 **Prompt copy that names itself.** Agents read the prompt as user
-text. Don't say "this is your tripwire prompt"; just give the
+text. Don't say "this is your JIT prompt"; just give the
 instruction.
 
 **Acks that the agent can short-circuit.** If `is_acknowledged`
@@ -191,11 +192,11 @@ returns True the moment a file exists, an empty file passes. Use the
 substantiveness contract (`fix_commits` or `declared_no_findings`)
 or check file content yourself.
 
-**Tripwires that fire on irrelevant lifecycle events.** Pick the
+**JIT prompts that fire on irrelevant lifecycle events.** Pick the
 narrowest event that catches the failure mode. `validate.run` fires
 on every CLI invocation — only use it for things you want to check
 on every run.
 
 **Forgetting `at`.** Without it, `tripwire validate` won't catch
-that your `workflow.yaml` references a tripwire that no longer
+that your `workflow.yaml` references a JIT prompt that no longer
 exists. Always set `at`.

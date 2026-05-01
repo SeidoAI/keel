@@ -1,28 +1,27 @@
-# v0.9 — Tripwire authoring loop
+# v0.9 — JIT prompt authoring loop
 
 **2026-04-30**
 
 This is the design spec for the v0.9 B-series — the project-team
-authoring loop for tripwires built on top of the v0.8 primitive
-(`docs/specs/2026-04-21-v08-tripwires-as-primitive.md`). It covers
-three pieces:
+authoring loop for JIT prompts built on top of the v0.8 prompt
+primitive. It covers three pieces:
 
 - **B1 (KUI-135)** — the authoring guide at
-  `docs/skill-references/AUTHORING_TRIPWIRES.md`.
-- **B2 (KUI-136)** — the `tripwire test-tripwire` PM CLI.
+  `docs/skill-references/AUTHORING_JIT_PROMPTS.md`.
+- **B2 (KUI-136)** — the `tripwire test-jit-prompt` PM CLI.
 - **B3 (KUI-137)** — the `tripwire session reopen --reset-acks` flag.
 
 ## Why a separate authoring loop
 
-The v0.8 primitive shipped with one canonical tripwire (`self-review`)
-hand-wired by tripwire's own maintainers. The team behaviour change we
-want — project teams writing their own tripwires for the workflow
+The v0.8 primitive shipped with one canonical JIT prompt (`self-review`)
+hand-wired by Tripwire's own maintainers. The team behaviour change we
+want — project teams writing their own JIT prompts for the workflow
 failure modes they keep hitting — needs three things v0.8 didn't
 provide:
 
 1. **Documentation that says how.** A spec is not a guide. The
    project team is not expected to read the primitive spec end-to-end
-   before writing their first tripwire.
+   before writing their first JIT prompt.
 2. **A way to test the prompt without a session.** Iterating on
    prompt copy by spawning a session and waiting for the lifecycle
    event to fire is too slow and expensive; project authors will give
@@ -35,57 +34,57 @@ provide:
 ## B1 — Authoring guide
 
 The guide lives outside the spec at
-`docs/skill-references/AUTHORING_TRIPWIRES.md`. It targets a project-
+`docs/skill-references/AUTHORING_JIT_PROMPTS.md`. It targets a project-
 team author who knows Python and has read the project's CLAUDE.md but
-hasn't read the tripwire primitive spec.
+hasn't read the JIT prompt primitive spec.
 
 Coverage:
 
-- When to write a tripwire (good vs. bad candidates).
-- The `Tripwire` subclass anatomy (id, fires_on, blocks, at, fire,
+- When to write a JIT prompt (good vs. bad candidates).
+- The `JitPrompt` subclass anatomy (id, fires_on, blocks, at, fire,
   is_acknowledged).
-- Testing via `tripwire test-tripwire`.
-- Registration via `project.yaml.tripwires.extra`.
+- Testing via `tripwire test-jit-prompt`.
+- Registration via `project.yaml.jit_prompts.extra`.
 - Common pitfalls.
 
-The guide is referenced from the project-manager skill's tripwire
+The guide is referenced from the project-manager skill's JIT prompt
 authoring page (a future cycle's responsibility — out of scope here).
 
-## B2 — `tripwire test-tripwire <id>` CLI
+## B2 — `tripwire test-jit-prompt <id>` CLI
 
-The PM-only CLI fires the named tripwire against a synthetic
-`TripwireContext` and prints the prompt that `fire()` would return.
+The PM-only CLI fires the named JIT prompt against a synthetic
+`JitPromptContext` and prints the prompt that `fire()` would return.
 
 ```
-tripwire test-tripwire <id> [--session <sid>] [--ack] [--project-dir <path>]
+tripwire test-jit-prompt <id> [--session <sid>] [--ack] [--project-dir <path>]
 ```
 
 Behaviour:
 
 - Loads the registry via the existing
-  `tripwire._internal.tripwires.loader.load_registry`. The registry
+  `tripwire._internal.jit_prompts.loader.load_jit_prompt_registry`. The registry
   loader handles built-ins AND project-local extras, so the same path
-  validates the author's `project.yaml.tripwires.extra` registration.
-- Resolves the tripwire by `id`. Unknown ids exit non-zero with the
+  validates the author's `project.yaml.jit_prompts.extra` registration.
+- Resolves the JIT prompt by `id`. Unknown ids exit non-zero with the
   list of known ids.
-- Builds a `TripwireContext` with the supplied `--session` (or a
+- Builds a `JitPromptContext` with the supplied `--session` (or a
   CLI sentinel like `<test>` when omitted) and the project's slug.
   This drives `variation_index` so the prompt the author sees is
   what an agent in that session would see.
-- Prints the prompt verbatim. No firings event is emitted — this is
-  not a lifecycle event.
+- Prints the prompt verbatim. No `jit_prompt_firings` event is emitted
+  — this is not a lifecycle event.
 - With `--ack`, writes the standard ack marker via
-  `tripwire.core.tripwire_state.write_ack_marker`. Useful for
+  `tripwire.core.jit_prompt_state.write_jit_prompt_ack_marker`. Useful for
   authoring tests that need to verify the ack path works.
 
-Role gating mirrors `tripwire tripwires list`: the role marker
+Role gating mirrors `tripwire jit-prompts list`: the role marker
 (`TRIPWIRE_ROLE=pm` env or `~/.tripwire/role` file) is required.
 Executors don't run this command.
 
-Why a CLI rather than a unit-test recipe? Tripwire authors are
+Why a CLI rather than a unit-test recipe? JIT prompt authors are
 typically project-team engineers, not framework maintainers — they
 think in CLI commands, not Python unit tests. The CLI is the
-authoring surface; the underlying `Tripwire` class is the
+authoring surface; the underlying `JitPrompt` class is the
 implementation surface.
 
 ## B3 — `tripwire session reopen --reset-acks`
@@ -99,32 +98,32 @@ Add a `--reset-acks` flag that:
 
 1. Deletes every file under `<project_dir>/.tripwire/acks/` matching
    the suffix `-<session-id>.json`. (Marker filenames are
-   `<tripwire-id>-<session-id>.json` per the v0.8 spec.)
+   `<jit-prompt-id>-<session-id>.json` per the v0.8 spec.)
 2. Emits a single `session.acks_reset` event under
    `<project_dir>/.tripwire/events/session_acks_reset/` recording the
    session id, the count of markers deleted, the reason text, and
    the timestamp.
 3. Surfaces the count in the user-facing CLI output ("Reset N
-   tripwire ack(s).").
+   JIT prompt ack(s).").
 
 The flag is opt-in. The default `session reopen` keeps current
 behaviour because the legitimate "reopen for a tiny touch-up" case
-shouldn't redo the entire tripwire dance.
+shouldn't redo the entire JIT prompt loop.
 
 ## Out of scope (for these three issues)
 
-- New tripwire types (workflow-deviation tripwires KUI-138-142 are
+- New JIT prompt types (workflow-deviation prompts KUI-138-142 are
   separate work in `v09-entity-graph-consumers`).
 - The PM PR review station that consumes self-review.md (KUI-150-152
   in `v09-workflow-consumers-ui`).
-- Auto-rewriting `project.yaml.tripwires.extra` from the CLI —
-  `tripwire init`-time tripwire scaffolding is a v1.0 idea.
+- Auto-rewriting `project.yaml.jit_prompts.extra` from the CLI —
+  `tripwire init`-time JIT prompt scaffolding is a v1.0 idea.
 
 ## Acceptance summary
 
 - Authoring guide exists and covers the path from "team is
-  forgetting X" to "tripwire registered and tested".
-- `tripwire test-tripwire <id>` returns the prompt for a known id
+  forgetting X" to "JIT prompt registered and tested".
+- `tripwire test-jit-prompt <id>` returns the prompt for a known id
   and exits non-zero with the registry listing for an unknown id.
 - `tripwire session reopen <sid> --reset-acks` deletes the per-
   session ack markers and emits a `session.acks_reset` event.

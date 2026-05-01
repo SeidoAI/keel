@@ -1,11 +1,11 @@
 """The workflow primitive — `workflow.yaml` schema, loader, registry.
 
 A workflow is a typed lifecycle graph: stations with declared
-validators, tripwires, and prompt-checks; transitions between stations
+validators, JIT prompts, and prompt-checks; transitions between stations
 gated by the runtime; and an append-only events log substrate.
 
 This module is the substrate for v0.9 — every other v0.9 session
-(consumers UI, entity graph, validator/tripwire authoring, etc.) reads
+(consumers UI, entity graph, validator/JIT prompt authoring, etc.) reads
 the typed workflow tree exposed here.
 
 Public surface:
@@ -18,7 +18,7 @@ Public surface:
 - :func:`tripwire.core.workflow.schema.validate_workflow_spec` —
   well-formedness validator surfaced through ``tripwire validate``.
 - :mod:`tripwire.core.workflow.registry` — station-to-validator and
-  station-to-tripwire registry indexed by ``@registers_at`` /
+  station-to-JIT-prompt registry indexed by ``@registers_at`` /
   ``at = (...)`` declarations.
 
 The architecture overlay

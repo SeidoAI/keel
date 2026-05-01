@@ -1,6 +1,6 @@
-"""The default project.yaml.j2 must render a `tripwires:` block.
+"""The default project.yaml.j2 must render a `jit_prompts:` block.
 
-Without this, freshly-initialised projects have no `tripwires:` field
+Without this, freshly-initialised projects have no `jit_prompts:` field
 and the load_project pydantic model uses its defaults — which works,
 but the AC requires the block to be visible in the rendered file so
 operators can edit it.
@@ -37,11 +37,11 @@ def _render() -> str:
     )
 
 
-def test_rendered_project_yaml_has_tripwires_block() -> None:
+def test_rendered_project_yaml_has_jit_prompts_block() -> None:
     rendered = _render()
     parsed = yaml.safe_load(rendered)
-    assert "tripwires" in parsed
-    assert parsed["tripwires"] == {
+    assert "jit_prompts" in parsed
+    assert parsed["jit_prompts"] == {
         "enabled": True,
         "opt_out": [],
         "extra": [],
@@ -52,7 +52,7 @@ def test_rendered_project_yaml_round_trips_through_project_model() -> None:
     """The rendered YAML must parse cleanly through ProjectConfig.
 
     `extra="forbid"` would block any unknown key, so this is the
-    canonical contract test that the rendered tripwires block matches
+    canonical contract test that the rendered JIT prompts block matches
     the typed model surface.
     """
     from tripwire.models.project import ProjectConfig
@@ -60,6 +60,6 @@ def test_rendered_project_yaml_round_trips_through_project_model() -> None:
     rendered = _render()
     parsed = yaml.safe_load(rendered)
     project = ProjectConfig.model_validate(parsed)
-    assert project.tripwires.enabled is True
-    assert project.tripwires.opt_out == []
-    assert project.tripwires.extra == []
+    assert project.jit_prompts.enabled is True
+    assert project.jit_prompts.opt_out == []
+    assert project.jit_prompts.extra == []

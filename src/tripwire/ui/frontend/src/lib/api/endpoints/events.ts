@@ -6,14 +6,14 @@ import { queryKeys, staleTime } from "../queryKeys";
 /**
  * Typed client for `/api/events` (Strand Y).
  *
- * The endpoint streams every "process event" (tripwire fires, validator
+ * The endpoint streams every "process event" (JIT prompt fires, validator
  * pass/fail, artifact rejections, PM reviews, status transitions). See
  * spec §2.2. As with workflow.ts, this client tolerates the endpoint
  * not being live yet — consumers see `data === undefined` and the
  * Dashboard centre column renders an empty state.
  */
 export type ProcessEventKind =
-  | "tripwire_fire"
+  | "jit_prompt_fire"
   | "validator_pass"
   | "validator_fail"
   | "artifact_rejected"
@@ -36,7 +36,7 @@ export interface ProcessEvent {
   /* Discriminated by `kind`; we keep optional fields shared rather than
    * authoring a tagged union since the Dashboard only renders summary
    * fields and the Tripwire Log (S6) does the real interrogation. */
-  tripwire_id?: string;
+  jit_prompt_id?: string;
   validator_id?: string;
   artifact?: string;
   evidence?: string;

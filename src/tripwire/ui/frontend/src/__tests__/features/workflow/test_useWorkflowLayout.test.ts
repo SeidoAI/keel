@@ -21,7 +21,7 @@ function buildGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
     project_id: "p1",
     lifecycle: { stations: STATIONS },
     validators: [],
-    tripwires: [],
+    jit_prompts: [],
     connectors: { sources: [], sinks: [] },
     artifacts: [],
     ...overrides,
@@ -86,7 +86,7 @@ describe("computeWorkflowLayout", () => {
     expect(v1.y).toBeLessThan(v0.y);
   });
 
-  it("stacks tripwires above their fires_on_station alongside validators", () => {
+  it("stacks JIT prompts above their fires_on_station alongside validators", () => {
     const layout = computeWorkflowLayout(
       buildGraph({
         validators: [
@@ -97,10 +97,10 @@ describe("computeWorkflowLayout", () => {
             fires_on_station: "in_review",
           },
         ],
-        tripwires: [
+        jit_prompts: [
           {
             id: "t1",
-            kind: "tripwire",
+            kind: "jit_prompt",
             name: "stale-context",
             fires_on_event: "session.complete",
             fires_on_station: "in_review",
@@ -108,12 +108,12 @@ describe("computeWorkflowLayout", () => {
         ],
       }),
     );
-    expect(layout.tripwires).toHaveLength(1);
+    expect(layout.jit_prompts).toHaveLength(1);
     const inReviewStation = must(
       layout.stations.find((s) => s.id === "in_review"),
       "in_review station missing",
     );
-    const t0 = must(layout.tripwires[0], "tripwires[0]");
+    const t0 = must(layout.jit_prompts[0], "jit_prompts[0]");
     const v0 = must(layout.validators[0], "validators[0]");
     expect(t0.x).toBe(inReviewStation.x);
     expect(t0.y).toBeLessThan(v0.y);
@@ -174,14 +174,14 @@ describe("computeWorkflowLayout", () => {
   it("returns empty layout collections for an empty graph", () => {
     const layout = computeWorkflowLayout(buildGraph());
     expect(layout.validators).toEqual([]);
-    expect(layout.tripwires).toEqual([]);
+    expect(layout.jit_prompts).toEqual([]);
     expect(layout.artifacts).toEqual([]);
     expect(layout.sources).toEqual([]);
     expect(layout.sinks).toEqual([]);
   });
 
-  it("returns a viewBox that expands to fit deep validator + tripwire stacks", () => {
-    // 4 validators + 3 tripwires at the same station produce a stack
+  it("returns a viewBox that expands to fit deep validator + JIT prompt stacks", () => {
+    // 4 validators + 3 JIT prompts at the same station produce a stack
     // that pushes the top-most card y above the default 0 origin.
     // The viewBox must grow upward (negative y) so cards render
     // inside it; without this the top of the stack is clipped.
@@ -193,17 +193,17 @@ describe("computeWorkflowLayout", () => {
           name: `validator-${i + 1}`,
           fires_on_station: "in_review",
         })),
-        tripwires: Array.from({ length: 3 }, (_, i) => ({
+        jit_prompts: Array.from({ length: 3 }, (_, i) => ({
           id: `t${i + 1}`,
-          kind: "tripwire" as const,
-          name: `tripwire-${i + 1}`,
+          kind: "jit_prompt" as const,
+          name: `jit-prompt-${i + 1}`,
           fires_on_station: "in_review",
         })),
       }),
     );
     const allTops = [
       ...layout.validators.map((v) => v.y - WORKFLOW_CARD_DIMS.validator.h / 2),
-      ...layout.tripwires.map((t) => t.y - WORKFLOW_CARD_DIMS.tripwire.h / 2),
+      ...layout.jit_prompts.map((t) => t.y - WORKFLOW_CARD_DIMS.jitPrompt.h / 2),
     ];
     const minTop = Math.min(...allTops);
     expect(minTop).toBeLessThan(0);
@@ -212,7 +212,7 @@ describe("computeWorkflowLayout", () => {
   });
 
   it("produces non-overlapping bounding boxes for a dense same-station stack", () => {
-    // Per round-3 PM follow-up: 4 validators + 3 tripwires at one
+    // Per round-3 PM follow-up: 4 validators + 3 JIT prompts at one
     // station must not overlap. Each card's bbox is centred on
     // (x, y) with the canonical width/height; assert no two
     // bounding boxes intersect.
@@ -224,10 +224,10 @@ describe("computeWorkflowLayout", () => {
           name: `validator-${i + 1}`,
           fires_on_station: "in_review",
         })),
-        tripwires: Array.from({ length: 3 }, (_, i) => ({
+        jit_prompts: Array.from({ length: 3 }, (_, i) => ({
           id: `t${i + 1}`,
-          kind: "tripwire" as const,
-          name: `tripwire-${i + 1}`,
+          kind: "jit_prompt" as const,
+          name: `jit-prompt-${i + 1}`,
           fires_on_station: "in_review",
         })),
       }),
@@ -247,12 +247,12 @@ describe("computeWorkflowLayout", () => {
         w: WORKFLOW_CARD_DIMS.validator.w,
         h: WORKFLOW_CARD_DIMS.validator.h,
       })),
-      ...layout.tripwires.map((t) => ({
+      ...layout.jit_prompts.map((t) => ({
         id: t.id,
-        x: t.x - WORKFLOW_CARD_DIMS.tripwire.w / 2,
-        y: t.y - WORKFLOW_CARD_DIMS.tripwire.h / 2,
-        w: WORKFLOW_CARD_DIMS.tripwire.w,
-        h: WORKFLOW_CARD_DIMS.tripwire.h,
+        x: t.x - WORKFLOW_CARD_DIMS.jitPrompt.w / 2,
+        y: t.y - WORKFLOW_CARD_DIMS.jitPrompt.h / 2,
+        w: WORKFLOW_CARD_DIMS.jitPrompt.w,
+        h: WORKFLOW_CARD_DIMS.jitPrompt.h,
       })),
     ];
     for (let i = 0; i < boxes.length; i++) {

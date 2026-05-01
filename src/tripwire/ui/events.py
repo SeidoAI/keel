@@ -120,7 +120,7 @@ class PongEvent(Event):
 
 
 ProcessEventKind = Literal[
-    "tripwire_fire",
+    "jit_prompt_fire",
     "validator_pass",
     "validator_fail",
     "artifact_rejected",

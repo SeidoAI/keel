@@ -7,9 +7,9 @@ the events log records actually happened. Three classes of drift:
   ``prompt_checks: [...]`` but the session left the station without a
   ``prompt_check.invoked`` event for one of the declared ids. The PM
   forgot to run a required check.
-- ``drift/tripwire_should_have_fired`` — a station declared
-  ``tripwires: [...]`` but the session left without a
-  ``tripwire.fired`` event for one of them. Either the tripwire is
+- ``drift/jit_prompt_should_have_fired`` — a station declared
+  ``jit_prompts: [...]`` but the session left without a
+  ``jit_prompt.fired`` event for one of them. Either the JIT prompt is
   miswired or the gate runner skipped it.
 - ``drift/unexpected_transition`` — session.yaml currently sits at a
   station that's NOT reachable from the last
@@ -22,7 +22,7 @@ Surfaced via :func:`detect_drift` (returns
 
 The reader walks the events log chronologically, partitions events by
 station-stay (each ``transition.completed`` ends one stay), and for
-each completed stay checks the declared prompt-checks/tripwires.
+each completed stay checks the declared prompt-checks/JIT prompts.
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def detect_drift(
 
 def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]:
     """For each `transition.completed` row, look at the FROM station's
-    declared prompt-checks + tripwires and confirm one of each was
+    declared prompt-checks + JIT prompts and confirm one of each was
     observed during the stay.
 
     A "stay" is the contiguous run of events on a session at a given
@@ -104,7 +104,7 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
                 continue
             stay_rows = inst_rows[stay_start:idx]
             invoked_pcs = _ids_for_event(stay_rows, "prompt_check.invoked")
-            fired_tws = _ids_for_event(stay_rows, "tripwire.fired")
+            fired_prompts = _ids_for_event(stay_rows, "jit_prompt.fired")
             for pc in station.prompt_checks:
                 if pc not in invoked_pcs:
                     out.append(
@@ -120,18 +120,18 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
                             ),
                         )
                     )
-            for tw in station.tripwires:
-                if tw not in fired_tws:
+            for prompt_id in station.jit_prompts:
+                if prompt_id not in fired_prompts:
                     out.append(
                         DriftFinding(
-                            code="drift/tripwire_should_have_fired",
+                            code="drift/jit_prompt_should_have_fired",
                             workflow=workflow.id,
                             instance=inst,
                             station=from_station,
                             message=(
                                 f"session {inst!r} left station "
                                 f"{from_station!r} without firing declared "
-                                f"tripwire {tw!r}"
+                                f"JIT prompt {prompt_id!r}"
                             ),
                         )
                     )

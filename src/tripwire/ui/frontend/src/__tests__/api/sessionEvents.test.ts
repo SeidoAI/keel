@@ -55,12 +55,12 @@ describe("useSessionEvents", () => {
     const { result } = renderHook(
       () =>
         useSessionEvents("p1", "sess-a", {
-          kinds: ["tripwire_fire", "validator_fail"],
+          kinds: ["jit_prompt_fire", "validator_fail"],
         }),
       { wrapper: wrapper(qc) },
     );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(kinds).toEqual(["tripwire_fire", "validator_fail"]);
+    expect(kinds).toEqual(["jit_prompt_fire", "validator_fail"]);
   });
 });

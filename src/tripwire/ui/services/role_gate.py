@@ -2,7 +2,7 @@
 
 The Tripwire UI surfaces the same `/api` endpoints to executor and PM
 viewers. PM-mode unhides a small handful of fields (most notably
-tripwire prompt bodies and private review comments). The check is *not*
+JIT prompt bodies and private review comments). The check is *not*
 security: it's the same posture as the rest of the app — semantic
 separation, not authentication. The PM toggle is gated by the
 `X-Tripwire-Role: pm` request header (with a `?role=pm` URL fallback
@@ -20,7 +20,7 @@ from starlette.requests import Request
 ROLE_HEADER = "x-tripwire-role"
 """Lowercased canonical header name. Starlette normalises on lookup."""
 
-PROMPT_REDACTED_PLACEHOLDER = "<<tripwire prompt — content hidden>>"
+PROMPT_REDACTED_PLACEHOLDER = "<<JIT prompt content hidden>>"
 """String returned in `prompt_redacted` for both PM and non-PM viewers."""
 
 Role = Literal["pm", "executor"]
@@ -47,17 +47,17 @@ def is_pm(request: Request) -> bool:
     return role_from_headers(request) == "pm"
 
 
-def redact_tripwire_prompt(
+def redact_jit_prompt(
     *,
     prompt: str | None,
     is_pm_role: bool,
 ) -> tuple[str | None, str]:
-    """Return ``(prompt_revealed, prompt_redacted)`` for one tripwire row.
+    """Return ``(prompt_revealed, prompt_redacted)`` for one JIT prompt row.
 
     Mirrors the ``/api/workflow`` field shape: ``prompt_revealed`` is the
     full string when the caller is PM, ``None`` otherwise. The redacted
     placeholder is constant — frontends render it verbatim so the grid
-    can show "[hidden]" without coupling to per-tripwire copy.
+    can show "[hidden]" without coupling to per-prompt copy.
     """
     revealed = prompt if (is_pm_role and prompt is not None) else None
     return revealed, PROMPT_REDACTED_PLACEHOLDER
@@ -68,6 +68,6 @@ __all__ = [
     "ROLE_HEADER",
     "Role",
     "is_pm",
-    "redact_tripwire_prompt",
+    "redact_jit_prompt",
     "role_from_headers",
 ]

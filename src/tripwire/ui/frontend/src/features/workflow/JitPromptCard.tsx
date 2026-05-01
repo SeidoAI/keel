@@ -6,12 +6,10 @@ const CARD_W = 184;
 const CARD_H = 78;
 
 /**
- * Tripwire card rendered above the lifecycle wire on the workflow
- * map. Per [[tripwire-primitive]] and [[dec-tripwires-are-agent-
- * facing]] the visual contract here is distinct from
- * `ValidatorCard`:
+ * JIT prompt card rendered above the lifecycle wire on the workflow
+ * map. Its visual contract is distinct from `ValidatorCard`:
  *
- *  - OCHRE tone (tripwire stamp) signals "fires + nudges + agent
+ *  - OCHRE tone signals "fires + nudges + agent
  *    must ack"
  *  - copy reads "fires on {event}; agent must ack" so a reader
  *    knows the lifecycle event that triggers it and what closes
@@ -20,10 +18,10 @@ const CARD_H = 78;
  * Prompts content is intentionally hidden on the card — it lives
  * inside the drawer and is gated by PM-mode (server-side
  * redaction). This card is purely the registry surface ("a
- * tripwire exists here").
+ * JIT prompt exists here").
  */
-export interface TripwireCardProps {
-  tripwire: WorkflowValidator;
+export interface JitPromptCardProps {
+  jitPrompt: WorkflowValidator;
   x: number;
   y: number;
   dimmed: boolean;
@@ -32,15 +30,15 @@ export interface TripwireCardProps {
   onMouseLeave?: () => void;
 }
 
-export function TripwireCard({
-  tripwire,
+export function JitPromptCard({
+  jitPrompt,
   x,
   y,
   dimmed,
   onClick,
   onMouseEnter,
   onMouseLeave,
-}: TripwireCardProps) {
+}: JitPromptCardProps) {
   return (
     <foreignObject
       x={x - CARD_W / 2}
@@ -55,7 +53,7 @@ export function TripwireCard({
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        aria-label={`Tripwire ${tripwire.name}`}
+        aria-label={`JIT prompt ${jitPrompt.name}`}
         className={cn(
           "flex h-full w-full flex-col items-start gap-1.5 rounded-(--radius-stamp)",
           "border border-(--color-tripwire) bg-(--color-paper) px-2.5 py-2 text-left",
@@ -64,14 +62,14 @@ export function TripwireCard({
       >
         <div className="flex items-center gap-1.5">
           <Stamp tone="tripwire" variant="status">
-            TRIPWIRE
+            JIT PROMPT
           </Stamp>
           <span className="font-sans font-semibold text-[12px] text-(--color-ink) leading-tight">
-            {tripwire.name}
+            {jitPrompt.name}
           </span>
         </div>
         <span className="font-serif text-[11px] italic text-(--color-ink-2) leading-snug">
-          fires on <span className="font-mono not-italic">{tripwire.fires_on_event ?? "—"}</span> —
+          fires on <span className="font-mono not-italic">{jitPrompt.fires_on_event ?? "—"}</span> —
           agent must ack
         </span>
       </button>

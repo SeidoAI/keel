@@ -13,7 +13,7 @@ import type {
  *
  * Stations evenly spaced on a horizontal wire at `wireY`; sources
  * stacked in the LEFT gutter; sinks in the RIGHT gutter;
- * validators + tripwires above the wire above their
+ * validators + JIT prompts above the wire above their
  * `fires_on_station`; artifacts below the wire under `produced_by`.
  *
  * Layout is deterministic by entity-kind and by position in the
@@ -36,7 +36,7 @@ export const WORKFLOW_CANVAS = {
   gutterRight: 200,
   validatorRowHeight: 96,
   validatorRowGap: 60,
-  tripwireRowGap: 40,
+  jitPromptRowGap: 40,
   artifactRowGap: 60,
   artifactRowHeight: 86,
   connectorRowGap: 70,
@@ -51,7 +51,7 @@ export const WORKFLOW_CANVAS = {
  *  themselves render at these dimensions. */
 export const WORKFLOW_CARD_DIMS = {
   validator: { w: 168, h: 84 },
-  tripwire: { w: 184, h: 84 },
+  jitPrompt: { w: 184, h: 84 },
   artifact: { w: 156, h: 60 },
   endpoint: { w: 132, h: 32 },
 } as const;
@@ -83,7 +83,7 @@ export interface PositionedConnector extends WorkflowConnector {
 export interface WorkflowLayout {
   stations: PositionedStation[];
   validators: PositionedValidator[];
-  tripwires: PositionedValidator[];
+  jit_prompts: PositionedValidator[];
   artifacts: PositionedArtifact[];
   sources: PositionedConnector[];
   sinks: PositionedConnector[];
@@ -115,24 +115,24 @@ export function computeWorkflowLayout(graph: WorkflowGraph): WorkflowLayout {
     return { ...v, x, y, stackIndex: idx };
   });
 
-  // Tripwires stack above the validator stack at each station, so a
-  // station with 2 validators + 1 tripwire renders [t1, v2, v1] from
-  // top down. The visual band is "above the wire," and tripwires
+  // JIT prompts stack above the validator stack at each station, so a
+  // station with 2 validators + 1 JIT prompt renders [p1, v2, v1] from
+  // top down. The visual band is "above the wire," and JIT prompts
   // sit higher to reinforce the cognitive ordering: gates first
-  // (closer to the wire they gate), tripwires further out (loud,
+  // (closer to the wire they gate), prompts further out (loud,
   // attention-getting).
-  const tripwires: PositionedValidator[] = graph.tripwires.map((t) => {
+  const jit_prompts: PositionedValidator[] = graph.jit_prompts.map((t) => {
     const validatorCount = validatorStackByStation.get(t.fires_on_station) ?? 0;
-    const tripwireOffset = validatorStackByStation.get(`__tw__${t.fires_on_station}`) ?? 0;
-    validatorStackByStation.set(`__tw__${t.fires_on_station}`, tripwireOffset + 1);
+    const promptOffset = validatorStackByStation.get(`__jp__${t.fires_on_station}`) ?? 0;
+    validatorStackByStation.set(`__jp__${t.fires_on_station}`, promptOffset + 1);
     const x = stationXById.get(t.fires_on_station) ?? WORKFLOW_CANVAS.width / 2;
     const y =
       WORKFLOW_CANVAS.wireY -
       WORKFLOW_CANVAS.validatorRowGap -
       validatorCount * WORKFLOW_CANVAS.validatorRowHeight -
-      WORKFLOW_CANVAS.tripwireRowGap -
-      tripwireOffset * WORKFLOW_CANVAS.validatorRowHeight;
-    return { ...t, x, y, stackIndex: validatorCount + tripwireOffset };
+      WORKFLOW_CANVAS.jitPromptRowGap -
+      promptOffset * WORKFLOW_CANVAS.validatorRowHeight;
+    return { ...t, x, y, stackIndex: validatorCount + promptOffset };
   });
 
   const artifactStackByStation = new Map<string, number>();
@@ -167,8 +167,8 @@ export function computeWorkflowLayout(graph: WorkflowGraph): WorkflowLayout {
       i * WORKFLOW_CANVAS.connectorRowGap,
   }));
 
-  const viewBox = computeViewBox({ validators, tripwires, artifacts, sources, sinks });
-  return { stations, validators, tripwires, artifacts, sources, sinks, viewBox };
+  const viewBox = computeViewBox({ validators, jit_prompts, artifacts, sources, sinks });
+  return { stations, validators, jit_prompts, artifacts, sources, sinks, viewBox };
 }
 
 /** Compute the dynamic SVG viewBox so every entity (plus
@@ -177,7 +177,7 @@ export function computeWorkflowLayout(graph: WorkflowGraph): WorkflowLayout {
  *  upward to keep them visible instead of clipping. */
 function computeViewBox(layout: {
   validators: PositionedValidator[];
-  tripwires: PositionedValidator[];
+  jit_prompts: PositionedValidator[];
   artifacts: PositionedArtifact[];
   sources: PositionedConnector[];
   sinks: PositionedConnector[];
@@ -188,9 +188,9 @@ function computeViewBox(layout: {
     minY = Math.min(minY, v.y - WORKFLOW_CARD_DIMS.validator.h / 2);
     maxY = Math.max(maxY, v.y + WORKFLOW_CARD_DIMS.validator.h / 2);
   }
-  for (const t of layout.tripwires) {
-    minY = Math.min(minY, t.y - WORKFLOW_CARD_DIMS.tripwire.h / 2);
-    maxY = Math.max(maxY, t.y + WORKFLOW_CARD_DIMS.tripwire.h / 2);
+  for (const t of layout.jit_prompts) {
+    minY = Math.min(minY, t.y - WORKFLOW_CARD_DIMS.jitPrompt.h / 2);
+    maxY = Math.max(maxY, t.y + WORKFLOW_CARD_DIMS.jitPrompt.h / 2);
   }
   for (const a of layout.artifacts) {
     maxY = Math.max(maxY, a.y + WORKFLOW_CARD_DIMS.artifact.h / 2);

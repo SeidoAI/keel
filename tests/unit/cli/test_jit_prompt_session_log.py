@@ -1,4 +1,4 @@
-"""Tests for `tripwire session log <sid>` — per-session tripwire log."""
+"""Tests for `tripwire session log <sid>` — per-session JIT prompt log."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _project(tmp_path: Path) -> None:
 
 
 def _write_event(tmp_path: Path, sid: str, n: int, payload: dict) -> None:
-    fire_dir = tmp_path / ".tripwire" / "events" / "firings" / sid
+    fire_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / sid
     fire_dir.mkdir(parents=True, exist_ok=True)
     (fire_dir / f"{n:04d}.json").write_text(json.dumps(payload), encoding="utf-8")
 
@@ -48,7 +48,7 @@ def test_session_log_no_events_says_so(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert (
-        "no tripwire fires" in result.output.lower()
+        "no jit prompt fires" in result.output.lower()
         or "0 fires" in result.output.lower()
     )
 
@@ -60,8 +60,8 @@ def test_session_log_lists_fires_with_timestamps(tmp_path: Path) -> None:
         "fixture-1",
         1,
         {
-            "kind": "tripwire_fire",
-            "tripwire_id": "self-review",
+            "kind": "jit_prompt_fire",
+            "jit_prompt_id": "self-review",
             "session_id": "fixture-1",
             "fired_at": "2026-04-26T14:32:18+00:00",
             "event": "session.complete",
@@ -71,7 +71,7 @@ def test_session_log_lists_fires_with_timestamps(tmp_path: Path) -> None:
             "fix_commits": [],
             "declared_no_findings": False,
             "escalated": False,
-            "prompt_redacted": "<<self-review prompt — content withheld>>",
+            "prompt_redacted": "<<self-review JIT prompt - content withheld>>",
             "prompt_revealed": "the four-lens body",
         },
     )
@@ -100,8 +100,8 @@ def test_session_log_ack_status_shown(tmp_path: Path) -> None:
         "fixture-1",
         1,
         {
-            "kind": "tripwire_fire",
-            "tripwire_id": "self-review",
+            "kind": "jit_prompt_fire",
+            "jit_prompt_id": "self-review",
             "session_id": "fixture-1",
             "fired_at": "2026-04-26T14:32:18+00:00",
             "event": "session.complete",
@@ -144,5 +144,5 @@ def test_session_log_web_prints_deeplink(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "tripwires" in result.output.lower()
+    assert "jit-prompts" in result.output.lower()
     assert "fixture-1" in result.output

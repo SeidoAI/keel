@@ -4,19 +4,19 @@
 
 This is the design spec for the v0.9 workflow primitive: a per-project
 `workflow.yaml` that hosts every lifecycle, station-registered
-validators / tripwires / prompt-checks, transition-token runtime, an
+validators / JIT prompts / prompt-checks, transition-token runtime, an
 append-only events log, and workflow-drift detection. Inherits all
 locked decisions from `backlog-architecture.md`.
 
 ## What changes vs v0.8
 
 Before v0.9, the lifecycle was implicit in PM-skill markdown,
-validator hooks, tripwire registration code, slash command shells, the
+validator hooks, JIT prompt registration code, slash command shells, the
 `project.yaml` lifecycle enum, and `enums/issue_status.yaml`. No
 single document said what the process looked like end-to-end.
 
 After v0.9, the lifecycle is one file: `<project>/workflow.yaml`. It
-declares stations, gate predicates, and every check/tripwire/prompt
+declares stations, gate predicates, and every check/JIT prompt/prompt
 that runs at each station. The runtime drives state transitions
 through the gate; the events log records everything; the drift report
 flags mismatches.
@@ -40,7 +40,7 @@ workflows:
 
         prompt_checks: [<id>, ...]            # optional
         validators: [<id>, ...]               # optional
-        tripwires: [<id>, ...]                # optional
+        jit_prompts: [<id>, ...]                # optional
 ```
 
 ### Conditional predicates
@@ -72,7 +72,7 @@ catches:
 | `workflow/invalid_predicate` | A conditional `if:` is malformed |
 | `workflow/invalid_next_shape` | `next:` is neither a string nor a list |
 | `workflow/unknown_validator` | A station references an unregistered validator |
-| `workflow/unknown_tripwire` | A station references an unregistered tripwire |
+| `workflow/unknown_jit_prompt` | A station references an unregistered JIT prompt |
 | `workflow/unknown_prompt_check` | A station references an unregistered prompt-check |
 
 ## Station registration
@@ -84,10 +84,10 @@ Each existing validator declares its station via metadata:
 def check_uuid_present(ctx): ...
 ```
 
-Each Tripwire subclass declares its station via a class attribute:
+Each JitPrompt subclass declares its station via a class attribute:
 
 ```python
-class SelfReviewTripwire(Tripwire):
+class SelfReviewJitPrompt(JitPrompt):
     at: ClassVar[tuple[str, str]] = ("coding-session", "review")
 ```
 
@@ -120,7 +120,7 @@ date (`events/2026-04-30.jsonl`). Schema:
 ```
 
 All emission flows through one `emit_event(...)` function. Validators,
-tripwires, and transitions all use it. The log is append-forever — no
+JIT prompts, and transitions all use it. The log is append-forever — no
 rotation in v0.9.
 
 ## Transition runtime
@@ -128,11 +128,11 @@ rotation in v0.9.
 `tripwire transition <session-id> <to-station>` submits a transition
 request:
 
-1. Load workflow.yaml, look up validators / tripwires / required
+1. Load workflow.yaml, look up validators / JIT prompts / required
    prompt-checks for `<to-station>`.
 2. Acquire `.tripwire/locks/transition-<sid>.lock` to serialise
    concurrent calls on the same session.
-3. Run the gate (validators → tripwires → prompt-checks).
+3. Run the gate (validators → JIT prompts → prompt-checks).
 4. On pass: update session.yaml's status, emit
    `transition.completed`.
 5. On fail: emit `transition.rejected` with `reason`. Session stays
@@ -150,7 +150,7 @@ PostToolUse hook drives.
   through
 - Unexpected transitions (gate-bypass writes that flip session.yaml
   status without going through `tripwire transition`)
-- Tripwires that should-have-fired-but-didn't per the workflow.yaml
+- JIT prompts that should-have-fired-but-didn't per the workflow.yaml
   declaration
 
 Empty on a clean run; correct mismatches surfaced when steps are
@@ -160,7 +160,7 @@ skipped.
 
 - Schema versioning (`_schema_version` + `tripwire migrate`) — v1.0.
 - Additional workflows in workflow.yaml — v1.0.
-- Concrete deviation tripwires — `v09-entity-graph-consumers`.
-- Lint expansion — `v09-validators-tripwires-authoring`.
-- Tripwire authoring loop — same.
+- Concrete deviation JIT prompts — `v09-entity-graph-consumers`.
+- Lint expansion — `v09-validators-jit-prompts-authoring`.
+- JIT prompt authoring loop — same.
 - Workflow Map UI — `v09-workflow-consumers-ui`.

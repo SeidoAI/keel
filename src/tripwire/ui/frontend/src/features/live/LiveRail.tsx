@@ -16,8 +16,8 @@ import { InterveneButton } from "./InterveneButton";
  * Sections, top-to-bottom:
  *  - Cost ticker (mono, tabular-nums) — increments with each turn
  *  - Agent state — `session.current_state` from the runtime
- *  - Tripwire fires — agent-facing copy per
- *    [[dec-tripwires-are-agent-facing]]; no "alert" / "warning"
+ *  - JIT prompt fires — agent-facing copy per
+ *    [[dec-jit-prompts-are-agent-facing]]; no "alert" / "warning"
  *  - Cost-approval chip — surfaces an open `cost-approval` inbox
  *    entry; clicking opens the EntityPreviewDrawer (parent owns
  *    the dialog state)
@@ -31,7 +31,7 @@ export interface LiveRailProps {
   /** Last-known agent state from the orchestration runtime; null
    *  when the session has never reported a status message. */
   agentState: string | null;
-  tripwireFires: ProcessEvent[];
+  jitPromptFires: ProcessEvent[];
   /** Open `cost-approval` inbox entry referencing this session, or
    *  null. The chip only renders when this is set. */
   costApprovalEntry: InboxItem | null;
@@ -46,7 +46,7 @@ export function LiveRail({
   status,
   costUsd,
   agentState,
-  tripwireFires,
+  jitPromptFires,
   costApprovalEntry,
   onCostApprovalClick,
 }: LiveRailProps) {
@@ -54,7 +54,7 @@ export function LiveRail({
     <aside className="flex w-[280px] shrink-0 flex-col gap-4 border-(--color-edge) border-l bg-(--color-paper-2) px-4 py-4">
       <CostTicker costUsd={costUsd} />
       <AgentState state={agentState} />
-      <TripwireFires fires={tripwireFires} />
+      <JitPromptFires fires={jitPromptFires} />
       {costApprovalEntry ? (
         <CostApprovalChip entry={costApprovalEntry} onClick={onCostApprovalClick} />
       ) : null}
@@ -92,10 +92,10 @@ function AgentState({ state }: { state: string | null }) {
   );
 }
 
-function TripwireFires({ fires }: { fires: ProcessEvent[] }) {
+function JitPromptFires({ fires }: { fires: ProcessEvent[] }) {
   return (
     <section>
-      <Heading icon={<Zap className="h-3 w-3" aria-hidden />}>tripwire fires</Heading>
+      <Heading icon={<Zap className="h-3 w-3" aria-hidden />}>JIT prompt fires</Heading>
       {fires.length === 0 ? (
         <div className="mt-1 font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
           none yet
@@ -105,14 +105,14 @@ function TripwireFires({ fires }: { fires: ProcessEvent[] }) {
           {fires.map((fire) => (
             <li
               key={fire.id}
-              data-testid={`tripwire-fire-row-${fire.id}`}
+              data-testid={`jit-prompt-fire-row-${fire.id}`}
               className="flex flex-col gap-0.5 rounded-(--radius-stamp) border border-(--color-rule)/40 bg-(--color-rule)/5 px-2 py-1.5"
             >
               <span className="font-mono text-[9px] text-(--color-rule) uppercase tracking-[0.18em]">
-                agent received tripwire
+                agent received JIT prompt
               </span>
               <span className="font-mono text-[11px] text-(--color-ink) tracking-[0.04em]">
-                {fire.tripwire_id ?? "(unnamed)"}
+                {fire.jit_prompt_id ?? "(unnamed)"}
               </span>
             </li>
           ))}

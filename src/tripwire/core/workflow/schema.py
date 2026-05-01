@@ -20,7 +20,7 @@ The shape:
             terminal: true               # terminal station
             prompt_checks: [<id>, ...]
             validators: [<id>, ...]
-            tripwires: [<id>, ...]
+            jit_prompts: [<id>, ...]
 
 Conditional predicates are equality-only for v0.9 (locked decision in
 ``backlog-architecture.md``): ``<dot-path> (==|!=) <bare-value>``.
@@ -146,7 +146,7 @@ class Station:
     next: NextSpec
     prompt_checks: list[str] = field(default_factory=list)
     validators: list[str] = field(default_factory=list)
-    tripwires: list[str] = field(default_factory=list)
+    jit_prompts: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -205,7 +205,7 @@ def validate_workflow_spec(
     spec: WorkflowSpec,
     *,
     known_validators: set[str],
-    known_tripwires: set[str],
+    known_jit_prompts: set[str],
     known_prompt_checks: set[str],
 ) -> list[WorkflowFinding]:
     """Run well-formedness checks against a parsed :class:`WorkflowSpec`.
@@ -221,9 +221,9 @@ def validate_workflow_spec(
       AND declares ``next``
     - ``workflow/no_terminal_station`` — the workflow has no terminal
       station (every workflow must converge)
-    - ``workflow/unknown_validator`` / ``workflow/unknown_tripwire`` /
+    - ``workflow/unknown_validator`` / ``workflow/unknown_jit_prompt`` /
       ``workflow/unknown_prompt_check`` — a station references a
-      validator / tripwire / prompt-check that isn't registered
+      validator / JIT prompt / prompt-check that isn't registered
     """
     findings: list[WorkflowFinding] = list(spec.load_findings)
     for wf_id, wf in spec.workflows.items():
@@ -233,7 +233,7 @@ def validate_workflow_spec(
                 wf_id,
                 wf,
                 known_validators=known_validators,
-                known_tripwires=known_tripwires,
+                known_jit_prompts=known_jit_prompts,
                 known_prompt_checks=known_prompt_checks,
             )
         )
@@ -319,7 +319,7 @@ def _check_refs(
     wf: Workflow,
     *,
     known_validators: set[str],
-    known_tripwires: set[str],
+    known_jit_prompts: set[str],
     known_prompt_checks: set[str],
 ) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
@@ -337,15 +337,15 @@ def _check_refs(
                         ),
                     )
                 )
-        for ref in station.tripwires:
-            if known_tripwires and ref not in known_tripwires:
+        for ref in station.jit_prompts:
+            if known_jit_prompts and ref not in known_jit_prompts:
                 out.append(
                     WorkflowFinding(
-                        code="workflow/unknown_tripwire",
+                        code="workflow/unknown_jit_prompt",
                         workflow=wf_id,
                         station=station.id,
                         message=(
-                            f"station {station.id!r} references tripwire "
+                            f"station {station.id!r} references JIT prompt "
                             f"{ref!r} which is not registered"
                         ),
                     )

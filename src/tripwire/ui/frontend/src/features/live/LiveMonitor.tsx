@@ -39,7 +39,7 @@ function LiveMonitorInner({ projectId, sid }: { projectId: string; sid: string }
   const [openInboxId, setOpenInboxId] = useState<string | null>(null);
 
   // Build the turn stream — engagement entries from the session
-  // (v2 runtime feature; empty in v1) plus tripwire fires from the
+  // (v2 runtime feature; empty in v1) plus JIT prompt fires from the
   // events stream interleaved by timestamp. The TurnStream owns
   // engagement-boundary divider rendering.
   const entries = useMemo<TurnStreamEntry[]>(() => {
@@ -65,17 +65,17 @@ function LiveMonitorInner({ projectId, sid }: { projectId: string; sid: string }
       })
       .filter((x): x is EngagementEntry => x !== null);
 
-    const fireEntries: TurnStreamEntry[] = live.tripwireFires.map((fire) => ({
-      kind: "tripwire_fire",
+    const fireEntries: TurnStreamEntry[] = live.jitPromptFires.map((fire) => ({
+      kind: "jit_prompt_fire",
       id: fire.id,
       timestamp: fire.fired_at,
-      tripwireId: fire.tripwire_id ?? "(unnamed)",
+      jitPromptId: fire.jit_prompt_id ?? "(unnamed)",
     }));
 
     return [...engagementEntries, ...fireEntries].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
-  }, [live.session, live.tripwireFires]);
+  }, [live.session, live.jitPromptFires]);
 
   if (live.isLoading) {
     return <LoadingState />;
@@ -131,7 +131,7 @@ function LiveMonitorInner({ projectId, sid }: { projectId: string; sid: string }
           status={session.status}
           costUsd={session.cost_usd}
           agentState={session.current_state}
-          tripwireFires={live.tripwireFires}
+          jitPromptFires={live.jitPromptFires}
           costApprovalEntry={live.costApprovalEntry}
           onCostApprovalClick={(id) => setOpenInboxId(id)}
         />

@@ -1,4 +1,4 @@
-"""Stopped-to-ask tripwire — KUI-140 / B6.
+"""Stopped-to-ask JIT prompt — KUI-140 / B6.
 
 Fires on ``session.complete`` when:
 
@@ -24,7 +24,7 @@ from typing import ClassVar
 
 import yaml
 
-from tripwire._internal.tripwires import Tripwire, TripwireContext
+from tripwire._internal.jit_prompts import JitPrompt, JitPromptContext
 
 _STOP_AND_ASK_HEADER_RE = re.compile(
     r"^\s*##\s*stop\s*and\s*ask\b", re.IGNORECASE | re.MULTILINE
@@ -64,7 +64,7 @@ Re-run with `--ack`. The marker requires fix-commit SHAs OR
 Stop. The plan said "stop and ask" applied here, you didn't, and
 the diff confirms it: at least one committed file lives outside the
 session's declared `key_files`. Silent scope creep is the failure
-mode this tripwire catches.
+mode this JIT prompt catches.
 
 Walk the commits in this session. For each file that's outside
 `key_files`:
@@ -100,24 +100,24 @@ Re-run with `--ack` once the marker carries fix-commit SHAs OR
 )
 
 
-class StoppedToAskTripwire(Tripwire):
+class StoppedToAskJitPrompt(JitPrompt):
     """Block when a stop-and-ask plan section is bypassed silently."""
 
     id: ClassVar[str] = "stopped-to-ask"
     fires_on: ClassVar[str] = "session.complete"
     blocks: ClassVar[bool] = True
 
-    def fire(self, ctx: TripwireContext) -> str:
+    def fire(self, ctx: JitPromptContext) -> str:
         idx = ctx.variation_index(len(_VARIATIONS))
         return _VARIATIONS[idx]
 
-    def is_acknowledged(self, ctx: TripwireContext) -> bool:
+    def is_acknowledged(self, ctx: JitPromptContext) -> bool:
         marker = ctx.ack_path(self.id)
         if not marker.is_file():
             return False
         return _marker_substantive(marker)
 
-    def should_fire(self, ctx: TripwireContext) -> bool:
+    def should_fire(self, ctx: JitPromptContext) -> bool:
         plan_path = (
             ctx.project_dir / "sessions" / ctx.session_id / "artifacts" / "plan.md"
         )
@@ -286,4 +286,4 @@ def _marker_substantive(marker_path: Path) -> bool:
     return bool(has_commits or declared is True)
 
 
-__all__ = ["StoppedToAskTripwire"]
+__all__ = ["StoppedToAskJitPrompt"]

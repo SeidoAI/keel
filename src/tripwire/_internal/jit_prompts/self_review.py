@@ -1,4 +1,4 @@
-"""The canonical first tripwire — self-review on ``session.complete``.
+"""The canonical first JIT prompt — self-review on ``session.complete``.
 
 Three prompt variations exist; ``fire(ctx)`` picks one
 deterministically from ``hash(project_id, session_id)`` so the same
@@ -6,7 +6,7 @@ session always sees the same prompt across re-runs but different
 sessions pick different ones.
 
 The four-lens prompt content lives ONLY in this module per
-``2026-04-21-v08-tripwires-as-primitive.md`` §8 — by design it does
+``2026-04-21-v08-jit-prompts-as-primitive.md`` §8 — by design it does
 not appear in any spec, plan, issue, or other doc that the executing
 agent's read path includes.
 """
@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 from typing import ClassVar
 
-from tripwire._internal.tripwires import Tripwire, TripwireContext
+from tripwire._internal.jit_prompts import JitPrompt, JitPromptContext
 
 _VARIATIONS: tuple[str, ...] = (
     """\
@@ -94,8 +94,8 @@ fix-commit SHAs or `declared_no_findings: true`.
 )
 
 
-class SelfReviewTripwire(Tripwire):
-    """Self-review tripwire — fires on ``session.complete``.
+class SelfReviewJitPrompt(JitPrompt):
+    """Self-review JIT prompt — fires on ``session.complete``.
 
     The marker file (``.tripwire/acks/self-review-<sid>.json``) must
     contain ``fix_commits: [...]`` (≥1 SHA) OR
@@ -106,17 +106,17 @@ class SelfReviewTripwire(Tripwire):
     id: ClassVar[str] = "self-review"
     fires_on: ClassVar[str] = "session.complete"
     blocks: ClassVar[bool] = True
-    # KUI-121: workflow station declaration. The self-review tripwire
+    # KUI-121: workflow station declaration. The self-review JIT prompt
     # belongs to the `verified` station of the `coding-session` workflow
     # — fires as the session transitions out of verified toward
     # completed (which is what `session.complete` is, lifecycle-wise).
     at: ClassVar[tuple[str, str]] = ("coding-session", "verified")
 
-    def fire(self, ctx: TripwireContext) -> str:
+    def fire(self, ctx: JitPromptContext) -> str:
         idx = ctx.variation_index(len(_VARIATIONS))
         return _VARIATIONS[idx]
 
-    def is_acknowledged(self, ctx: TripwireContext) -> bool:
+    def is_acknowledged(self, ctx: JitPromptContext) -> bool:
         marker = ctx.ack_path(self.id)
         if not marker.is_file():
             return False

@@ -1,9 +1,9 @@
-"""Tests for the cost-ceiling tripwire (KUI-142 / B8).
+"""Tests for the cost-ceiling JIT prompt (KUI-142 / B8).
 
 Fires on ``session.complete`` when the session's cumulative cost
 (computed from the claude stream-json log via
 ``compute_session_cost``) exceeds a threshold (default $5).
-Configurable via ``project.yaml.tripwires.extra`` for an entry with
+Configurable via ``project.yaml.jit_prompts.extra`` for an entry with
 ``id: cost-ceiling`` and ``params: {ceiling_usd: N}``.
 """
 
@@ -15,11 +15,11 @@ from unittest.mock import patch
 
 import yaml
 
-from tripwire._internal.tripwires import TripwireContext
-from tripwire._internal.tripwires.cost_ceiling import (
+from tripwire._internal.jit_prompts import JitPromptContext
+from tripwire._internal.jit_prompts.cost_ceiling import (
     _VARIATIONS,
     DEFAULT_COST_CEILING_USD,
-    CostCeilingTripwire,
+    CostCeilingJitPrompt,
     _read_ceiling,
 )
 from tripwire.core.session_cost import CostBreakdown
@@ -33,7 +33,7 @@ def _seed_project(project_dir: Path, *, extras: list[dict] | None = None) -> Non
         "repos": {"SeidoAI/demo": {"local": "."}},
     }
     if extras is not None:
-        project_yaml["tripwires"] = {"extra": extras}
+        project_yaml["jit_prompts"] = {"extra": extras}
     (project_dir / "project.yaml").write_text(
         yaml.safe_dump(project_yaml, sort_keys=False), encoding="utf-8"
     )
@@ -62,8 +62,8 @@ def _seed_session(
     )
 
 
-def _ctx(tmp_path: Path, session_id: str = "alpha") -> TripwireContext:
-    return TripwireContext(
+def _ctx(tmp_path: Path, session_id: str = "alpha") -> JitPromptContext:
+    return JitPromptContext(
         project_dir=tmp_path,
         session_id=session_id,
         project_id="demo",
@@ -78,7 +78,7 @@ def _bd(total: float) -> CostBreakdown:
 
 
 def test_class_attrs() -> None:
-    tw = CostCeilingTripwire()
+    tw = CostCeilingJitPrompt()
     assert tw.id == "cost-ceiling"
     assert tw.fires_on == "session.complete"
     assert tw.blocks is True
@@ -99,10 +99,10 @@ def test_should_fire_under_default_ceiling(tmp_path: Path) -> None:
     _seed_project(tmp_path)
     _seed_session(tmp_path, "alpha", log_path=str(tmp_path / "log.jsonl"))
     with patch(
-        "tripwire._internal.tripwires.cost_ceiling.compute_session_cost",
+        "tripwire._internal.jit_prompts.cost_ceiling.compute_session_cost",
         return_value=_bd(4.99),
     ):
-        tw = CostCeilingTripwire()
+        tw = CostCeilingJitPrompt()
         assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -110,10 +110,10 @@ def test_should_fire_over_default_ceiling(tmp_path: Path) -> None:
     _seed_project(tmp_path)
     _seed_session(tmp_path, "alpha", log_path=str(tmp_path / "log.jsonl"))
     with patch(
-        "tripwire._internal.tripwires.cost_ceiling.compute_session_cost",
+        "tripwire._internal.jit_prompts.cost_ceiling.compute_session_cost",
         return_value=_bd(5.50),
     ):
-        tw = CostCeilingTripwire()
+        tw = CostCeilingJitPrompt()
         assert tw.should_fire(_ctx(tmp_path)) is True
 
 
@@ -121,7 +121,7 @@ def test_should_fire_silent_when_no_log_path(tmp_path: Path) -> None:
     """Session with no recorded log_path → silent (cost = $0)."""
     _seed_project(tmp_path)
     _seed_session(tmp_path, "alpha", log_path=None)
-    tw = CostCeilingTripwire()
+    tw = CostCeilingJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -133,7 +133,7 @@ def test_per_project_ceiling_override_respected(tmp_path: Path) -> None:
                 "id": "cost-ceiling",
                 "fires_on": "session.complete",
                 "class": (
-                    "tripwire._internal.tripwires.cost_ceiling.CostCeilingTripwire"
+                    "tripwire._internal.jit_prompts.cost_ceiling.CostCeilingJitPrompt"
                 ),
                 "params": {"ceiling_usd": 1.0},
             }
@@ -141,10 +141,10 @@ def test_per_project_ceiling_override_respected(tmp_path: Path) -> None:
     )
     _seed_session(tmp_path, "alpha", log_path=str(tmp_path / "log.jsonl"))
     with patch(
-        "tripwire._internal.tripwires.cost_ceiling.compute_session_cost",
+        "tripwire._internal.jit_prompts.cost_ceiling.compute_session_cost",
         return_value=_bd(2.0),
     ):
-        tw = CostCeilingTripwire()
+        tw = CostCeilingJitPrompt()
         # 2.0 > 1.0 (override) → fires; default $5 would have been silent.
         assert tw.should_fire(_ctx(tmp_path)) is True
 
@@ -157,7 +157,7 @@ def test_per_project_ceiling_override_silent_below(tmp_path: Path) -> None:
                 "id": "cost-ceiling",
                 "fires_on": "session.complete",
                 "class": (
-                    "tripwire._internal.tripwires.cost_ceiling.CostCeilingTripwire"
+                    "tripwire._internal.jit_prompts.cost_ceiling.CostCeilingJitPrompt"
                 ),
                 "params": {"ceiling_usd": 50.0},
             }
@@ -165,10 +165,10 @@ def test_per_project_ceiling_override_silent_below(tmp_path: Path) -> None:
     )
     _seed_session(tmp_path, "alpha", log_path=str(tmp_path / "log.jsonl"))
     with patch(
-        "tripwire._internal.tripwires.cost_ceiling.compute_session_cost",
+        "tripwire._internal.jit_prompts.cost_ceiling.compute_session_cost",
         return_value=_bd(20.0),
     ):
-        tw = CostCeilingTripwire()
+        tw = CostCeilingJitPrompt()
         # 20 < 50 → silent; default $5 would have fired.
         assert tw.should_fire(_ctx(tmp_path)) is False
 
@@ -186,7 +186,7 @@ def test_read_ceiling_uses_extra_params(tmp_path: Path) -> None:
                 "id": "cost-ceiling",
                 "fires_on": "session.complete",
                 "class": (
-                    "tripwire._internal.tripwires.cost_ceiling.CostCeilingTripwire"
+                    "tripwire._internal.jit_prompts.cost_ceiling.CostCeilingJitPrompt"
                 ),
                 "params": {"ceiling_usd": 12.5},
             }
@@ -196,7 +196,7 @@ def test_read_ceiling_uses_extra_params(tmp_path: Path) -> None:
 
 
 def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
-    tw = CostCeilingTripwire()
+    tw = CostCeilingJitPrompt()
     ctx = _ctx(tmp_path)
     marker = ctx.ack_path("cost-ceiling")
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -205,6 +205,6 @@ def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
 
 
 def test_fire_returns_one_of_the_variations(tmp_path: Path) -> None:
-    tw = CostCeilingTripwire()
+    tw = CostCeilingJitPrompt()
     prompt = tw.fire(_ctx(tmp_path))
     assert prompt in _VARIATIONS

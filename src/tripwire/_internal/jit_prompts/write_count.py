@@ -1,20 +1,20 @@
-"""Write-count tripwire — KUI-141 / B7.
+"""Write-count JIT prompt — KUI-141 / B7.
 
 Fires on ``session.complete`` when the count of file-edit tool
 invocations in the session's claude stream-json log exceeds a
 threshold (default 20). Forces a validation cadence: long runs of
 edits without intervening validation accumulate drift.
 
-Per-project override: if ``project.yaml.tripwires.extra`` carries an
+Per-project override: if ``project.yaml.jit_prompts.extra`` carries an
 entry with ``id: write-count`` and a ``params: {threshold: N}`` key,
 that ``N`` overrides the default. The override does NOT affect the
-manifest registration — the tripwire is registered once via the
+manifest registration — the JIT prompt is registered once via the
 built-in manifest; the ``extra`` entry is read solely for its params.
 
 Per the v0.9 plan's stop-and-ask escape, this implementation does not
 read ``validate.run`` events from the events log (the validate CLI
 doesn't emit them yet). The threshold itself enforces validation
-cadence; once acked, the tripwire stays silent for the session. See
+cadence; once acked, the JIT prompt stays silent for the session. See
 ``decisions.md`` D6 for the rationale.
 """
 
@@ -26,7 +26,7 @@ from typing import ClassVar
 
 import yaml
 
-from tripwire._internal.tripwires import Tripwire, TripwireContext
+from tripwire._internal.jit_prompts import JitPrompt, JitPromptContext
 
 DEFAULT_WRITE_COUNT_THRESHOLD = 20
 
@@ -52,7 +52,7 @@ SHAs OR `declared_no_findings: true`.
 """,
     """\
 Stop. The write count for this session has crossed the threshold.
-Validation cadence is the pattern this tripwire enforces: edit, run
+Validation cadence is the pattern this JIT prompt enforces: edit, run
 validate, edit, run validate. Long edit stretches without validation
 mean broken contracts can ride for hundreds of lines before anyone
 notices.
@@ -67,7 +67,7 @@ Re-run with `--ack`. The marker is rejected if it lacks fix-commit
 SHAs and does not declare `declared_no_findings: true`.
 """,
     """\
-The write-count tripwire is a smoke alarm for "I forgot to validate".
+The write-count JIT prompt is a smoke alarm for "I forgot to validate".
 You've crossed the threshold. Don't argue with the alarm — run
 validation.
 
@@ -80,7 +80,7 @@ Concretely:
     AND note the deferral in `decisions.md`.
 
 The threshold itself is configurable via
-`project.yaml.tripwires.extra` for an `id: write-count` entry's
+`project.yaml.jit_prompts.extra` for an `id: write-count` entry's
 `params: {threshold: N}`; bump it if 20 is genuinely too low for
 your project's idiom. Default exists for a reason.
 
@@ -89,24 +89,24 @@ Re-run `--ack` once the marker is substantive.
 )
 
 
-class WriteCountTripwire(Tripwire):
+class WriteCountJitPrompt(JitPrompt):
     """Block when file-edit count crosses the configured threshold."""
 
     id: ClassVar[str] = "write-count"
     fires_on: ClassVar[str] = "session.complete"
     blocks: ClassVar[bool] = True
 
-    def fire(self, ctx: TripwireContext) -> str:
+    def fire(self, ctx: JitPromptContext) -> str:
         idx = ctx.variation_index(len(_VARIATIONS))
         return _VARIATIONS[idx]
 
-    def is_acknowledged(self, ctx: TripwireContext) -> bool:
+    def is_acknowledged(self, ctx: JitPromptContext) -> bool:
         marker = ctx.ack_path(self.id)
         if not marker.is_file():
             return False
         return _marker_substantive(marker)
 
-    def should_fire(self, ctx: TripwireContext) -> bool:
+    def should_fire(self, ctx: JitPromptContext) -> bool:
         log_path = _session_log_path(ctx.project_dir, ctx.session_id)
         if log_path is None:
             return False
@@ -155,16 +155,16 @@ def _read_threshold(project_dir: Path) -> int:
         return DEFAULT_WRITE_COUNT_THRESHOLD
     if not isinstance(data, dict):
         return DEFAULT_WRITE_COUNT_THRESHOLD
-    tripwires = data.get("tripwires")
-    if not isinstance(tripwires, dict):
+    jit_prompts = data.get("jit_prompts")
+    if not isinstance(jit_prompts, dict):
         return DEFAULT_WRITE_COUNT_THRESHOLD
-    extras = tripwires.get("extra") or []
+    extras = jit_prompts.get("extra") or []
     if not isinstance(extras, list):
         return DEFAULT_WRITE_COUNT_THRESHOLD
     for entry in extras:
         if not isinstance(entry, dict):
             continue
-        if entry.get("id") != WriteCountTripwire.id:
+        if entry.get("id") != WriteCountJitPrompt.id:
             continue
         params = entry.get("params") or {}
         if not isinstance(params, dict):
@@ -223,4 +223,4 @@ def _marker_substantive(marker_path: Path) -> bool:
     return bool(has_commits or declared is True)
 
 
-__all__ = ["DEFAULT_WRITE_COUNT_THRESHOLD", "WriteCountTripwire"]
+__all__ = ["DEFAULT_WRITE_COUNT_THRESHOLD", "WriteCountJitPrompt"]

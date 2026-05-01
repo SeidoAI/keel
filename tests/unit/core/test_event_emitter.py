@@ -17,7 +17,7 @@ from tripwire.core.event_emitter import EventEmitter, FileEmitter, NullEmitter
 
 def test_null_emitter_returns_empty_string_and_writes_nothing(tmp_path: Path) -> None:
     emitter = NullEmitter()
-    result = emitter.emit("firings", {"session_id": "s1", "x": 1})
+    result = emitter.emit("jit_prompt_firings", {"session_id": "s1", "x": 1})
     assert result == ""
     # No directories created anywhere relative to tmp_path.
     assert not (tmp_path / ".tripwire").exists()
@@ -25,23 +25,23 @@ def test_null_emitter_returns_empty_string_and_writes_nothing(tmp_path: Path) ->
 
 def test_null_emitter_satisfies_protocol() -> None:
     emitter: EventEmitter = NullEmitter()
-    assert emitter.emit("firings", {"session_id": "s1"}) == ""
+    assert emitter.emit("jit_prompt_firings", {"session_id": "s1"}) == ""
 
 
 def test_file_emitter_satisfies_protocol(tmp_path: Path) -> None:
     emitter: EventEmitter = FileEmitter(tmp_path)
-    path = emitter.emit("firings", {"session_id": "s1", "kind": "tripwire_fire"})
+    path = emitter.emit("jit_prompt_firings", {"session_id": "s1", "kind": "jit_prompt_fire"})
     assert path  # non-empty
     assert Path(path).is_file()
 
 
 def test_file_emitter_writes_to_expected_layout(tmp_path: Path) -> None:
     emitter = FileEmitter(tmp_path)
-    payload = {"session_id": "v0710-routing", "kind": "tripwire_fire", "x": 42}
-    path_str = emitter.emit("firings", payload)
+    payload = {"session_id": "v0710-routing", "kind": "jit_prompt_fire", "x": 42}
+    path_str = emitter.emit("jit_prompt_firings", payload)
     path = Path(path_str)
 
-    expected_dir = tmp_path / ".tripwire" / "events" / "firings" / "v0710-routing"
+    expected_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "v0710-routing"
     assert path.parent == expected_dir
     assert path.name == "0001.json"
     written = json.loads(path.read_text(encoding="utf-8"))
@@ -50,9 +50,9 @@ def test_file_emitter_writes_to_expected_layout(tmp_path: Path) -> None:
 
 def test_file_emitter_monotonic_numbering_per_kind_sid(tmp_path: Path) -> None:
     emitter = FileEmitter(tmp_path)
-    p1 = Path(emitter.emit("firings", {"session_id": "s1"}))
-    p2 = Path(emitter.emit("firings", {"session_id": "s1"}))
-    p3 = Path(emitter.emit("firings", {"session_id": "s1"}))
+    p1 = Path(emitter.emit("jit_prompt_firings", {"session_id": "s1"}))
+    p2 = Path(emitter.emit("jit_prompt_firings", {"session_id": "s1"}))
+    p3 = Path(emitter.emit("jit_prompt_firings", {"session_id": "s1"}))
     assert p1.name == "0001.json"
     assert p2.name == "0002.json"
     assert p3.name == "0003.json"
@@ -60,9 +60,9 @@ def test_file_emitter_monotonic_numbering_per_kind_sid(tmp_path: Path) -> None:
 
 def test_file_emitter_numbering_independent_across_sids(tmp_path: Path) -> None:
     emitter = FileEmitter(tmp_path)
-    a1 = Path(emitter.emit("firings", {"session_id": "alpha"}))
-    b1 = Path(emitter.emit("firings", {"session_id": "beta"}))
-    a2 = Path(emitter.emit("firings", {"session_id": "alpha"}))
+    a1 = Path(emitter.emit("jit_prompt_firings", {"session_id": "alpha"}))
+    b1 = Path(emitter.emit("jit_prompt_firings", {"session_id": "beta"}))
+    a2 = Path(emitter.emit("jit_prompt_firings", {"session_id": "alpha"}))
     assert a1.name == "0001.json"
     assert b1.name == "0001.json"
     assert a2.name == "0002.json"
@@ -70,9 +70,9 @@ def test_file_emitter_numbering_independent_across_sids(tmp_path: Path) -> None:
 
 def test_file_emitter_numbering_independent_across_kinds(tmp_path: Path) -> None:
     emitter = FileEmitter(tmp_path)
-    f1 = Path(emitter.emit("firings", {"session_id": "s1"}))
+    f1 = Path(emitter.emit("jit_prompt_firings", {"session_id": "s1"}))
     v1 = Path(emitter.emit("validator_runs", {"session_id": "s1"}))
-    f2 = Path(emitter.emit("firings", {"session_id": "s1"}))
+    f2 = Path(emitter.emit("jit_prompt_firings", {"session_id": "s1"}))
     assert f1.name == "0001.json"
     assert v1.name == "0001.json"
     assert f2.name == "0002.json"
@@ -81,17 +81,17 @@ def test_file_emitter_numbering_independent_across_kinds(tmp_path: Path) -> None
 def test_file_emitter_creates_project_dir_if_missing(tmp_path: Path) -> None:
     target = tmp_path / "newproj"  # does not exist yet
     emitter = FileEmitter(target)
-    path = Path(emitter.emit("firings", {"session_id": "s1"}))
+    path = Path(emitter.emit("jit_prompt_firings", {"session_id": "s1"}))
     assert path.is_file()
-    assert (target / ".tripwire" / "events" / "firings" / "s1").is_dir()
+    assert (target / ".tripwire" / "events" / "jit_prompt_firings" / "s1").is_dir()
 
 
 def test_file_emitter_rejects_payload_without_session_id(tmp_path: Path) -> None:
     emitter = FileEmitter(tmp_path)
     with pytest.raises(ValueError, match="session_id"):
-        emitter.emit("firings", {})
+        emitter.emit("jit_prompt_firings", {})
     with pytest.raises(ValueError, match="session_id"):
-        emitter.emit("firings", {"session_id": ""})
+        emitter.emit("jit_prompt_firings", {"session_id": ""})
 
 
 def test_file_emitter_rejects_empty_kind(tmp_path: Path) -> None:
@@ -103,9 +103,9 @@ def test_file_emitter_rejects_empty_kind(tmp_path: Path) -> None:
 def test_file_emitter_rejects_kind_with_path_separators(tmp_path: Path) -> None:
     emitter = FileEmitter(tmp_path)
     with pytest.raises(ValueError, match="kind"):
-        emitter.emit("firings/../etc", {"session_id": "s1"})
+        emitter.emit("jit_prompt_firings/../etc", {"session_id": "s1"})
     with pytest.raises(ValueError, match="session_id"):
-        emitter.emit("firings", {"session_id": "../escape"})
+        emitter.emit("jit_prompt_firings", {"session_id": "../escape"})
 
 
 def test_file_emitter_concurrent_threads_no_clobber(tmp_path: Path) -> None:
@@ -119,7 +119,7 @@ def test_file_emitter_concurrent_threads_no_clobber(tmp_path: Path) -> None:
     def worker(i: int) -> None:
         barrier.wait()
         for j in range(per_thread):
-            p = emitter.emit("firings", {"session_id": "s1", "thread": i, "n": j})
+            p = emitter.emit("jit_prompt_firings", {"session_id": "s1", "thread": i, "n": j})
             with paths_lock:
                 paths.append(p)
 
@@ -134,7 +134,7 @@ def test_file_emitter_concurrent_threads_no_clobber(tmp_path: Path) -> None:
     assert len(set(paths)) == expected_count, "duplicate paths returned to callers"
 
     files = sorted(
-        (tmp_path / ".tripwire" / "events" / "firings" / "s1").glob("*.json")
+        (tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "s1").glob("*.json")
     )
     assert len(files) == expected_count
     names = [f.name for f in files]
@@ -148,29 +148,29 @@ def test_file_emitter_pads_to_four_digits_then_grows(tmp_path: Path) -> None:
     """`<n>` is padded to at least 4 digits; rolls over correctly past 9999."""
     emitter = FileEmitter(tmp_path)
     # Pre-seed 9999 so the next emit lands on 10000.
-    sid_dir = tmp_path / ".tripwire" / "events" / "firings" / "s1"
+    sid_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "s1"
     sid_dir.mkdir(parents=True)
     (sid_dir / "9999.json").write_text("{}", encoding="utf-8")
-    p = Path(emitter.emit("firings", {"session_id": "s1"}))
+    p = Path(emitter.emit("jit_prompt_firings", {"session_id": "s1"}))
     assert p.name == "10000.json"
 
 
 def test_file_emitter_resumes_numbering_from_existing_files(tmp_path: Path) -> None:
-    sid_dir = tmp_path / ".tripwire" / "events" / "firings" / "s1"
+    sid_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "s1"
     sid_dir.mkdir(parents=True)
     (sid_dir / "0001.json").write_text("{}", encoding="utf-8")
     (sid_dir / "0007.json").write_text("{}", encoding="utf-8")
     emitter = FileEmitter(tmp_path)
-    p = Path(emitter.emit("firings", {"session_id": "s1"}))
+    p = Path(emitter.emit("jit_prompt_firings", {"session_id": "s1"}))
     assert p.name == "0008.json"
 
 
 def test_file_emitter_ignores_non_event_files_when_numbering(tmp_path: Path) -> None:
-    sid_dir = tmp_path / ".tripwire" / "events" / "firings" / "s1"
+    sid_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "s1"
     sid_dir.mkdir(parents=True)
     (sid_dir / "README.md").write_text("notes", encoding="utf-8")
     (sid_dir / "0002.json.tmp").write_text("{}", encoding="utf-8")
     (sid_dir / "abc.json").write_text("{}", encoding="utf-8")
     emitter = FileEmitter(tmp_path)
-    p = Path(emitter.emit("firings", {"session_id": "s1"}))
+    p = Path(emitter.emit("jit_prompt_firings", {"session_id": "s1"}))
     assert p.name == "0001.json"

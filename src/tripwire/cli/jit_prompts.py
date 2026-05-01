@@ -1,8 +1,8 @@
-"""`tripwire tripwires` — PM-side registry inspection.
+"""`tripwire jit-prompts` — PM-side registry inspection.
 
 Subcommands:
 
-  * ``list`` — list registered tripwires for the project. ``--reveal``
+  * ``list`` — list registered JIT prompts for the project. ``--reveal``
     surfaces the prompt body (PM-only — sensitive surface).
 
 The role gate is the same one the primitive spec calls for in §7:
@@ -39,18 +39,18 @@ def _is_pm() -> bool:
 def _require_pm() -> None:
     if not _is_pm():
         raise click.ClickException(
-            "`tripwire tripwires` is PM-only. Set `TRIPWIRE_ROLE=pm` "
+            "`tripwire jit-prompts` is PM-only. Set `TRIPWIRE_ROLE=pm` "
             "or write `pm` to `~/.tripwire/role` (or "
             "`$TRIPWIRE_HOME/role`) and re-run."
         )
 
 
-@click.group("tripwires")
-def tripwires_cmd() -> None:
-    """PM-side tripwire registry inspection."""
+@click.group("jit-prompts")
+def jit_prompts_cmd() -> None:
+    """PM-side JIT prompt registry inspection."""
 
 
-@tripwires_cmd.command("list")
+@jit_prompts_cmd.command("list")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
@@ -61,37 +61,39 @@ def tripwires_cmd() -> None:
     "--reveal",
     is_flag=True,
     default=False,
-    help="Reveal each tripwire's prompt body (PM-only — content is sensitive).",
+    help="Reveal each JIT prompt body (PM-only; content is sensitive).",
 )
-def tripwires_list_cmd(project_dir: Path, reveal: bool) -> None:
-    """List registered tripwires for the project."""
-    from tripwire._internal.tripwires import TripwireContext
-    from tripwire._internal.tripwires.loader import load_registry
+def jit_prompts_list_cmd(project_dir: Path, reveal: bool) -> None:
+    """List registered JIT prompts for the project."""
+    from tripwire._internal.jit_prompts import JitPromptContext
+    from tripwire._internal.jit_prompts.loader import load_jit_prompt_registry
 
     _require_pm()
 
     resolved = project_dir.expanduser().resolve()
-    registry = load_registry(resolved)
+    registry = load_jit_prompt_registry(resolved)
     if not registry:
-        click.echo("Tripwires are disabled for this project (no tripwires registered).")
+        click.echo("JIT prompts are disabled for this project (no prompts registered).")
         return
 
     # Synthetic context for prompt rendering when --reveal is set.
     # The session_id is a placeholder — variation choice is by
     # (project_id, session_id) hash, so this gives a deterministic
     # "default" view without needing an actual session.
-    ctx = TripwireContext(
+    ctx = JitPromptContext(
         project_dir=resolved, session_id="<inspection>", project_id="<inspection>"
     )
 
     rows = 0
     for event in sorted(registry):
-        for tw in registry[event]:
+        for jit_prompt in registry[event]:
             rows += 1
-            click.echo(f"  {tw.id}  fires_on={event}  blocks={tw.blocks}")
+            click.echo(
+                f"  {jit_prompt.id}  fires_on={event}  blocks={jit_prompt.blocks}"
+            )
             if reveal:
                 try:
-                    prompt = tw.fire(ctx)
+                    prompt = jit_prompt.fire(ctx)
                 except Exception as exc:  # pragma: no cover — defensive
                     click.echo(f"    <error rendering prompt: {exc}>")
                     continue

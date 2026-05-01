@@ -1,8 +1,8 @@
-"""Tests for the write-count tripwire (KUI-141 / B7).
+"""Tests for the write-count JIT prompt (KUI-141 / B7).
 
 Fires on ``session.complete`` when the count of file-edit tool
 invocations in the session's claude log exceeds a threshold (default
-20). Per-project override via ``project.yaml.tripwires.extra`` for an
+20). Per-project override via ``project.yaml.jit_prompts.extra`` for an
 entry with ``id: write-count`` and ``params: {threshold: N}``.
 """
 
@@ -13,11 +13,11 @@ from pathlib import Path
 
 import yaml
 
-from tripwire._internal.tripwires import TripwireContext
-from tripwire._internal.tripwires.write_count import (
+from tripwire._internal.jit_prompts import JitPromptContext
+from tripwire._internal.jit_prompts.write_count import (
     _VARIATIONS,
     DEFAULT_WRITE_COUNT_THRESHOLD,
-    WriteCountTripwire,
+    WriteCountJitPrompt,
     _count_writes,
     _read_threshold,
 )
@@ -33,7 +33,7 @@ def _seed_project(project_dir: Path, *, extras: list[dict] | None = None) -> Non
         "repos": {"SeidoAI/demo": {"local": "."}},
     }
     if extras is not None:
-        project_yaml["tripwires"] = {"extra": extras}
+        project_yaml["jit_prompts"] = {"extra": extras}
     (project_dir / "project.yaml").write_text(
         yaml.safe_dump(project_yaml, sort_keys=False), encoding="utf-8"
     )
@@ -99,8 +99,8 @@ def _seed_session_with_log(
     return log_path
 
 
-def _ctx(tmp_path: Path, session_id: str = "alpha") -> TripwireContext:
-    return TripwireContext(
+def _ctx(tmp_path: Path, session_id: str = "alpha") -> JitPromptContext:
+    return JitPromptContext(
         project_dir=tmp_path,
         session_id=session_id,
         project_id="demo",
@@ -108,7 +108,7 @@ def _ctx(tmp_path: Path, session_id: str = "alpha") -> TripwireContext:
 
 
 def test_class_attrs() -> None:
-    tw = WriteCountTripwire()
+    tw = WriteCountJitPrompt()
     assert tw.id == "write-count"
     assert tw.fires_on == "session.complete"
     assert tw.blocks is True
@@ -165,7 +165,7 @@ def test_count_writes_missing_log_returns_zero(tmp_path: Path) -> None:
 def test_should_fire_under_threshold(tmp_path: Path) -> None:
     _seed_project(tmp_path)
     _seed_session_with_log(tmp_path, "alpha", write_count=5)
-    tw = WriteCountTripwire()
+    tw = WriteCountJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -174,12 +174,12 @@ def test_should_fire_above_default_threshold(tmp_path: Path) -> None:
     _seed_session_with_log(
         tmp_path, "alpha", write_count=DEFAULT_WRITE_COUNT_THRESHOLD + 5
     )
-    tw = WriteCountTripwire()
+    tw = WriteCountJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is True
 
 
 def test_per_project_threshold_override_respected(tmp_path: Path) -> None:
-    """Per-project override via tripwires.extra.params.threshold."""
+    """Per-project override via jit_prompts.extra.params.threshold."""
     _seed_project(
         tmp_path,
         extras=[
@@ -187,14 +187,14 @@ def test_per_project_threshold_override_respected(tmp_path: Path) -> None:
                 "id": "write-count",
                 "fires_on": "session.complete",
                 "class": (
-                    "tripwire._internal.tripwires.write_count.WriteCountTripwire"
+                    "tripwire._internal.jit_prompts.write_count.WriteCountJitPrompt"
                 ),
                 "params": {"threshold": 5},
             }
         ],
     )
     _seed_session_with_log(tmp_path, "alpha", write_count=10)
-    tw = WriteCountTripwire()
+    tw = WriteCountJitPrompt()
     # 10 > 5 (override) → fires
     assert tw.should_fire(_ctx(tmp_path)) is True
 
@@ -207,14 +207,14 @@ def test_per_project_threshold_override_silent_below(tmp_path: Path) -> None:
                 "id": "write-count",
                 "fires_on": "session.complete",
                 "class": (
-                    "tripwire._internal.tripwires.write_count.WriteCountTripwire"
+                    "tripwire._internal.jit_prompts.write_count.WriteCountJitPrompt"
                 ),
                 "params": {"threshold": 100},
             }
         ],
     )
     _seed_session_with_log(tmp_path, "alpha", write_count=50)
-    tw = WriteCountTripwire()
+    tw = WriteCountJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -231,7 +231,7 @@ def test_read_threshold_uses_extra_params(tmp_path: Path) -> None:
                 "id": "write-count",
                 "fires_on": "session.complete",
                 "class": (
-                    "tripwire._internal.tripwires.write_count.WriteCountTripwire"
+                    "tripwire._internal.jit_prompts.write_count.WriteCountJitPrompt"
                 ),
                 "params": {"threshold": 7},
             }
@@ -256,12 +256,12 @@ def test_silent_when_log_path_missing(tmp_path: Path) -> None:
         "---\n" + yaml.safe_dump(body, sort_keys=False) + "---\n",
         encoding="utf-8",
     )
-    tw = WriteCountTripwire()
+    tw = WriteCountJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
 def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
-    tw = WriteCountTripwire()
+    tw = WriteCountJitPrompt()
     ctx = _ctx(tmp_path)
     marker = ctx.ack_path("write-count")
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -270,6 +270,6 @@ def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
 
 
 def test_fire_returns_one_of_the_variations(tmp_path: Path) -> None:
-    tw = WriteCountTripwire()
+    tw = WriteCountJitPrompt()
     prompt = tw.fire(_ctx(tmp_path))
     assert prompt in _VARIATIONS

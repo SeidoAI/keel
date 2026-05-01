@@ -15,7 +15,7 @@ function mockFetch() {
         project_id: "p1",
         lifecycle: { stations: [] },
         validators: [],
-        tripwires: [],
+        jit_prompts: [],
         connectors: { sources: [], sinks: [] },
         artifacts: [],
       }),

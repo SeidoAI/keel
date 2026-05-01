@@ -5,10 +5,10 @@ each :class:`WorkflowFinding` into the validator's standard
 :class:`CheckResult` channel. Surfaces under ``tripwire validate``.
 
 This first cut runs with empty ``known_validators`` /
-``known_tripwires`` / ``known_prompt_checks`` sets — meaning the
+``known_jit_prompts`` / ``known_prompt_checks`` sets — meaning the
 ref-existence checks short-circuit. Subsequent v0.9 sessions tighten
 the contract by populating those sets from the station registries
-(KUI-120 validators, KUI-121 tripwires, KUI-122 prompt-checks). The
+(KUI-120 validators, KUI-121 JIT prompts, KUI-122 prompt-checks). The
 schema-shape checks (unknown_next_station, terminal_with_next, …)
 fire today.
 """
@@ -52,7 +52,7 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
     findings = validate_workflow_spec(
         spec,
         known_validators=_known_validators(),
-        known_tripwires=_known_tripwires(),
+        known_jit_prompts=_known_jit_prompts(),
         known_prompt_checks=_known_prompt_checks(ctx.project_dir),
     )
     for finding in findings:
@@ -84,29 +84,29 @@ def _known_validators() -> set[str]:
     return known_validator_ids()
 
 
-def _known_tripwires() -> set[str]:
-    """Return the registry-declared tripwire ids.
+def _known_jit_prompts() -> set[str]:
+    """Return the registry-declared JIT prompt ids.
 
-    Populated by KUI-121 once each Tripwire subclass declares its
+    Populated by KUI-121 once each JitPrompt subclass declares its
     station via ``at = (...)``.
 
     KNOWN GAP (codex P2 on PR #73): the registry is populated as a
-    side-effect of `_instantiate()` in tripwires/loader.py, which only
-    runs when `load_registry(project_dir)` is called. `tripwire
+    side-effect of `_instantiate()` in jit_prompts/loader.py, which only
+    runs when `load_jit_prompt_registry(project_dir)` is called. `tripwire
     validate` does not call it, so this set is usually empty during
     workflow.yaml ref-checks — which silently disables the
-    `workflow/unknown_tripwire` finding. Force-loading from this
+    `workflow/unknown_jit_prompt` finding. Force-loading from this
     callsite would mutate global registry state in a way that leaks
     into the gate runtime in transitions.py (the same registry is
-    used to enforce tripwires-at-stations during `tripwire
+    used to enforce JIT-prompts-at-stations during `tripwire
     transition`), turning workflow.yaml validation into an
     unintentional precondition for transition behaviour. Filed as
     follow-up: see post-completion-comments.md §Follow-ups
-    "snapshot/restore tripwire registry for validate-time ref checks".
+    "snapshot/restore JIT prompt registry for validate-time ref checks".
     """
-    from tripwire.core.workflow.registry import known_tripwire_ids
+    from tripwire.core.workflow.registry import known_jit_prompt_ids
 
-    return known_tripwire_ids()
+    return known_jit_prompt_ids()
 
 
 def _known_prompt_checks(project_dir):  # type: ignore[no-untyped-def]

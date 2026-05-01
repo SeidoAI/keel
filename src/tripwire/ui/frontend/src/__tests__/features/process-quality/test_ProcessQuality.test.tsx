@@ -39,7 +39,7 @@ describe("ProcessQuality", () => {
   it("renders kind histogram, instance histogram, and top rules from seeded data", () => {
     const Wrapper = withRoute({
       total: 7,
-      by_kind: { "validator.run": 4, "tripwire.fired": 3 },
+      by_kind: { "validator.run": 4, "jit_prompt.fired": 3 },
       by_instance: { "sess-1": 5, "sess-2": 2 },
       top_rules: [
         { id: "v_uuid_present", count: 4 },
@@ -48,7 +48,7 @@ describe("ProcessQuality", () => {
     });
     render(<ProcessQuality />, { wrapper: Wrapper });
     expect(screen.getByTestId("pq-kind-validator.run")).toBeInTheDocument();
-    expect(screen.getByTestId("pq-kind-tripwire.fired")).toBeInTheDocument();
+    expect(screen.getByTestId("pq-kind-jit_prompt.fired")).toBeInTheDocument();
     expect(screen.getByTestId("pq-instance-sess-1")).toBeInTheDocument();
     expect(screen.getByText("v_uuid_present")).toBeInTheDocument();
     expect(screen.getByText("tw_self_review")).toBeInTheDocument();

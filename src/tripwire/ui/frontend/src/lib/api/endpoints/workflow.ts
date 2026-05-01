@@ -21,7 +21,7 @@ export interface WorkflowStation {
 
 export interface WorkflowValidator {
   id: string;
-  kind: "gate" | "tripwire";
+  kind: "gate" | "jit_prompt";
   name: string;
   checks?: string;
   fires_on_station: string;
@@ -60,15 +60,13 @@ export type WorkflowYamlNext =
   | { kind: "conditional"; branches: WorkflowYamlBranch[] }
   | { kind: "terminal" };
 
-export type WorkflowYamlBranch =
-  | { if: string; then: string }
-  | { else: string };
+export type WorkflowYamlBranch = { if: string; then: string } | { else: string };
 
 export interface WorkflowYamlStation {
   id: string;
   next: WorkflowYamlNext;
   validators: string[];
-  tripwires: string[];
+  jit_prompts: string[];
   prompt_checks: string[];
 }
 
@@ -83,7 +81,7 @@ export interface WorkflowGraph {
   project_id: string;
   lifecycle: { stations: WorkflowStation[] };
   validators: WorkflowValidator[];
-  tripwires: WorkflowValidator[];
+  jit_prompts: WorkflowValidator[];
   connectors: { sources: WorkflowConnector[]; sinks: WorkflowConnector[] };
   artifacts: WorkflowArtifact[];
   /** v0.9 — workflow.yaml-derived workflow definitions (KUI-125). */
@@ -95,7 +93,7 @@ export const workflowApi = {
    * GET the orchestration graph for a project.
    *
    * `pmMode` toggles the `X-Tripwire-Role: pm` header so the
-   * server fills `tripwires[*].prompt_revealed` with the
+   * server fills `jit_prompts[*].prompt_revealed` with the
    * unredacted body (otherwise it returns `null`). The role gate
    * is a semantic separation, not auth — see `role_gate.py`.
    */
@@ -108,7 +106,7 @@ export const workflowApi = {
 /** Polling floor for the workflow query.
  *
  * The workflow graph is built from registries at request time —
- * a Python-side validator/tripwire registration changes the
+ * a Python-side validator/JIT prompt registration changes the
  * payload but doesn't fire any of the existing `file_changed`
  * entity types. Polling at 30s is the cheap floor that keeps
  * the AC#3 "auto-updates when backend registers a new entity"
@@ -125,7 +123,7 @@ export const WORKFLOW_REFETCH_MS = 30_000;
 export function useWorkflow(pid: string, opts?: { pmMode?: boolean }) {
   const pmMode = Boolean(opts?.pmMode);
   return useQuery<WorkflowGraph>({
-    // PM-mode payload differs from default (tripwire prompt
+    // PM-mode payload differs from default (JIT prompt
     // bodies revealed); cache them under separate keys so toggling
     // role doesn't return a stale redacted graph.
     queryKey: [...queryKeys.workflow(pid), { pmMode }] as const,

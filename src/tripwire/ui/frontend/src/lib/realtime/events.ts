@@ -64,7 +64,7 @@ export interface PongEvent {
  *  Named `ProcessEventBroadcast` rather than `ProcessEvent` to avoid
  *  colliding with the same-named REST type in `endpoints/events.ts`. */
 export type ProcessEventKindBroadcast =
-  | "tripwire_fire"
+  | "jit_prompt_fire"
   | "validator_pass"
   | "validator_fail"
   | "artifact_rejected"

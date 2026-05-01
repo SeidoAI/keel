@@ -1,4 +1,4 @@
-"""Tests for the stopped-to-ask tripwire (KUI-140 / B6).
+"""Tests for the stopped-to-ask JIT prompt (KUI-140 / B6).
 
 Fires on ``session.complete`` if the session plan declares a
 ``## Stop and ask`` section but the session log shows no agent comment
@@ -15,10 +15,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tripwire._internal.tripwires import TripwireContext
-from tripwire._internal.tripwires.stopped_to_ask import (
+from tripwire._internal.jit_prompts import JitPromptContext
+from tripwire._internal.jit_prompts.stopped_to_ask import (
     _VARIATIONS,
-    StoppedToAskTripwire,
+    StoppedToAskJitPrompt,
     _plan_has_stop_and_ask,
     _scope_creep,
     _stop_ask_signalled,
@@ -78,8 +78,8 @@ def _seed_comment(
     )
 
 
-def _ctx(tmp_path: Path, session_id: str = "alpha") -> TripwireContext:
-    return TripwireContext(
+def _ctx(tmp_path: Path, session_id: str = "alpha") -> JitPromptContext:
+    return JitPromptContext(
         project_dir=tmp_path,
         session_id=session_id,
         project_id="demo",
@@ -87,7 +87,7 @@ def _ctx(tmp_path: Path, session_id: str = "alpha") -> TripwireContext:
 
 
 def test_class_attrs() -> None:
-    tw = StoppedToAskTripwire()
+    tw = StoppedToAskJitPrompt()
     assert tw.id == "stopped-to-ask"
     assert tw.fires_on == "session.complete"
     assert tw.blocks is True
@@ -148,7 +148,7 @@ def test_should_fire_clean_session(tmp_path: Path) -> None:
     _seed_project(tmp_path)
     _seed_session(tmp_path, "alpha", key_files=["src/foo/"])
     _seed_plan(tmp_path, "alpha", "## Steps\nbody\n")
-    tw = StoppedToAskTripwire()
+    tw = StoppedToAskJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
@@ -161,7 +161,7 @@ def test_should_fire_when_scope_creep_no_signal(
     _seed_plan(tmp_path, "alpha", "## Stop and ask\n- if X, stop\n")
 
     # Monkeypatch the "touched files" provider to simulate scope creep.
-    from tripwire._internal.tripwires import stopped_to_ask
+    from tripwire._internal.jit_prompts import stopped_to_ask
 
     monkeypatch.setattr(
         stopped_to_ask,
@@ -169,7 +169,7 @@ def test_should_fire_when_scope_creep_no_signal(
         lambda project_dir, session_id: ["src/foo/x.py", "src/baz/y.py"],
     )
 
-    tw = StoppedToAskTripwire()
+    tw = StoppedToAskJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is True
 
 
@@ -186,25 +186,25 @@ def test_should_fire_silent_when_signal_present(
         "001",
         {"kind": "stop_and_ask", "body": "blocked on Y, please decide?"},
     )
-    from tripwire._internal.tripwires import stopped_to_ask
+    from tripwire._internal.jit_prompts import stopped_to_ask
 
     monkeypatch.setattr(
         stopped_to_ask,
         "_session_touched_files",
         lambda project_dir, session_id: ["src/foo/x.py", "src/baz/y.py"],
     )
-    tw = StoppedToAskTripwire()
+    tw = StoppedToAskJitPrompt()
     assert tw.should_fire(_ctx(tmp_path)) is False
 
 
 def test_fire_returns_one_of_the_variations(tmp_path: Path) -> None:
-    tw = StoppedToAskTripwire()
+    tw = StoppedToAskJitPrompt()
     prompt = tw.fire(_ctx(tmp_path))
     assert prompt in _VARIATIONS
 
 
 def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
-    tw = StoppedToAskTripwire()
+    tw = StoppedToAskJitPrompt()
     ctx = _ctx(tmp_path)
     marker = ctx.ack_path("stopped-to-ask")
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -233,7 +233,7 @@ def test_session_touched_files_uses_project_base_branch(
         seen_args.append(list(args))
         return ""
 
-    from tripwire._internal.tripwires import stopped_to_ask
+    from tripwire._internal.jit_prompts import stopped_to_ask
 
     monkeypatch.setattr(stopped_to_ask.subprocess, "check_output", _fake)
     stopped_to_ask._session_touched_files(tmp_path, "alpha")
@@ -254,7 +254,7 @@ def test_session_touched_files_falls_back_to_main_when_unknown(
         seen_args.append(list(args))
         return ""
 
-    from tripwire._internal.tripwires import stopped_to_ask
+    from tripwire._internal.jit_prompts import stopped_to_ask
 
     monkeypatch.setattr(stopped_to_ask.subprocess, "check_output", _fake)
     stopped_to_ask._session_touched_files(tmp_path, "alpha")

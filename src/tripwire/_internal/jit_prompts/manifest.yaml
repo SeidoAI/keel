@@ -1,0 +1,26 @@
+# Built-in JIT prompt registry — event → prompt-class mapping.
+#
+# v0.8.0 ships the primitive plus the canonical first JIT prompt
+# (self-review on session.complete). v0.9 adds deviation prompts that
+# fire only when their observed pattern is present.
+#
+# Five lifecycle events are wired through the registry; only the one
+# below has registered prompts. Empty event keys are
+# explicitly listed so the loader's contract surface is the full set.
+session.complete:
+  - id: self-review
+    class: tripwire._internal.jit_prompts.self_review.SelfReviewJitPrompt
+  - id: phase-transition
+    class: tripwire._internal.jit_prompts.phase_transition.PhaseTransitionJitPrompt
+  - id: followups-not-filed
+    class: tripwire._internal.jit_prompts.followups_not_filed.FollowupsNotFiledJitPrompt
+  - id: stopped-to-ask
+    class: tripwire._internal.jit_prompts.stopped_to_ask.StoppedToAskJitPrompt
+  - id: write-count
+    class: tripwire._internal.jit_prompts.write_count.WriteCountJitPrompt
+  - id: cost-ceiling
+    class: tripwire._internal.jit_prompts.cost_ceiling.CostCeilingJitPrompt
+issue.close: []
+pr.open: []
+validate.run: []
+session.resume: []

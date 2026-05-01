@@ -5,16 +5,16 @@ import { useProjectShell } from "@/app/ProjectShell";
 import { Stamp } from "@/components/ui/stamp";
 import { ApiError } from "@/lib/api/client";
 import {
+  useWorkflow,
   type WorkflowYamlBranch,
   type WorkflowYamlDefinition,
   type WorkflowYamlStation,
-  useWorkflow,
 } from "@/lib/api/endpoints/workflow";
 import { isPmMode } from "@/lib/role";
 import { ArtifactCard } from "./ArtifactCard";
 import { ConnectorCurve } from "./ConnectorCurve";
+import { JitPromptCard } from "./JitPromptCard";
 import { StationCard } from "./StationCard";
-import { TripwireCard } from "./TripwireCard";
 import {
   computeWorkflowLayout,
   type PositionedConnector,
@@ -29,7 +29,7 @@ import { WorkflowDrawer, type WorkflowSelection } from "./WorkflowDrawer";
  *
  * Read-only visualisation of how Tripwire orchestrates a session.
  * Sources flow in LEFT, sinks flow out RIGHT, the lifecycle wire
- * runs through the centre, validators and tripwires sit above
+ * runs through the centre, validators and JIT prompts sit above
  * their gating station, artifacts below their producer.
  *
  * Per [[dec-critical-path-elon-method]] this is process spec, not
@@ -41,7 +41,7 @@ export function WorkflowMap() {
   const [searchParams] = useSearchParams();
   // Detect PM-mode BEFORE the fetch so the hook can pin
   // X-Tripwire-Role on the request and the React Query cache key
-  // — the backend nulls `tripwires[*].prompt_revealed` for non-PM
+  // — the backend nulls `jit_prompts[*].prompt_revealed` for non-PM
   // viewers, so without this the drawer never has the prompt body
   // even when ?role=pm is set.
   const pmMode = useMemo(() => isPmMode(searchParams.get("role")), [searchParams]);
@@ -93,7 +93,7 @@ export function WorkflowMap() {
  * Workflow.yaml-derived panel (KUI-125).
  *
  * Renders one card per declared workflow with stations, conditional
- * branches, and the validators/tripwires/prompt-checks each station
+ * branches, and the validators/JIT prompts/prompt-checks each station
  * references. Sits below the canvas so the existing introspection-
  * derived view (lifecycle wire) stays visible at the top — the panel
  * is the new shape; the canvas is the live one. Future iterations
@@ -144,11 +144,7 @@ function WorkflowDefinitionCard({ workflow }: { workflow: WorkflowYamlDefinition
       <ol className="flex flex-col gap-1.5 font-mono text-[11px] text-(--color-ink-2)">
         {workflow.stations.map((station, idx) => (
           <li key={station.id}>
-            <WorkflowStationRow
-              station={station}
-              index={idx}
-              total={workflow.stations.length}
-            />
+            <WorkflowStationRow station={station} index={idx} total={workflow.stations.length} />
           </li>
         ))}
       </ol>
@@ -174,14 +170,11 @@ function WorkflowStationRow({
         <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
           {String(index + 1).padStart(2, "0")}
         </span>
-        <span className="font-sans font-semibold text-(--color-ink)">
-          {station.id}
-        </span>
+        <span className="font-sans font-semibold text-(--color-ink)">{station.id}</span>
         <NextSpec next={station.next} />
       </div>
-      {(station.validators.length ||
-        station.tripwires.length ||
-        station.prompt_checks.length) > 0 ? (
+      {(station.validators.length || station.jit_prompts.length || station.prompt_checks.length) >
+      0 ? (
         <div className="flex flex-wrap gap-1.5 text-[10px]">
           {station.validators.map((v) => (
             <span
@@ -192,13 +185,13 @@ function WorkflowStationRow({
               gate: {v}
             </span>
           ))}
-          {station.tripwires.map((t) => (
+          {station.jit_prompts.map((t) => (
             <span
               key={`t-${t}`}
-              data-testid={`yaml-station-${station.id}-tripwire-${t}`}
+              data-testid={`yaml-station-${station.id}-jit-prompt-${t}`}
               className="rounded-(--radius-stamp) border border-(--color-tripwire) bg-(--color-paper) px-1.5 py-0.5 text-(--color-tripwire)"
             >
-              tripwire: {t}
+              JIT prompt: {t}
             </span>
           ))}
           {station.prompt_checks.map((p) => (
@@ -242,9 +235,10 @@ function NextSpec({ next }: { next: WorkflowYamlStation["next"] }) {
       data-testid="next-conditional"
       className="ml-auto flex flex-col items-end gap-0.5 font-mono text-[10px] text-(--color-ink-3)"
     >
-      {next.branches.map((b, i) => (
-        <span key={i}>{branchLabel(b)}</span>
-      ))}
+      {next.branches.map((b) => {
+        const label = branchLabel(b);
+        return <span key={label}>{label}</span>;
+      })}
     </span>
   );
 }
@@ -260,7 +254,7 @@ function is404(err: unknown): boolean {
 
 type HoverKey =
   | { kind: "validator"; id: string }
-  | { kind: "tripwire"; id: string }
+  | { kind: "jit_prompt"; id: string }
   | { kind: "artifact"; id: string }
   | { kind: "source"; id: string }
   | { kind: "sink"; id: string };
@@ -273,7 +267,7 @@ interface CanvasProps {
 }
 
 function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
-  const { stations, validators, tripwires, artifacts, sources, sinks, viewBox } = layout;
+  const { stations, validators, jit_prompts, artifacts, sources, sinks, viewBox } = layout;
   const stationsById = new Map(stations.map((s) => [s.id, s] as const));
   const hl = useMemo(() => computeHighlight(hovered), [hovered]);
 
@@ -363,15 +357,15 @@ function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
             onMouseLeave={() => onHover(null)}
           />
         ))}
-        {tripwires.map((t) => (
-          <TripwireCard
-            key={`tripwire-${t.id}`}
-            tripwire={t}
+        {jit_prompts.map((t) => (
+          <JitPromptCard
+            key={`jit-prompt-${t.id}`}
+            jitPrompt={t}
             x={t.x}
             y={t.y}
-            dimmed={hl.entityDimmed(`tripwire-${t.id}`)}
-            onClick={() => onSelect({ kind: "tripwire", entity: t })}
-            onMouseEnter={() => onHover({ kind: "tripwire", id: t.id })}
+            dimmed={hl.entityDimmed(`jit_prompt-${t.id}`)}
+            onClick={() => onSelect({ kind: "jit_prompt", entity: t })}
+            onMouseEnter={() => onHover({ kind: "jit_prompt", id: t.id })}
             onMouseLeave={() => onHover(null)}
           />
         ))}
@@ -440,7 +434,6 @@ function ConnectorEndpoint({
       <div
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        // biome-ignore lint/a11y/noStaticElementInteractions: hover-only
         // visualisation; connector endpoints are NOT focusable (the
         // cards above the wire are the real click/focus targets).
         // We don't attach onFocus/onBlur because there's no
@@ -516,7 +509,7 @@ const LEGEND_CHIPS: {
   { label: "STATION", tone: "rule", copy: "lifecycle stage on the wire" },
   { label: "SINK", tone: "default", copy: "external output wired out" },
   { label: "GATE", tone: "gate", copy: "validator blocks until rule passes" },
-  { label: "TRIPWIRE", tone: "tripwire", copy: "fires on event — agent must ack" },
+  { label: "JIT PROMPT", tone: "tripwire", copy: "fires on event - agent must ack" },
   { label: "ARTIFACT", tone: "info", copy: "typed document the workflow produces" },
 ];
 

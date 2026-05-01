@@ -3,10 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { useProjectShell } from "@/app/ProjectShell";
 import { Stamp } from "@/components/ui/stamp";
-import {
-  type WorkflowEvent,
-  useWorkflowEvents,
-} from "@/lib/api/endpoints/workflowEvents";
+import { useWorkflowEvents, type WorkflowEvent } from "@/lib/api/endpoints/workflowEvents";
 
 /**
  * Event Log viewer (KUI-155 / I2).
@@ -24,7 +21,7 @@ import {
  */
 const EVENT_KIND_FILTERS = [
   "validator.run",
-  "tripwire.fired",
+  "jit_prompt.fired",
   "prompt_check.invoked",
   "transition.requested",
   "transition.completed",
@@ -91,8 +88,7 @@ export function EventLog() {
           Events
         </h1>
         <p className="font-serif text-[14px] italic text-(--color-ink-2) leading-snug">
-          chronological log of every validator, tripwire, prompt-check, and
-          transition. Read-only.
+          chronological log of every validator, tripwire, prompt-check, and transition. Read-only.
         </p>
       </header>
 
@@ -240,26 +236,20 @@ function chipClass(active: boolean): string {
 
 function KindStamp({ kind }: { kind: string }) {
   const tone =
-    kind === "tripwire.fired" || kind.endsWith("rejected")
+    kind === "jit_prompt.fired" || kind.endsWith("rejected")
       ? "tripwire"
       : kind.startsWith("validator")
         ? "gate"
         : kind.startsWith("transition")
           ? "rule"
           : "info";
-  return (
-    <Stamp tone={tone}>
-      {kind}
-    </Stamp>
-  );
+  return <Stamp tone={tone}>{kind}</Stamp>;
 }
 
 function DetailPane({ event }: { event: WorkflowEvent }) {
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="font-sans font-semibold text-[16px] text-(--color-ink)">
-        {event.event}
-      </h2>
+      <h2 className="font-sans font-semibold text-[16px] text-(--color-ink)">{event.event}</h2>
       <dl className="grid grid-cols-[80px_1fr] gap-x-3 gap-y-1 font-mono text-[12px] text-(--color-ink-2)">
         <dt>ts</dt>
         <dd className="text-(--color-ink)">{event.ts}</dd>
@@ -274,18 +264,14 @@ function DetailPane({ event }: { event: WorkflowEvent }) {
         data-testid="event-detail-json"
         className="overflow-auto rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) p-3 font-mono text-[11px] text-(--color-ink)"
       >
-{JSON.stringify(event.details, null, 2)}
+        {JSON.stringify(event.details, null, 2)}
       </pre>
     </div>
   );
 }
 
 function EmptyRow({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="px-4 py-6 font-serif text-[13px] italic text-(--color-ink-3)">
-      {children}
-    </p>
-  );
+  return <p className="px-4 py-6 font-serif text-[13px] italic text-(--color-ink-3)">{children}</p>;
 }
 
 function formatTs(ts: string): string {

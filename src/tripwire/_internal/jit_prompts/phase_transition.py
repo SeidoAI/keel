@@ -1,4 +1,4 @@
-"""Phase-transition tripwire — KUI-138 / B4.
+"""Phase-transition JIT prompt — KUI-138 / B4.
 
 Fires on ``session.complete`` when the project's ``phase:`` has been
 advanced past the natural end of the previous phase but issues
@@ -7,8 +7,8 @@ catches is the v0.8.x premature-close incident: PM bumps
 ``phase: executing → reviewing`` while ``in_progress`` issues
 remain.
 
-The tripwire body lives inline as ``_VARIATIONS`` (matching
-:mod:`tripwire._internal.tripwires.self_review`) per the design
+The JIT prompt body lives inline as ``_VARIATIONS`` (matching
+:mod:`tripwire._internal.jit_prompts.self_review`) per the design
 decision recorded in ``decisions.md``: there is no markdown-loading
 path in the substrate.
 """
@@ -19,7 +19,7 @@ import json
 from pathlib import Path
 from typing import ClassVar
 
-from tripwire._internal.tripwires import Tripwire, TripwireContext
+from tripwire._internal.jit_prompts import JitPrompt, JitPromptContext
 
 # Phases the project can hold the work in. Linear progression matches
 # ``models.project.ProjectPhase``: scoping → scoped → executing →
@@ -38,7 +38,7 @@ _OPEN_STATUSES = {"backlog", "todo", "in_progress", "in_review"}
 # Label convention: issues are tagged with ``phase:<name>`` to scope
 # them to a project phase. The body of an Issue YAML uses
 # ``labels: [phase:executing, ...]`` — the validator does not enforce
-# this prefix today, so the tripwire treats it as a soft convention.
+# this prefix today, so the JIT prompt treats it as a soft convention.
 _PHASE_LABEL_PREFIX = "phase:"
 
 _VARIATIONS: tuple[str, ...] = (
@@ -103,24 +103,24 @@ fix-commit SHAs and does not declare `declared_no_findings: true`.
 )
 
 
-class PhaseTransitionTripwire(Tripwire):
+class PhaseTransitionJitPrompt(JitPrompt):
     """Block ``session.complete`` when phase moved past open prev-phase issues."""
 
     id: ClassVar[str] = "phase-transition"
     fires_on: ClassVar[str] = "session.complete"
     blocks: ClassVar[bool] = True
 
-    def fire(self, ctx: TripwireContext) -> str:
+    def fire(self, ctx: JitPromptContext) -> str:
         idx = ctx.variation_index(len(_VARIATIONS))
         return _VARIATIONS[idx]
 
-    def is_acknowledged(self, ctx: TripwireContext) -> bool:
+    def is_acknowledged(self, ctx: JitPromptContext) -> bool:
         marker = ctx.ack_path(self.id)
         if not marker.is_file():
             return False
         return _marker_substantive(marker)
 
-    def should_fire(self, ctx: TripwireContext) -> bool:
+    def should_fire(self, ctx: JitPromptContext) -> bool:
         """Fire iff the project advanced past a phase with open issues."""
         return _phase_contract_broken(ctx.project_dir)
 
@@ -158,7 +158,7 @@ def _phase_contract_broken(project_dir: Path) -> bool:
 
 
 def _marker_substantive(marker_path: Path) -> bool:
-    """Same substantiveness check as :class:`SelfReviewTripwire`."""
+    """Same substantiveness check as :class:`SelfReviewJitPrompt`."""
     try:
         data = json.loads(marker_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -173,4 +173,4 @@ def _marker_substantive(marker_path: Path) -> bool:
     return bool(has_commits or declared is True)
 
 
-__all__ = ["PREVIOUS_PHASE", "PhaseTransitionTripwire"]
+__all__ = ["PREVIOUS_PHASE", "PhaseTransitionJitPrompt"]

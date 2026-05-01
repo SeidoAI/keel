@@ -10,13 +10,13 @@ import type { WorkflowArtifact, WorkflowValidator } from "@/lib/api/endpoints/wo
  */
 export type WorkflowSelection =
   | { kind: "validator"; entity: WorkflowValidator }
-  | { kind: "tripwire"; entity: WorkflowValidator }
+  | { kind: "jit_prompt"; entity: WorkflowValidator }
   | { kind: "artifact"; entity: WorkflowArtifact };
 
 export interface WorkflowDrawerProps {
   selection: WorkflowSelection | null;
   /** Whether the current viewer is in PM-mode. Drives whether the
-   *  tripwire drawer reveals `prompt_revealed` content. The server
+   *  JIT prompt drawer reveals `prompt_revealed` content. The server
    *  is the source of truth (it nulls out `prompt_revealed` for
    *  non-PM viewers) — this flag is the UI-side belt-and-braces
    *  so we don't accidentally show a leaked value. */
@@ -60,24 +60,24 @@ function renderContents(
               {v.checks ?? "—"}
             </span>
           </FieldBlock>
-          <FieldBlock label="Recent firings">
+          <FieldBlock label="Recent runs">
             <p className="font-serif text-[13px] italic text-(--color-ink-3)">
-              See the Tripwire Log for the full firing history of this validator.
+              See the Events log for the full history of this validator.
             </p>
           </FieldBlock>
         </div>
       ),
     };
   }
-  if (selection.kind === "tripwire") {
+  if (selection.kind === "jit_prompt") {
     const t = selection.entity;
     const reveal = pmMode ? t.prompt_revealed : null;
-    const placeholder = t.prompt_redacted ?? "<<tripwire registered>>";
+    const placeholder = t.prompt_redacted ?? "<<JIT prompt registered>>";
     return {
       title: t.name,
       header: (
         <div className="flex items-center gap-2">
-          <Stamp tone="tripwire">TRIPWIRE</Stamp>
+          <Stamp tone="tripwire">JIT PROMPT</Stamp>
           <span className="font-mono text-[11px] text-(--color-ink-3)">
             station · {t.fires_on_station}
           </span>
@@ -86,9 +86,9 @@ function renderContents(
       body: (
         <div className="flex flex-col gap-4">
           <DefinitionBlock>
-            A <strong>tripwire</strong> fires on a lifecycle event with an agent-facing prompt. The
-            agent must <em>acknowledge</em> the prompt (act on it, then `--ack`) before the event
-            proceeds.
+            A <strong>JIT prompt</strong> fires on a lifecycle event with agent-facing instructions.
+            The agent must <em>acknowledge</em> the prompt (act on it, then `--ack`) before the
+            event proceeds.
           </DefinitionBlock>
           <FieldBlock label="Fires on">
             <span className="font-mono text-[12px] text-(--color-ink)">

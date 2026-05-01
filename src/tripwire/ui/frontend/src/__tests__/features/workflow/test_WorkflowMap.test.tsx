@@ -37,15 +37,15 @@ function makeGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
         blocks: true,
       },
     ],
-    tripwires: [
+    jit_prompts: [
       {
         id: "t1",
-        kind: "tripwire",
+        kind: "jit_prompt",
         name: "stale-context",
         fires_on_station: "in_review",
         fires_on_event: "session.complete",
         prompt_revealed: null,
-        prompt_redacted: "<<tripwire registered>>",
+        prompt_redacted: "<<JIT prompt registered>>",
       },
     ],
     connectors: {
@@ -96,14 +96,14 @@ describe("WorkflowMap", () => {
     // than a hand-rolled "legend version" of the chip.
     const chips = legend.querySelectorAll("[data-tone]");
     expect(chips.length).toBe(6);
-    // Validator vs tripwire distinction is the cognitive teaching
+    // Validator vs JIT prompt distinction is the cognitive teaching
     // surface — both chips + their explanatory copy must be present.
     expect(within(legend).getByText("GATE")).toBeTruthy();
-    expect(within(legend).getByText("TRIPWIRE")).toBeTruthy();
+    expect(within(legend).getByText("JIT PROMPT")).toBeTruthy();
     expect(within(legend).getByText(/blocks/i)).toBeTruthy();
     expect(within(legend).getByText(/agent must ack/i)).toBeTruthy();
     // All 6 categories represented.
-    for (const label of ["SOURCE", "STATION", "SINK", "GATE", "TRIPWIRE", "ARTIFACT"]) {
+    for (const label of ["SOURCE", "STATION", "SINK", "GATE", "JIT PROMPT", "ARTIFACT"]) {
       expect(within(legend).getByText(label)).toBeTruthy();
     }
   });
@@ -134,34 +134,34 @@ describe("WorkflowMap", () => {
     expect(within(dialog).getByText(/self-review\.md exists/i)).toBeTruthy();
   });
 
-  it("opens the tripwire drawer with the redacted placeholder for non-PM viewers", () => {
+  it("opens the JIT prompt drawer with the redacted placeholder for non-PM viewers", () => {
     const Wrapper = withProviders(makeGraph());
     render(
       <Wrapper>
         <WorkflowMap />
       </Wrapper>,
     );
-    const tripwireButton = screen.getByLabelText(/Tripwire stale-context/);
-    fireEvent.click(tripwireButton);
+    const jitPromptButton = screen.getByLabelText(/JIT prompt stale-context/);
+    fireEvent.click(jitPromptButton);
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText("<<tripwire registered>>")).toBeTruthy();
+    expect(within(dialog).getByText("<<JIT prompt registered>>")).toBeTruthy();
   });
 
   it("reveals the prompt body for ?role=pm viewers (PM-mode payload reaches the drawer)", () => {
-    // Seed the PM-mode cache key with a graph whose tripwire has
+    // Seed the PM-mode cache key with a graph whose JIT prompt has
     // `prompt_revealed` populated (mirroring what the server returns
     // when the `X-Tripwire-Role: pm` header arrives). The drawer
     // should render that body, not the placeholder.
     const graph = makeGraph({
-      tripwires: [
+      jit_prompts: [
         {
           id: "t1",
-          kind: "tripwire",
+          kind: "jit_prompt",
           name: "stale-context",
           fires_on_station: "in_review",
           fires_on_event: "session.complete",
           prompt_revealed: "secret-prompt-body for the agent",
-          prompt_redacted: "<<tripwire registered>>",
+          prompt_redacted: "<<JIT prompt registered>>",
         },
       ],
     });
@@ -171,7 +171,7 @@ describe("WorkflowMap", () => {
         <WorkflowMap />
       </Wrapper>,
     );
-    fireEvent.click(screen.getByLabelText(/Tripwire stale-context/));
+    fireEvent.click(screen.getByLabelText(/JIT prompt stale-context/));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(/secret-prompt-body for the agent/i)).toBeTruthy();
   });

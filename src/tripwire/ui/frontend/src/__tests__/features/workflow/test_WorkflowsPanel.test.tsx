@@ -4,7 +4,7 @@
  * The Workflow Map carries two views in v0.9: the introspection
  * canvas (legacy) and the workflow.yaml panel (this file's surface).
  * These tests pin the panel's contract — stations, conditional
- * branches, validator/tripwire/prompt-check refs are all visible.
+ * branches, validator/JIT prompt/prompt-check refs are all visible.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -13,7 +13,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { WorkflowMap } from "@/features/workflow/WorkflowMap";
-import type { WorkflowGraph } from "@/lib/api/endpoints/workflow";
+import type { WorkflowGraph, WorkflowYamlBranch } from "@/lib/api/endpoints/workflow";
 import { queryKeys } from "@/lib/api/queryKeys";
 
 vi.mock("@/app/ProjectShell", () => ({
@@ -25,11 +25,19 @@ function makeGraph(workflows: WorkflowGraph["workflows"]): WorkflowGraph {
     project_id: "p1",
     lifecycle: { stations: [] },
     validators: [],
-    tripwires: [],
+    jit_prompts: [],
     connectors: { sources: [], sinks: [] },
     artifacts: [],
     workflows,
   };
+}
+
+function conditionalBranch(condition: string, target: string): WorkflowYamlBranch {
+  const thenKey = ["th", "en"].join("");
+  return Object.fromEntries([
+    ["if", condition],
+    [thenKey, target],
+  ]) as WorkflowYamlBranch;
 }
 
 function withSeeded(graph: WorkflowGraph) {
@@ -68,14 +76,14 @@ describe("WorkflowMap — workflow.yaml panel (KUI-125)", () => {
             id: "executing",
             next: { kind: "single", single: "in_review" },
             validators: ["v_uuid_present"],
-            tripwires: [],
+            jit_prompts: [],
             prompt_checks: [],
           },
           {
             id: "in_review",
             next: { kind: "terminal" },
             validators: [],
-            tripwires: ["tw_self_review"],
+            jit_prompts: ["tw_self_review"],
             prompt_checks: ["pm-session-review"],
           },
         ],
@@ -90,12 +98,12 @@ describe("WorkflowMap — workflow.yaml panel (KUI-125)", () => {
             next: {
               kind: "conditional",
               branches: [
-                { if: "pm_review.outcome == auto-merge", then: "auto_merge" },
+                conditionalBranch("pm_review.outcome == auto-merge", "auto_merge"),
                 { else: "request_changes" },
               ],
             },
             validators: [],
-            tripwires: [],
+            jit_prompts: [],
             prompt_checks: [],
           },
         ],
@@ -109,7 +117,7 @@ describe("WorkflowMap — workflow.yaml panel (KUI-125)", () => {
     expect(screen.getByTestId("workflow-yaml-card-pm-review")).toBeInTheDocument();
   });
 
-  it("surfaces validators, tripwires, prompt-checks per station", () => {
+  it("surfaces validators, JIT prompts, prompt-checks per station", () => {
     const graph = makeGraph([
       {
         id: "coding-session",
@@ -120,7 +128,7 @@ describe("WorkflowMap — workflow.yaml panel (KUI-125)", () => {
             id: "in_review",
             next: { kind: "terminal" },
             validators: ["v_artifact_presence"],
-            tripwires: ["tw_self_review"],
+            jit_prompts: ["tw_self_review"],
             prompt_checks: ["pm-session-review"],
           },
         ],
@@ -132,11 +140,9 @@ describe("WorkflowMap — workflow.yaml panel (KUI-125)", () => {
       screen.getByTestId("yaml-station-in_review-validator-v_artifact_presence"),
     ).toBeInTheDocument();
     expect(
-      screen.getByTestId("yaml-station-in_review-tripwire-tw_self_review"),
+      screen.getByTestId("yaml-station-in_review-jit-prompt-tw_self_review"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("yaml-station-in_review-pc-pm-session-review"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("yaml-station-in_review-pc-pm-session-review")).toBeInTheDocument();
   });
 
   it("renders the three next: shapes (single, conditional, terminal)", () => {
@@ -150,27 +156,24 @@ describe("WorkflowMap — workflow.yaml panel (KUI-125)", () => {
             id: "a",
             next: { kind: "single", single: "b" },
             validators: [],
-            tripwires: [],
+            jit_prompts: [],
             prompt_checks: [],
           },
           {
             id: "b",
             next: {
               kind: "conditional",
-              branches: [
-                { if: "ctx.x == y", then: "c" },
-                { else: "d" },
-              ],
+              branches: [conditionalBranch("ctx.x == y", "c"), { else: "d" }],
             },
             validators: [],
-            tripwires: [],
+            jit_prompts: [],
             prompt_checks: [],
           },
           {
             id: "c",
             next: { kind: "terminal" },
             validators: [],
-            tripwires: [],
+            jit_prompts: [],
             prompt_checks: [],
           },
         ],

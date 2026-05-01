@@ -1,4 +1,4 @@
-"""Tests for `tripwire tripwires list` — PM-side registry inspection."""
+"""Tests for `tripwire jit-prompts list` — PM-side registry inspection."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from click.testing import CliRunner
 from tripwire.cli.main import cli
 
 
-def _project(tmp_path: Path, tripwires: dict | None = None) -> None:
+def _project(tmp_path: Path, jit_prompts: dict | None = None) -> None:
     body: dict = {
         "name": "fixture",
         "key_prefix": "FIX",
@@ -20,8 +20,8 @@ def _project(tmp_path: Path, tripwires: dict | None = None) -> None:
         "next_session_number": 1,
         "phase": "scoping",
     }
-    if tripwires is not None:
-        body["tripwires"] = tripwires
+    if jit_prompts is not None:
+        body["jit_prompts"] = jit_prompts
     (tmp_path / "project.yaml").write_text(yaml.safe_dump(body), encoding="utf-8")
 
 
@@ -35,12 +35,12 @@ def pm_role(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return role_dir
 
 
-def test_tripwires_list_lists_registered_tripwires(
+def test_jit_prompts_list_lists_registered_prompts(
     tmp_path: Path, pm_role: Path
 ) -> None:
     _project(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(cli, ["tripwires", "list", "--project-dir", str(tmp_path)])
+    result = runner.invoke(cli, ["jit-prompts", "list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output
     assert "self-review" in result.output
     assert "session.complete" in result.output
@@ -48,13 +48,13 @@ def test_tripwires_list_lists_registered_tripwires(
     assert "AC met but not really" not in result.output
 
 
-def test_tripwires_list_reveal_shows_prompt(tmp_path: Path, pm_role: Path) -> None:
+def test_jit_prompts_list_reveal_shows_prompt(tmp_path: Path, pm_role: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         cli,
         [
-            "tripwires",
+            "jit-prompts",
             "list",
             "--project-dir",
             str(tmp_path),
@@ -66,19 +66,19 @@ def test_tripwires_list_reveal_shows_prompt(tmp_path: Path, pm_role: Path) -> No
     assert "--ack" in result.output
 
 
-def test_tripwires_list_disabled_project_says_disabled(
+def test_jit_prompts_list_disabled_project_says_disabled(
     tmp_path: Path, pm_role: Path
 ) -> None:
     _project(tmp_path, {"enabled": False})
     runner = CliRunner()
-    result = runner.invoke(cli, ["tripwires", "list", "--project-dir", str(tmp_path)])
+    result = runner.invoke(cli, ["jit-prompts", "list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output
     assert (
-        "disabled" in result.output.lower() or "no tripwires" in result.output.lower()
+        "disabled" in result.output.lower() or "no prompts" in result.output.lower()
     )
 
 
-def test_tripwires_list_requires_pm_role(
+def test_jit_prompts_list_requires_pm_role(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _project(tmp_path)
@@ -88,12 +88,12 @@ def test_tripwires_list_requires_pm_role(
     monkeypatch.setenv("TRIPWIRE_HOME", str(role_dir))
     monkeypatch.delenv("TRIPWIRE_ROLE", raising=False)
     runner = CliRunner()
-    result = runner.invoke(cli, ["tripwires", "list", "--project-dir", str(tmp_path)])
+    result = runner.invoke(cli, ["jit-prompts", "list", "--project-dir", str(tmp_path)])
     assert result.exit_code != 0
     assert "pm" in result.output.lower() or "role" in result.output.lower()
 
 
-def test_tripwires_list_role_via_env(
+def test_jit_prompts_list_role_via_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """`TRIPWIRE_ROLE=pm` env var is the alternate role gate."""
@@ -102,5 +102,5 @@ def test_tripwires_list_role_via_env(
     # Avoid bleed-through from prior fixtures.
     monkeypatch.delenv("TRIPWIRE_HOME", raising=False)
     runner = CliRunner()
-    result = runner.invoke(cli, ["tripwires", "list", "--project-dir", str(tmp_path)])
+    result = runner.invoke(cli, ["jit-prompts", "list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output

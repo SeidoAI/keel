@@ -30,27 +30,27 @@ describe("WorkflowDrawer — validator selection", () => {
   });
 });
 
-describe("WorkflowDrawer — tripwire selection redaction", () => {
+describe("WorkflowDrawer — JIT prompt selection redaction", () => {
   it("hides the prompt content for non-PM mode and shows the placeholder", () => {
     render(
       <WorkflowDrawer
         selection={{
-          kind: "tripwire",
+          kind: "jit_prompt",
           entity: {
             id: "t1",
-            kind: "tripwire",
+            kind: "jit_prompt",
             name: "stale-context",
             fires_on_station: "in_review",
             fires_on_event: "session.complete",
             prompt_revealed: null,
-            prompt_redacted: "<<tripwire registered>>",
+            prompt_redacted: "<<JIT prompt registered>>",
           },
         }}
         pmMode={false}
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText("<<tripwire registered>>")).toBeTruthy();
+    expect(screen.getByText("<<JIT prompt registered>>")).toBeTruthy();
     expect(screen.queryByText(/secret-prompt-body/i)).toBeNull();
   });
 
@@ -58,15 +58,15 @@ describe("WorkflowDrawer — tripwire selection redaction", () => {
     render(
       <WorkflowDrawer
         selection={{
-          kind: "tripwire",
+          kind: "jit_prompt",
           entity: {
             id: "t1",
-            kind: "tripwire",
+            kind: "jit_prompt",
             name: "stale-context",
             fires_on_station: "in_review",
             fires_on_event: "session.complete",
             prompt_revealed: "secret-prompt-body for the agent",
-            prompt_redacted: "<<tripwire registered>>",
+            prompt_redacted: "<<JIT prompt registered>>",
           },
         }}
         pmMode={true}

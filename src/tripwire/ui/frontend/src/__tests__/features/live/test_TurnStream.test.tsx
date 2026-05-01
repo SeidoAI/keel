@@ -16,12 +16,12 @@ function engagement(id: string, startedAt: string, trigger: string): TurnStreamE
   };
 }
 
-function tripwire(id: string, firedAt: string, name: string): TurnStreamEntry {
+function jitPrompt(id: string, firedAt: string, name: string): TurnStreamEntry {
   return {
-    kind: "tripwire_fire",
+    kind: "jit_prompt_fire",
     id,
     timestamp: firedAt,
-    tripwireId: name,
+    jitPromptId: name,
   };
 }
 
@@ -29,7 +29,7 @@ describe("TurnStream — KUI-107 turn stream", () => {
   it("renders engagement entries oldest-to-newest with engagement-boundary dividers between consecutive engagements", () => {
     const entries: TurnStreamEntry[] = [
       engagement("eng-1", "2026-04-27T10:00:00Z", "spawn"),
-      tripwire("tw-1", "2026-04-27T11:00:00Z", "no-merge-without-self-review"),
+      jitPrompt("tw-1", "2026-04-27T11:00:00Z", "no-merge-without-self-review"),
       engagement("eng-2", "2026-04-27T14:10:00Z", "resume"),
     ];
 
@@ -45,10 +45,10 @@ describe("TurnStream — KUI-107 turn stream", () => {
     expect(eng2).toHaveTextContent(/engagement #2/i);
     expect(eng2).toHaveTextContent(/resume/i);
 
-    // Tripwire-fire copy is reframed per [[dec-tripwires-are-agent-facing]] —
+    // JIT-prompt-fire copy is reframed per [[dec-jit-prompts-are-agent-facing]] —
     // no "alert" / "warning" language, agent-facing framing instead.
-    const fire = screen.getByTestId("tripwire-fire-tw-1");
-    expect(fire).toHaveTextContent(/agent received tripwire/i);
+    const fire = screen.getByTestId("jit-prompt-fire-tw-1");
+    expect(fire).toHaveTextContent(/agent received JIT prompt/i);
     expect(fire).not.toHaveTextContent(/alert/i);
     expect(fire).not.toHaveTextContent(/warning/i);
   });
@@ -142,7 +142,7 @@ describe("TurnStream — KUI-107 turn stream", () => {
       <TurnStream
         entries={[
           engagement("eng-1", "2026-04-27T10:00:00Z", "spawn"),
-          tripwire("tw-2", "2026-04-27T11:00:00Z", "two"),
+          jitPrompt("tw-2", "2026-04-27T11:00:00Z", "two"),
         ]}
       />,
     );
@@ -175,7 +175,7 @@ describe("TurnStream — KUI-107 turn stream", () => {
       <TurnStream
         entries={[
           engagement("eng-1", "2026-04-27T10:00:00Z", "spawn"),
-          tripwire("tw-2", "2026-04-27T11:00:00Z", "two"),
+          jitPrompt("tw-2", "2026-04-27T11:00:00Z", "two"),
         ]}
       />,
     );
@@ -214,7 +214,7 @@ describe("TurnStream — KUI-107 turn stream", () => {
       <TurnStream
         entries={[
           engagement("eng-1", "2026-04-27T10:00:00Z", "spawn"),
-          tripwire("tw-2", "2026-04-27T11:00:00Z", "two"),
+          jitPrompt("tw-2", "2026-04-27T11:00:00Z", "two"),
         ]}
         isOffTrack={true}
       />,

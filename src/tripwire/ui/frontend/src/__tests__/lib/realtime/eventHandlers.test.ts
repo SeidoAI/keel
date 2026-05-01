@@ -174,7 +174,7 @@ describe("dispatchEvent", () => {
       type: "process_event",
       project_id: "p1",
       event_id: "ev-1",
-      kind: "tripwire_fire",
+      kind: "jit_prompt_fire",
       session_id: "sess-01",
       fired_at: "2026-04-28T10:00:00Z",
     });

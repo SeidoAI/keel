@@ -22,7 +22,7 @@ function withClient(client = makeTestQueryClient()) {
 }
 
 describe("useLiveSession", () => {
-  it("returns session, off-track flag, and surfaces tripwire fires + cost-approval entry", async () => {
+  it("returns session, off-track flag, and surfaces JIT prompt fires + cost-approval entry", async () => {
     const { client, wrapper } = withClient();
 
     // Seed the session as `executing` (in-flow).
@@ -35,21 +35,21 @@ describe("useLiveSession", () => {
       }),
     );
 
-    // Tripwire-fire events scoped to this session, plus an unrelated
+    // JIT-prompt-fire events scoped to this session, plus an unrelated
     // event that must NOT appear in the filtered list.
     const fire: ProcessEvent = {
       id: "ev-1",
-      kind: "tripwire_fire",
+      kind: "jit_prompt_fire",
       fired_at: "2026-04-28T10:00:00Z",
       session_id: "v08-foo",
-      tripwire_id: "no-merge-without-self-review",
+      jit_prompt_id: "no-merge-without-self-review",
     };
     const otherFire: ProcessEvent = {
       id: "ev-2",
-      kind: "tripwire_fire",
+      kind: "jit_prompt_fire",
       fired_at: "2026-04-28T10:01:00Z",
       session_id: "other-sess",
-      tripwire_id: "x",
+      jit_prompt_id: "x",
     };
     const eventsResp: EventsResponse = {
       events: [fire, otherFire],
@@ -100,8 +100,8 @@ describe("useLiveSession", () => {
     expect(result.current.session?.id).toBe("v08-foo");
     expect(result.current.session?.cost_usd).toBe(1.234);
     expect(result.current.isOffTrack).toBe(false);
-    // Only the tripwire fire scoped to *this* session should be returned.
-    expect(result.current.tripwireFires.map((e) => e.id)).toEqual(["ev-1"]);
+    // Only the JIT prompt fire scoped to *this* session should be returned.
+    expect(result.current.jitPromptFires.map((e) => e.id)).toEqual(["ev-1"]);
     // The cost-approval entry must surface; the other blocked entry
     // (different escalation_reason) must not.
     expect(result.current.costApprovalEntry?.id).toBe("inbox-1");

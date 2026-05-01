@@ -10,7 +10,7 @@ import { renderWithProviders } from "../../test-utils";
 function makeEvent(overrides: Partial<ProcessEvent>): ProcessEvent {
   return {
     id: "evt-1",
-    kind: "tripwire_fire",
+    kind: "jit_prompt_fire",
     fired_at: "2026-04-27T10:00:00Z",
     session_id: "sess-a",
     ...overrides,
@@ -38,7 +38,7 @@ describe("SessionEventFeed", () => {
       http.get("/api/projects/p1/events", () =>
         HttpResponse.json({
           events: [
-            makeEvent({ id: "e1", kind: "tripwire_fire", tripwire_id: "self-review" }),
+            makeEvent({ id: "e1", kind: "jit_prompt_fire", jit_prompt_id: "self-review" }),
             makeEvent({
               id: "e2",
               kind: "validator_pass",
@@ -69,7 +69,7 @@ describe("SessionEventFeed", () => {
       http.get("/api/projects/p1/events", ({ request }) => {
         const kinds = new URL(request.url).searchParams.getAll("kind");
         const all: ProcessEvent[] = [
-          makeEvent({ id: "e1", kind: "tripwire_fire", tripwire_id: "self-review" }),
+          makeEvent({ id: "e1", kind: "jit_prompt_fire", jit_prompt_id: "self-review" }),
           makeEvent({
             id: "e2",
             kind: "validator_pass",
@@ -85,9 +85,9 @@ describe("SessionEventFeed", () => {
     renderWithProviders(<SessionEventFeed projectId="p1" sessionId="sess-a" />);
     expect(await screen.findByText("v_ref_resolution")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /firings/i }));
+    fireEvent.click(screen.getByRole("button", { name: /JIT prompt fires/i }));
 
-    // After narrowing, validator_pass should disappear; tripwire_fire stays.
+    // After narrowing, validator_pass should disappear; jit_prompt_fire stays.
     await screen.findByText("self-review");
     expect(screen.queryByText("v_ref_resolution")).not.toBeInTheDocument();
   });

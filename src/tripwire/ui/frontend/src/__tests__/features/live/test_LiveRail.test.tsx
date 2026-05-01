@@ -14,7 +14,7 @@ const baseProps = {
   status: "executing" as const,
   costUsd: 1.234,
   agentState: "drafting plan",
-  tripwireFires: [] as ProcessEvent[],
+  jitPromptFires: [] as ProcessEvent[],
   costApprovalEntry: null as InboxItem | null,
   onCostApprovalClick: vi.fn(),
 };
@@ -36,18 +36,18 @@ describe("LiveRail — KUI-107 right rail", () => {
     );
   });
 
-  it("shows tripwire fires with agent-facing copy (no 'alert' / 'warning' language)", () => {
+  it("shows JIT prompt fires with agent-facing copy (no 'alert' / 'warning' language)", () => {
     const fire: ProcessEvent = {
       id: "ev-fire-1",
-      kind: "tripwire_fire",
+      kind: "jit_prompt_fire",
       fired_at: "2026-04-28T11:00:00Z",
       session_id: "v08-foo",
-      tripwire_id: "no-merge-without-self-review",
+      jit_prompt_id: "no-merge-without-self-review",
     };
-    renderWithProviders(<LiveRail {...baseProps} tripwireFires={[fire]} />);
+    renderWithProviders(<LiveRail {...baseProps} jitPromptFires={[fire]} />);
 
-    const row = screen.getByTestId("tripwire-fire-row-ev-fire-1");
-    expect(row).toHaveTextContent(/agent received tripwire/i);
+    const row = screen.getByTestId("jit-prompt-fire-row-ev-fire-1");
+    expect(row).toHaveTextContent(/agent received JIT prompt/i);
     expect(row).toHaveTextContent(/no-merge-without-self-review/);
     expect(row).not.toHaveTextContent(/alert/i);
     expect(row).not.toHaveTextContent(/warning/i);

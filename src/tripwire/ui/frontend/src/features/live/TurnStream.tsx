@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 /**
  * Stream entry types rendered by the Live Monitor turn stream.
  *
- * v1 carries `engagement` boundary markers and `tripwire_fire`
+ * v1 carries `engagement` boundary markers and `jit_prompt_fire`
  * markers — the LiveMonitor builds the entry list by interleaving
  * the session's engagement history (when present in v2 runtime) with
  * the per-session process-event stream from KUI-100.
@@ -26,10 +26,10 @@ export type TurnStreamEntry =
       outcome: string | null;
     }
   | {
-      kind: "tripwire_fire";
+      kind: "jit_prompt_fire";
       id: string;
       timestamp: string;
-      tripwireId: string;
+      jitPromptId: string;
     };
 
 export interface TurnStreamProps {
@@ -127,7 +127,7 @@ export function TurnStream({ entries, isOffTrack = false, className }: TurnStrea
                   <EngagementMarker key={entry.id} ordinal={engagementOrdinal} entry={entry} />
                 );
               }
-              return <TripwireFire key={entry.id} entry={entry} />;
+              return <JitPromptFire key={entry.id} entry={entry} />;
             })}
           </ol>
         )}
@@ -171,23 +171,23 @@ function EngagementMarker({ ordinal, entry }: EngagementMarkerProps) {
   );
 }
 
-interface TripwireFireProps {
-  entry: Extract<TurnStreamEntry, { kind: "tripwire_fire" }>;
+interface JitPromptFireProps {
+  entry: Extract<TurnStreamEntry, { kind: "jit_prompt_fire" }>;
 }
 
-function TripwireFire({ entry }: TripwireFireProps) {
+function JitPromptFire({ entry }: JitPromptFireProps) {
   const firedLabel = formatTimestamp(entry.timestamp);
   return (
     <li
-      data-testid={`tripwire-fire-${entry.id}`}
+      data-testid={`jit-prompt-fire-${entry.id}`}
       className="flex items-center gap-2 rounded-(--radius-stamp) border border-(--color-rule)/40 bg-(--color-rule)/5 px-3 py-2"
     >
       <Zap className="h-3.5 w-3.5 text-(--color-rule)" aria-hidden strokeWidth={2.2} />
       <span className="font-mono text-[10px] text-(--color-rule) uppercase tracking-[0.18em]">
-        agent received tripwire
+        agent received JIT prompt
       </span>
       <span className="font-mono text-[11px] text-(--color-ink) tracking-[0.04em]">
-        {entry.tripwireId}
+        {entry.jitPromptId}
       </span>
       <span className="ml-auto font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]">
         {firedLabel}
@@ -197,7 +197,7 @@ function TripwireFire({ entry }: TripwireFireProps) {
 }
 
 /** YYYY-MM-DD HH:MM — used for engagement-boundary dividers and
- *  tripwire-fire timestamps. Falls back to the raw value when the
+ *  jit-prompt-fire timestamps. Falls back to the raw value when the
  *  timestamp can't be parsed (defensive — the backend may emit a
  *  string we can't read on the wire). */
 function formatTimestamp(raw: string): string {

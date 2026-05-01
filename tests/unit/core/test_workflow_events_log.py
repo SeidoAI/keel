@@ -145,7 +145,7 @@ def test_read_events_filters_by_event_kind(tmp_path: Path) -> None:
     from tripwire.core.events.log import emit_event, read_events
 
     pd = _project_dir(tmp_path)
-    for kind in ("validator.run", "tripwire.fired", "validator.run"):
+    for kind in ("validator.run", "jit_prompt.fired", "validator.run"):
         emit_event(
             pd,
             workflow="w",
@@ -244,7 +244,7 @@ def test_cli_events_filter_narrows_results(tmp_path: Path) -> None:
         workflow="w",
         instance="b",
         station="s",
-        event="tripwire.fired",
+        event="jit_prompt.fired",
         details={},
     )
 

@@ -88,7 +88,7 @@ describe("EventLog", () => {
     const Wrapper = withRoute();
     render(<EventLog />, { wrapper: Wrapper });
     expect(screen.getByTestId("filter-kind-validator.run")).toBeInTheDocument();
-    expect(screen.getByTestId("filter-kind-tripwire.fired")).toBeInTheDocument();
+    expect(screen.getByTestId("filter-kind-jit_prompt.fired")).toBeInTheDocument();
     expect(screen.getByTestId("filter-kind-prompt_check.invoked")).toBeInTheDocument();
   });
 

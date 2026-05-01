@@ -1,15 +1,15 @@
-"""End-to-end integration smoke for the v0.9 deviation tripwires.
+"""End-to-end integration smoke for the v0.9 deviation JIT prompts.
 
-Drives a fixture project through ``fire_event(event="session.complete")``
-under scenarios that fire each of the five deviation tripwires, then
+Drives a fixture project through ``fire_jit_prompt_event(event="session.complete")``
+under scenarios that fire each of the five deviation JIT prompts, then
 verifies:
 
   - Each fire is recorded as a JSON event under
-    ``.tripwire/events/firings/<sid>/``.
+    ``.tripwire/events/jit_prompt_firings/<sid>/``.
   - Acks via ``ctx.ack_path(...)`` (the same path
-    ``tripwire test-tripwire --ack`` would write to) suppress
-    re-firing on the next ``fire_event`` call.
-  - Tripwires whose pattern isn't present stay silent.
+    ``tripwire test-jit-prompt --ack`` would write to) suppress
+    re-firing on the next ``fire_jit_prompt_event`` call.
+  - JIT prompts whose pattern isn't present stay silent.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import yaml
 
-from tripwire._internal.tripwires import fire_event
+from tripwire._internal.jit_prompts import fire_jit_prompt_event
 from tripwire.core.session_cost import CostBreakdown
 
 
@@ -103,16 +103,16 @@ def _seed_pm_response(project_dir: Path, session_id: str, items: list[dict]) -> 
     )
 
 
-def _ack(project_dir: Path, tw_id: str, session_id: str) -> Path:
+def _ack(project_dir: Path, jit_prompt_id: str, session_id: str) -> Path:
     """Write a substantive ack marker so ``is_acknowledged`` returns True."""
-    marker = project_dir / ".tripwire" / "acks" / f"{tw_id}-{session_id}.json"
+    marker = project_dir / ".tripwire" / "acks" / f"{jit_prompt_id}-{session_id}.json"
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(json.dumps({"fix_commits": ["abcd1234"]}), encoding="utf-8")
     return marker
 
 
-def _firings_for(project_dir: Path, session_id: str, tw_id: str) -> list[dict]:
-    fdir = project_dir / ".tripwire" / "events" / "firings" / session_id
+def _firings_for(project_dir: Path, session_id: str, prompt_id: str) -> list[dict]:
+    fdir = project_dir / ".tripwire" / "events" / "jit_prompt_firings" / session_id
     if not fdir.is_dir():
         return []
     out: list[dict] = []
@@ -121,7 +121,7 @@ def _firings_for(project_dir: Path, session_id: str, tw_id: str) -> list[dict]:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if payload.get("tripwire_id") == tw_id:
+        if payload.get("jit_prompt_id") == prompt_id:
             out.append(payload)
     return out
 
@@ -134,11 +134,11 @@ def test_phase_transition_fires_on_open_prev_phase_issue(tmp_path: Path) -> None
     _seed_session(tmp_path, "alpha")
     _seed_issue(tmp_path, "DEV-1", status="in_progress", labels=["phase:executing"])
 
-    result = fire_event(
+    result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
 
-    assert any(tw_id == "phase-transition" for tw_id, _ in result.fires)
+    assert any(jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result.fires)
     assert _firings_for(tmp_path, "alpha", "phase-transition")
     assert result.blocked is True
 
@@ -148,10 +148,10 @@ def test_phase_transition_silent_when_clean(tmp_path: Path) -> None:
     _seed_session(tmp_path, "alpha")
     _seed_issue(tmp_path, "DEV-1", status="done", labels=["phase:executing"])
 
-    result = fire_event(
+    result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert not any(tw_id == "phase-transition" for tw_id, _ in result.fires)
+    assert not any(jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result.fires)
 
 
 # ---------- followups-not-filed (B5) --------------------------------------
@@ -172,10 +172,10 @@ def test_followups_not_filed_fires_on_missing_issue(tmp_path: Path) -> None:
             }
         ],
     )
-    result = fire_event(
+    result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert any(tw_id == "followups-not-filed" for tw_id, _ in result.fires)
+    assert any(jit_prompt_id == "followups-not-filed" for jit_prompt_id, _ in result.fires)
 
 
 def test_followups_not_filed_silent_when_issue_present(tmp_path: Path) -> None:
@@ -194,10 +194,10 @@ def test_followups_not_filed_silent_when_issue_present(tmp_path: Path) -> None:
             }
         ],
     )
-    result = fire_event(
+    result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert not any(tw_id == "followups-not-filed" for tw_id, _ in result.fires)
+    assert not any(jit_prompt_id == "followups-not-filed" for jit_prompt_id, _ in result.fires)
 
 
 # ---------- write-count (B7) ----------------------------------------------
@@ -221,10 +221,10 @@ def test_write_count_fires_above_threshold(tmp_path: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
-    result = fire_event(
+    result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert any(tw_id == "write-count" for tw_id, _ in result.fires)
+    assert any(jit_prompt_id == "write-count" for jit_prompt_id, _ in result.fires)
 
 
 # ---------- cost-ceiling (B8) ---------------------------------------------
@@ -236,13 +236,13 @@ def test_cost_ceiling_fires_above_default(tmp_path: Path) -> None:
     bd = CostBreakdown()
     bd.input_usd = 5.50
     with patch(
-        "tripwire._internal.tripwires.cost_ceiling.compute_session_cost",
+        "tripwire._internal.jit_prompts.cost_ceiling.compute_session_cost",
         return_value=bd,
     ):
-        result = fire_event(
+        result = fire_jit_prompt_event(
             project_dir=tmp_path, event="session.complete", session_id="alpha"
         )
-    assert any(tw_id == "cost-ceiling" for tw_id, _ in result.fires)
+    assert any(jit_prompt_id == "cost-ceiling" for jit_prompt_id, _ in result.fires)
 
 
 # ---------- ack suppresses re-fire ----------------------------------------
@@ -254,30 +254,30 @@ def test_ack_suppresses_re_fire(tmp_path: Path) -> None:
     _seed_issue(tmp_path, "DEV-1", status="in_progress", labels=["phase:executing"])
 
     # First fire — phase-transition fires.
-    result1 = fire_event(
+    result1 = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert any(tw_id == "phase-transition" for tw_id, _ in result1.fires)
+    assert any(jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result1.fires)
 
     # Ack it.
     _ack(tmp_path, "phase-transition", "alpha")
 
     # Second fire — phase-transition stays silent.
-    result2 = fire_event(
+    result2 = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert not any(tw_id == "phase-transition" for tw_id, _ in result2.fires)
+    assert not any(jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result2.fires)
 
 
 # ---------- self-review never silenced --------------------------------
 
 
 def test_self_review_always_fires_on_unacked_session(tmp_path: Path) -> None:
-    """The self-review tripwire stays unconditional — regression check
+    """The self-review JIT prompt stays unconditional — regression check
     that the new should_fire gate didn't silence it."""
     _seed_project(tmp_path)
     _seed_session(tmp_path, "alpha")
-    result = fire_event(
+    result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert any(tw_id == "self-review" for tw_id, _ in result.fires)
+    assert any(jit_prompt_id == "self-review" for jit_prompt_id, _ in result.fires)

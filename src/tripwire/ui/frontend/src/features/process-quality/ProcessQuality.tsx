@@ -9,7 +9,7 @@ import { useWorkflowStats } from "@/lib/api/endpoints/workflowEvents";
  *
  * Aggregates the v0.9 events log into:
  *
- *   - per-event-kind histogram (validator.run vs tripwire.fired vs ...)
+ *   - per-event-kind histogram (validator.run vs jit_prompt.fired vs ...)
  *   - per-instance fire histogram (which sessions are noisiest)
  *   - top-N rules table (which validator/tripwire fires most)
  *
@@ -36,8 +36,8 @@ export function ProcessQuality() {
           Process quality
         </h1>
         <p className="font-serif text-[14px] italic text-(--color-ink-2) leading-snug">
-          aggregate analytics over the workflow events log — fire histograms,
-          top-N rules, drill-down by kind or session.
+          aggregate analytics over the workflow events log — fire histograms, top-N rules,
+          drill-down by kind or session.
         </p>
       </header>
 
@@ -100,7 +100,10 @@ export function ProcessQuality() {
           ) : (
             <ol className="flex flex-col gap-2">
               {topRules.map((rule, idx) => (
-                <li key={rule.id} className="flex items-center gap-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-3 py-2">
+                <li
+                  key={rule.id}
+                  className="flex items-center gap-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-3 py-2"
+                >
                   <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
                     {String(idx + 1).padStart(2, "0")}
                   </span>
@@ -181,18 +184,11 @@ function BarTrack({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
   return (
     <div className="flex h-2 w-32 overflow-hidden rounded-full bg-(--color-paper-3)">
-      <div
-        className="h-full bg-(--color-ink)"
-        style={{ width: `${pct}%` }}
-      />
+      <div className="h-full bg-(--color-ink)" style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="px-2 py-3 font-serif text-[12px] italic text-(--color-ink-3)">
-      {children}
-    </p>
-  );
+  return <p className="px-2 py-3 font-serif text-[12px] italic text-(--color-ink-3)">{children}</p>;
 }
