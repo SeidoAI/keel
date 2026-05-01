@@ -43,7 +43,7 @@ def test_build_workflow_returns_top_level_keys(tmp_path: Path) -> None:
         "project_id",
         "lifecycle",
         "validators",
-        "tripwires",
+        "jit_prompts",
         "connectors",
         "artifacts",
     }
@@ -86,12 +86,12 @@ def test_build_workflow_enumerates_validators(tmp_path: Path) -> None:
     assert "v_reference_integrity" in ids
 
 
-def test_build_workflow_enumerates_tripwires(tmp_path: Path) -> None:
+def test_build_workflow_enumerates_jit_prompts(tmp_path: Path) -> None:
     project_dir = _write_project(tmp_path)
     graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
-    tripwires = graph["tripwires"]
-    assert isinstance(tripwires, list) and len(tripwires) > 0
-    sample = tripwires[0]
+    jit_prompts = graph["jit_prompts"]
+    assert isinstance(jit_prompts, list) and len(jit_prompts) > 0
+    sample = jit_prompts[0]
     for k in (
         "id",
         "kind",
@@ -105,25 +105,25 @@ def test_build_workflow_enumerates_tripwires(tmp_path: Path) -> None:
         assert k in sample
 
 
-def test_build_workflow_redacts_tripwire_prompt_when_not_pm(
+def test_build_workflow_redacts_jit_prompt_when_not_pm(
     tmp_path: Path,
 ) -> None:
     project_dir = _write_project(tmp_path)
     graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
-    for tw in graph["tripwires"]:
-        assert tw["prompt_revealed"] is None
-        assert isinstance(tw["prompt_redacted"], str)
+    for prompt in graph["jit_prompts"]:
+        assert prompt["prompt_revealed"] is None
+        assert isinstance(prompt["prompt_redacted"], str)
 
 
-def test_build_workflow_reveals_tripwire_prompt_when_pm(tmp_path: Path) -> None:
+def test_build_workflow_reveals_jit_prompt_when_pm(tmp_path: Path) -> None:
     project_dir = _write_project(tmp_path)
     graph = build_workflow(project_dir, project_id="x", is_pm_role=True)
     revealed_count = 0
-    for tw in graph["tripwires"]:
-        if isinstance(tw["prompt_revealed"], str) and tw["prompt_revealed"]:
+    for prompt in graph["jit_prompts"]:
+        if isinstance(prompt["prompt_revealed"], str) and prompt["prompt_revealed"]:
             revealed_count += 1
     assert revealed_count > 0, (
-        "expected at least one tripwire to expose its prompt in PM mode"
+        "expected at least one JIT prompt to expose its body in PM mode"
     )
 
 

@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from tripwire.ui.dependencies import ProjectContext, get_project
 from tripwire.ui.routes._common import envelope_exception
+from tripwire.ui.routes._params import ensure_session_id
 from tripwire.ui.services.artifact_service import (
     ArtifactContent,
     ArtifactManifest,
@@ -64,6 +65,7 @@ async def list_session_artifacts(
     sid: str,
     project: ProjectContext = Depends(get_project),  # noqa: B008
 ) -> list[ArtifactStatus]:
+    ensure_session_id(sid)
     return svc_list_session_artifacts(project.project_dir, sid)
 
 
@@ -76,6 +78,7 @@ async def get_artifact(
     name: str,
     project: ProjectContext = Depends(get_project),  # noqa: B008
 ) -> ArtifactContent:
+    ensure_session_id(sid)
     try:
         return get_session_artifact(project.project_dir, sid, name)
     except FileNotFoundError as exc:
@@ -96,6 +99,7 @@ async def approve(
     body: ApproveBody = ApproveBody(),  # noqa: B008
     project: ProjectContext = Depends(get_project),  # noqa: B008
 ) -> ArtifactStatus:
+    ensure_session_id(sid)
     try:
         return approve_artifact(project.project_dir, sid, name, feedback=body.feedback)
     except ValueError as exc:
@@ -116,6 +120,7 @@ async def reject(
     body: RejectBody,
     project: ProjectContext = Depends(get_project),  # noqa: B008
 ) -> ArtifactStatus:
+    ensure_session_id(sid)
     try:
         return reject_artifact(project.project_dir, sid, name, feedback=body.feedback)
     except ValueError as exc:

@@ -12,7 +12,7 @@ from starlette.requests import Request
 from tripwire.ui.services.role_gate import (
     PROMPT_REDACTED_PLACEHOLDER,
     is_pm,
-    redact_tripwire_prompt,
+    redact_jit_prompt,
     role_from_headers,
 )
 
@@ -60,8 +60,8 @@ def test_is_pm_false_when_no_header() -> None:
     assert is_pm(req) is False
 
 
-def test_redact_tripwire_prompt_returns_none_for_non_pm() -> None:
-    revealed, redacted = redact_tripwire_prompt(
+def test_redact_jit_prompt_returns_none_for_non_pm() -> None:
+    revealed, redacted = redact_jit_prompt(
         prompt="full secret prompt body",
         is_pm_role=False,
     )
@@ -69,8 +69,8 @@ def test_redact_tripwire_prompt_returns_none_for_non_pm() -> None:
     assert redacted == PROMPT_REDACTED_PLACEHOLDER
 
 
-def test_redact_tripwire_prompt_reveals_for_pm() -> None:
-    revealed, redacted = redact_tripwire_prompt(
+def test_redact_jit_prompt_reveals_for_pm() -> None:
+    revealed, redacted = redact_jit_prompt(
         prompt="full secret prompt body",
         is_pm_role=True,
     )
@@ -78,8 +78,8 @@ def test_redact_tripwire_prompt_reveals_for_pm() -> None:
     assert redacted == PROMPT_REDACTED_PLACEHOLDER
 
 
-def test_redact_tripwire_prompt_handles_none_input() -> None:
-    revealed, redacted = redact_tripwire_prompt(prompt=None, is_pm_role=False)
+def test_redact_jit_prompt_handles_none_input() -> None:
+    revealed, redacted = redact_jit_prompt(prompt=None, is_pm_role=False)
     assert revealed is None
     assert redacted == PROMPT_REDACTED_PLACEHOLDER
 

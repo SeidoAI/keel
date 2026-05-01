@@ -1,7 +1,7 @@
 """End-to-end tests for ``tripwire transition`` (KUI-159).
 
 The transition CLI is the gate runner: it loads workflow.yaml, runs
-the station's validators → tripwires → prompt-checks, and on pass
+the station's validators → JIT prompts → prompt-checks, and on pass
 moves the session to the new station and assigns a station-instance
 id. On fail it emits ``transition.rejected`` with a structured
 ``reason`` and the session stays put.

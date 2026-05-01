@@ -1,4 +1,4 @@
-"""Integration: PM-mode header gates tripwire prompt redaction.
+"""Integration: PM-mode header gates JIT prompt redaction.
 
 KUI-100 — see `docs/specs/2026-04-26-v08-handoff.md` §2.5. The
 `X-Tripwire-Role: pm` header (case-insensitive) is the only gate; missing
@@ -59,28 +59,24 @@ def project_id(project_dir: Path) -> str:
     return _project_svc._project_id(project_dir.resolve())
 
 
-def test_no_header_redacts_tripwire_prompts(
-    client: TestClient, project_id: str
-) -> None:
+def test_no_header_redacts_jit_prompts(client: TestClient, project_id: str) -> None:
     resp = client.get(f"/api/projects/{project_id}/workflow")
     assert resp.status_code == 200, resp.text
-    for tw in resp.json()["tripwires"]:
-        assert tw["prompt_revealed"] is None
-        assert tw["prompt_redacted"]
+    for prompt in resp.json()["jit_prompts"]:
+        assert prompt["prompt_revealed"] is None
+        assert prompt["prompt_redacted"]
 
 
-def test_pm_header_reveals_tripwire_prompts(
-    client: TestClient, project_id: str
-) -> None:
+def test_pm_header_reveals_jit_prompts(client: TestClient, project_id: str) -> None:
     resp = client.get(
         f"/api/projects/{project_id}/workflow",
         headers={"X-Tripwire-Role": "pm"},
     )
     assert resp.status_code == 200
     revealed = [
-        tw["prompt_revealed"]
-        for tw in resp.json()["tripwires"]
-        if tw["prompt_revealed"]
+        prompt["prompt_revealed"]
+        for prompt in resp.json()["jit_prompts"]
+        if prompt["prompt_revealed"]
     ]
     assert revealed, "expected revealed prompts in PM mode"
 
@@ -93,8 +89,8 @@ def test_pm_header_value_unrelated_role_falls_back_to_redacted(
         headers={"X-Tripwire-Role": "anonymous"},
     )
     assert resp.status_code == 200
-    for tw in resp.json()["tripwires"]:
-        assert tw["prompt_revealed"] is None
+    for prompt in resp.json()["jit_prompts"]:
+        assert prompt["prompt_revealed"] is None
 
 
 def test_pm_header_case_insensitive_value(client: TestClient, project_id: str) -> None:
@@ -104,8 +100,8 @@ def test_pm_header_case_insensitive_value(client: TestClient, project_id: str) -
     )
     assert resp.status_code == 200
     revealed = [
-        tw["prompt_revealed"]
-        for tw in resp.json()["tripwires"]
-        if tw["prompt_revealed"]
+        prompt["prompt_revealed"]
+        for prompt in resp.json()["jit_prompts"]
+        if prompt["prompt_revealed"]
     ]
     assert revealed

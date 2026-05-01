@@ -121,14 +121,9 @@ def _read_plan(project_dir: Path, session_id: str) -> str:
 
 def _read_task_progress(project_dir: Path, session_id: str) -> TaskProgress:
     artifacts_dir = paths.session_artifacts_dir(project_dir, session_id)
-    # task-checklist.md can live either inside artifacts/ or at the session
-    # root — accept both to match existing session layouts.
-    for candidate in (
-        artifacts_dir / _TASK_CHECKLIST_FILENAME,
-        paths.session_dir(project_dir, session_id) / _TASK_CHECKLIST_FILENAME,
-    ):
-        if candidate.is_file():
-            return _parse_task_checklist(candidate.read_text(encoding="utf-8"))
+    candidate = artifacts_dir / _TASK_CHECKLIST_FILENAME
+    if candidate.is_file():
+        return _parse_task_checklist(candidate.read_text(encoding="utf-8"))
     return TaskProgress()
 
 
@@ -139,13 +134,10 @@ def _artifact_status(
 ) -> dict[str, str]:
     if manifest is None:
         return {}
-    sdir = paths.session_dir(project_dir, session_id)
     artifacts_dir = paths.session_artifacts_dir(project_dir, session_id)
     out: dict[str, str] = {}
     for entry in manifest.artifacts:
-        present = (artifacts_dir / entry.file).is_file() or (
-            sdir / entry.file
-        ).is_file()
+        present = (artifacts_dir / entry.file).is_file()
         out[entry.name] = "present" if present else "missing"
     return out
 
@@ -278,18 +270,13 @@ def get_session(project_dir: Path, session_id: str) -> SessionDetail:
     summary = _build_summary(project_dir, session)
     manifest = _load_manifest(project_dir)
 
-    # TODO-v2: the engagements list is a v2-container-runtime placeholder.
-    # Per KUI-18 execution constraint: "v1 it's always empty. Do not guess
-    # at its shape — leave it as [] with a clear TODO-v2 comment." The
-    # `re_engagement_count` scalar is still derived from whatever the
-    # session.yaml has on disk (that's just a count).
     return SessionDetail(
         **summary.model_dump(),
         plan_md=_read_plan(project_dir, session_id),
         key_files=list(session.key_files),
         docs=list(session.docs or []),
         grouping_rationale=session.grouping_rationale,
-        engagements=[],
+        engagements=[entry.model_dump(mode="json") for entry in session.engagements],
         artifact_status=_artifact_status(project_dir, session_id, manifest),
     )
 

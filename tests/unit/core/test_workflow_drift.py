@@ -6,7 +6,7 @@ Drift detection queries the events log for:
   through.
 - Unexpected transitions (gate-bypass writes that flip session.yaml
   status without going through `tripwire transition`).
-- Tripwires that should-have-fired-but-didn't per workflow.yaml's
+- JIT prompts that should-have-fired-but-didn't per workflow.yaml's
   station declarations.
 
 `tripwire drift report` surfaces these as findings. Empty on a clean
@@ -23,7 +23,7 @@ from click.testing import CliRunner
 
 def _project_dir(tmp_path: Path) -> Path:
     """Project with a coding-session workflow declaring a prompt-check
-    + a tripwire on `executing`."""
+    + a JIT prompt on `executing`."""
     (tmp_path / "project.yaml").write_text(
         "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
         "status_transitions:\n  planned: []\nrepos: {}\nnext_issue_number: 1\n"
@@ -45,7 +45,7 @@ def _project_dir(tmp_path: Path) -> Path:
                     prompt_checks: [pm-session-queue]
                   - id: executing
                     next: in_review
-                    tripwires: [self-review]
+                    jit_prompts: [self-review]
                   - id: in_review
                     next: verified
                     prompt_checks: [pm-session-review]
@@ -117,14 +117,14 @@ def test_drift_clears_when_prompt_check_invoked(tmp_path: Path) -> None:
     assert "drift/prompt_check_missing" not in codes
 
 
-def test_drift_detects_should_have_fired_tripwire(tmp_path: Path) -> None:
-    """A station declares a tripwire; the session left that station
-    without a `tripwire.fired` event for it → drift."""
+def test_drift_detects_should_have_fired_jit_prompt(tmp_path: Path) -> None:
+    """A station declares a JIT prompt; the session left that station
+    without a `jit_prompt.fired` event for it → drift."""
     from tripwire.core.events.log import emit_event
     from tripwire.core.workflow.drift import detect_drift
 
     pd = _project_dir(tmp_path)
-    # Session left executing (which declares self-review tripwire) without
+    # Session left executing (which declares self-review JIT prompt) without
     # firing it.
     emit_event(
         pd,
@@ -136,7 +136,7 @@ def test_drift_detects_should_have_fired_tripwire(tmp_path: Path) -> None:
     )
     findings = detect_drift(pd, instance="test-session")
     codes = [f.code for f in findings]
-    assert "drift/tripwire_should_have_fired" in codes
+    assert "drift/jit_prompt_should_have_fired" in codes
 
 
 def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
@@ -187,7 +187,7 @@ def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
         workflow="coding-session",
         instance="test-session",
         station="executing",
-        event="tripwire.fired",
+        event="jit_prompt.fired",
         details={"id": "self-review"},
     )
     findings = detect_drift(pd, instance="test-session")

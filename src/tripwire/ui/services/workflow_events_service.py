@@ -5,7 +5,7 @@ Wraps :func:`tripwire.core.events.log.read_events` for the UI's
 endpoints. Distinct from
 :mod:`tripwire.ui.services.event_aggregator` (the v0.8 emitter, with
 its own on-disk layout); the two coexist for the UI rather than the
-v0.9 surface ripping out the v0.8 one — the validator/tripwire events
+v0.9 surface ripping out the v0.8 one — validator/JIT-prompt events
 that drive the dashboard still flow through the v0.8 path.
 
 All read-only. Filters are applied here rather than passed to the
@@ -88,7 +88,7 @@ def stats(
 
     - ``by_kind`` — count of events per ``event`` field
     - ``by_instance`` — count of events per ``instance`` field
-    - ``top_rules`` — top N (validator/tripwire/prompt-check) ids by
+    - ``top_rules`` — top N (validator/JIT-prompt/prompt-check) ids by
       fire count, derived from ``details.id`` on each row that has one.
     """
     by_kind: Counter[str] = Counter()

@@ -148,7 +148,7 @@ def _parse_station(wf_id: str, raw: dict) -> tuple[Station, list[WorkflowFinding
             next=nxt,
             prompt_checks=_str_list(raw.get("prompt_checks")),
             validators=_str_list(raw.get("validators")),
-            tripwires=_str_list(raw.get("tripwires")),
+            jit_prompts=_str_list(raw.get("jit_prompts")),
         ),
         findings,
     )

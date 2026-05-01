@@ -78,7 +78,7 @@ def _decode_event_id(encoded: str) -> tuple[str, str, int] | None:
     """Inverse of `encode_event_id`. Returns ``None`` for malformed input.
 
     Validates against the `kind` / `session_id` charsets the emitter uses
-    so a hostile id like `firings/../escape/1` cannot reach disk.
+    so a hostile id like `jit_prompt_firings/../escape/1` cannot reach disk.
     """
     m = ENCODED_ID_RE.match(encoded)
     if m is None:
@@ -194,8 +194,8 @@ def list_events(
         refs = [r for r in refs if r.session_id == session_id]
     if kinds:
         kind_set = set(kinds)
-        # Refs are keyed by directory kind (`firings`/`validator_runs`/…),
-        # but callers filter by event kind (`tripwire_fire`/…). The
+        # Refs are keyed by directory kind (`jit_prompt_firings`/`validator_runs`/…),
+        # but callers filter by event kind (`jit_prompt_fire`/…). The
         # mapping is stored *inside* each event body, so consult the file
         # only when a kind filter is in play.
         refs = [r for r in refs if _read_event_kind(r.path) in kind_set]

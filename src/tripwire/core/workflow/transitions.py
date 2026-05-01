@@ -15,10 +15,10 @@ to a target station. The runtime:
       with ``strict=True``. Any error fails the gate. This is the
       same code path the KUI-110 edit-time hook drives (no parallel
       hook surface).
-   b. **Tripwires** — for every tripwire registered at the target
+   b. **JIT prompts** — for every JIT prompt registered at the target
       station (``at = (workflow, station)``), confirm
-      :meth:`Tripwire.is_acknowledged` returns True. An unack'd
-      blocking tripwire fails the gate.
+      :meth:`JitPrompt.is_acknowledged` returns True. An unack'd
+      blocking JIT prompt fails the gate.
    c. **Prompt-checks** — for every prompt-check declared at the
       *current* station, query the events log to verify it was
       invoked since the session entered the current station. Missing
@@ -46,7 +46,7 @@ from tripwire.core.events.log import emit_event, read_events
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
 from tripwire.core.workflow.loader import load_workflows
-from tripwire.core.workflow.registry import tripwires_for_station
+from tripwire.core.workflow.registry import jit_prompts_for_station
 from tripwire.core.workflow.schema import (
     NextSpec,
     Workflow,
@@ -252,24 +252,24 @@ def _run_gate(
             reason=f"validators_failed: {first.code}: {first.message}",
         )
 
-    # 3. Tripwires — every tripwire registered at the target station
-    # must be acknowledged. Unack'd blocking tripwires fail the gate.
-    tripwire_ids = tripwires_for_station(WORKFLOW_ID, target_station)
-    if tripwire_ids:
-        from tripwire._internal.tripwires.loader import load_registry
+    # 3. JIT prompts — every prompt registered at the target station
+    # must be acknowledged. Unack'd blocking prompts fail the gate.
+    jit_prompt_ids = jit_prompts_for_station(WORKFLOW_ID, target_station)
+    if jit_prompt_ids:
+        from tripwire._internal.jit_prompts.loader import load_jit_prompt_registry
 
         # The registry indexes by `fires_on` event; we want the
         # subset that registered at this station via class-level `at`.
-        registry = load_registry(project_dir)
-        unacked = _unacked_station_tripwires(
-            project_dir, registry, session_id=session_id, want_ids=set(tripwire_ids)
+        registry = load_jit_prompt_registry(project_dir)
+        unacked = _unacked_station_jit_prompts(
+            project_dir, registry, session_id=session_id, want_ids=set(jit_prompt_ids)
         )
         if unacked:
             return _reject(
                 project_dir,
                 session_id,
                 target_station,
-                reason=f"tripwires_not_acknowledged: {sorted(unacked)}",
+                reason=f"jit_prompts_not_acknowledged: {sorted(unacked)}",
             )
 
     # 4. Required prompt-checks declared on the current station in
@@ -344,35 +344,35 @@ def _reject(
     )
 
 
-def _unacked_station_tripwires(
+def _unacked_station_jit_prompts(
     project_dir: Path,
     registry: dict,
     *,
     session_id: str,
     want_ids: set[str],
 ) -> set[str]:
-    """Return the subset of ``want_ids`` whose tripwire is not
+    """Return the subset of ``want_ids`` whose JIT prompt is not
     acknowledged for the session.
 
-    The tripwire registry is keyed by `fires_on` event; we walk it,
+    The JIT prompt registry is keyed by `fires_on` event; we walk it,
     find each instance whose id is in ``want_ids``, build a
-    :class:`TripwireContext`, and ask
-    :meth:`Tripwire.is_acknowledged`. Missing tripwires (in the want
+    :class:`JitPromptContext`, and ask
+    :meth:`JitPrompt.is_acknowledged`. Missing prompts (in the want
     set but not loaded) count as unacked — the gate is conservative.
     """
-    from tripwire._internal.tripwires import TripwireContext
+    from tripwire._internal.jit_prompts import JitPromptContext
     from tripwire.core.store import load_project
 
     project = load_project(project_dir)
     project_id = project.name.lower().replace(" ", "-")
-    ctx = TripwireContext(
+    ctx = JitPromptContext(
         project_dir=project_dir, session_id=session_id, project_id=project_id
     )
     unacked = set(want_ids)
     for instances in registry.values():
-        for tw in instances:
-            if tw.id in unacked and tw.is_acknowledged(ctx):
-                unacked.discard(tw.id)
+        for jit_prompt in instances:
+            if jit_prompt.id in unacked and jit_prompt.is_acknowledged(ctx):
+                unacked.discard(jit_prompt.id)
     return unacked
 
 

@@ -7,12 +7,12 @@ WebSocket event, return the result DTO. The service layer owns:
 - the validator subprocess (via :func:`tripwire.core.validator.validate_project`,
   run on a background thread by the route);
 - the graph-cache rebuild (via
-  :func:`tripwire.core.graph_cache.ensure_fresh`);
+  :func:`tripwire.core.graph.cache.ensure_fresh`);
 - the phase-advance transaction — write `phase`, validate, revert on
   failure — with an `flock`-held ``project.yaml`` to avoid racing
   `tripwire next-key` or another advance_phase;
-- the session finalisation — flip status to ``completed``, stamp
-  ``updated_at``, and close any open engagements.
+- the session finalisation — delegate to the same close-out gates used by
+  ``tripwire session complete``.
 
 Every successful mutation writes a JSON-line audit entry via
 :mod:`tripwire.ui.services._audit`. The existing
@@ -30,9 +30,11 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from tripwire.core import graph_cache, paths
+from tripwire.core import paths
+from tripwire.core.graph import cache as graph_cache
 from tripwire.core.locks import project_lock
 from tripwire.core.parser import serialize_frontmatter_body
+from tripwire.core.session_complete import CompleteError, complete_session
 from tripwire.core.session_store import load_session
 from tripwire.core.store import load_project
 from tripwire.core.validator import ValidationReport, validate_project
@@ -92,6 +94,14 @@ class SessionStatusError(ValueError):
 
 class SessionRuntimeError(RuntimeError):
     """Raised when the runtime refuses to honour a state change (e.g. SIGTERM ignored)."""
+
+
+class SessionCompletionError(ValueError):
+    """Raised when real session close-out gates refuse finalisation."""
+
+    def __init__(self, code: str, message: str):
+        self.code = code
+        super().__init__(message)
 
 
 # ---------------------------------------------------------------------------
@@ -351,64 +361,48 @@ def pause_session(project_dir: Path, session_id: str) -> SessionResult:
 
 
 def finalize_session(project_dir: Path, session_id: str) -> SessionResult:
-    """Mark a session as ``completed`` and stamp ``updated_at``.
+    """Run the canonical session-complete close-out and return status.
 
-    Any engagement entry that has no ``ended_at`` timestamp is closed
-    out with the current time. This matches the verification checklist
-    ("status + engagements[].ended_at"). No container operations are
-    triggered — v1 finalisation is purely a bookkeeping write.
-
-    Timestamps are tz-aware UTC so downstream consumers such as
-    ``tripwire.core.lint_rules.session_stale`` don't have to defensively
-    coerce naive values.
+    The UI route must not be a second completion path. It delegates to
+    :func:`tripwire.core.session_complete.complete_session`, which enforces
+    the same status, merged-PR, required-artifact, and review gates as the
+    CLI. A refused gate becomes :class:`SessionCompletionError` for routes
+    to translate into a 409 envelope.
 
     Raises:
         FileNotFoundError: if the session yaml is missing (propagated
             from :func:`tripwire.core.session_store.load_session`).
+        SessionCompletionError: if a close-out gate refuses completion.
     """
-    with project_lock(project_dir):
-        session = load_session(project_dir, session_id)
-        now = datetime.now(tz=timezone.utc)
-        old_status = session.status
-        session.status = SessionStatus.COMPLETED
-        session.updated_at = now
-        closed_engagements = 0
-        for engagement in session.engagements:
-            if engagement.ended_at is None:
-                engagement.ended_at = now
-                closed_engagements += 1
-        _atomic_save_session(project_dir, session)
+    before = load_session(project_dir, session_id)
+    old_status = before.status
+    try:
+        complete_session(project_dir, session_id)
+    except CompleteError as exc:
+        raise SessionCompletionError(exc.code, str(exc)) from exc
 
-        write_audit_entry(
-            project_dir,
-            "actions.finalize_session",
-            before={"status": old_status},
-            after={
-                "status": "completed",
-                "closed_engagements": closed_engagements,
-            },
-            result_summary=(
-                f"{session_id}: {old_status} → completed "
-                f"(closed {closed_engagements} open engagement(s))"
-            ),
-            extras={"session_id": session_id},
-        )
-    logger.info(
-        "finalize_session: %s %s → completed (%d engagement(s) closed)",
-        session_id,
-        old_status,
-        closed_engagements,
+    session = load_session(project_dir, session_id)
+    changed_at = session.updated_at or datetime.now(tz=timezone.utc)
+    write_audit_entry(
+        project_dir,
+        "actions.finalize_session",
+        before={"status": old_status},
+        after={"status": session.status},
+        result_summary=f"{session_id}: {old_status} → {session.status}",
+        extras={"session_id": session_id},
     )
+    logger.info("finalize_session: %s %s → %s", session_id, old_status, session.status)
     return SessionResult(
         session_id=session_id,
-        status="completed",
-        changed_at=now,
+        status=str(session.status),
+        changed_at=changed_at,
     )
 
 
 __all__ = [
     "PhaseResult",
     "RebuildResult",
+    "SessionCompletionError",
     "SessionResult",
     "SessionRuntimeError",
     "SessionStatusError",

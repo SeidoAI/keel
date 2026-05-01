@@ -17,8 +17,8 @@ All emission goes via :func:`emit_event`. Three callers:
 
 - :mod:`tripwire.core.validator` (KUI-120) — emits ``validator.run``
   per check function as part of every ``tripwire validate`` run.
-- :mod:`tripwire._internal.tripwires` (KUI-121) — emits
-  ``tripwire.fired`` when a tripwire fires.
+- :mod:`tripwire._internal.jit_prompts` (KUI-121) — emits
+  ``jit_prompt.fired`` when a JIT prompt fires.
 - :mod:`tripwire.core.workflow.transitions` (KUI-159) — emits
   ``transition.requested`` / ``transition.completed`` /
   ``transition.rejected`` for each gate run.

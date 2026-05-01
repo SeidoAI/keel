@@ -9,8 +9,8 @@ approval gate. This module exposes:
   (empty manifest on missing file, matching the v0.3 behaviour noted in
   the KUI-22 execution constraints).
 - :func:`list_session_artifacts` — cross the manifest with what's
-  actually on disk in ``sessions/<sid>/`` (and ``sessions/<sid>/artifacts/``)
-  and return one :class:`ArtifactStatus` per manifest entry.
+  actually on disk in ``sessions/<sid>/artifacts/`` and return one
+  :class:`ArtifactStatus` per manifest entry.
 - :func:`get_session_artifact` — load one artifact's body + mtime.
 - :func:`approve_artifact` / :func:`reject_artifact` — write an
   ``<name>.approval.yaml`` sidecar next to the session directory. The
@@ -139,21 +139,13 @@ def _sidecar_path(project_dir: Path, session_id: str, name: str) -> Path:
 
 
 def _resolve_artifact_file(project_dir: Path, session_id: str, file: str) -> Path:
-    """Pick whichever of ``sessions/<sid>/<file>`` or
-    ``sessions/<sid>/artifacts/<file>`` actually exists, or the
-    ``artifacts/`` path if neither exists (callers expect an absolute
-    path even when the file is missing)."""
-    sdir = paths.session_dir(project_dir, session_id)
-    artifacts_dir = paths.session_artifacts_dir(project_dir, session_id)
-    root_candidate = sdir / file
-    artifacts_candidate = artifacts_dir / file
-    if root_candidate.is_file():
-        return root_candidate
-    if artifacts_candidate.is_file():
-        return artifacts_candidate
-    # Prefer the artifacts/ layout for missing files so the UI can
-    # surface the expected write location.
-    return artifacts_candidate
+    """Return the canonical session artifact path.
+
+    Session manifest artifacts live only under
+    ``sessions/<sid>/artifacts/<file>``. The UI intentionally does not
+    accept the pre-subdir root layout as a fallback.
+    """
+    return paths.session_artifacts_dir(project_dir, session_id) / file
 
 
 def _load_sidecar(

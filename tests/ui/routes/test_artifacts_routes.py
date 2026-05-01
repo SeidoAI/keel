@@ -75,6 +75,7 @@ def artifact_client(
         ],
     )
     save_test_session(artifact_project, "session-a", plan=True)
+    save_test_session(artifact_project, "TST-S1", plan=True)
     # Write the plan artifact on disk (plan=True creates plan.md under artifacts/).
     (
         artifact_project / "sessions" / "session-a" / "artifacts" / "task-checklist.md"
@@ -104,6 +105,26 @@ class TestListSessionArtifacts:
         plan = next(a for a in body if a["spec"]["name"] == "plan")
         assert plan["present"] is True
 
+    def test_accepts_uppercase_sequential_session_key(
+        self,
+        artifact_client,
+        artifact_project_id,
+    ):
+        r = artifact_client.get(
+            f"/api/projects/{artifact_project_id}/sessions/TST-S1/artifacts"
+        )
+
+        assert r.status_code == 200
+        plan = next(a for a in r.json() if a["spec"]["name"] == "plan")
+        assert plan["present"] is True
+
+    def test_bad_session_id_returns_400(self, artifact_client, artifact_project_id):
+        r = artifact_client.get(
+            f"/api/projects/{artifact_project_id}/sessions/bad.value/artifacts"
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
+
 
 class TestGetArtifact:
     def test_happy_path(self, artifact_client, artifact_project_id):
@@ -115,6 +136,18 @@ class TestGetArtifact:
         assert body["name"] == "plan"
         assert "body" in body
         assert "mtime" in body
+
+    def test_accepts_uppercase_sequential_session_key(
+        self,
+        artifact_client,
+        artifact_project_id,
+    ):
+        r = artifact_client.get(
+            f"/api/projects/{artifact_project_id}/sessions/TST-S1/artifacts/plan"
+        )
+
+        assert r.status_code == 200
+        assert r.json()["name"] == "plan"
 
     def test_missing_file_returns_404(
         self,
@@ -141,6 +174,13 @@ class TestGetArtifact:
         )
         assert r.status_code == 404
 
+    def test_bad_session_id_returns_400(self, artifact_client, artifact_project_id):
+        r = artifact_client.get(
+            f"/api/projects/{artifact_project_id}/sessions/bad.value/artifacts/plan"
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
+
 
 class TestApproveArtifact:
     def test_happy_path_writes_sidecar(
@@ -160,6 +200,22 @@ class TestApproveArtifact:
         assert body["approval"]["approved"] is True
         # Sidecar file on disk.
         sidecar = artifact_project / "sessions" / "session-a" / "plan.approval.yaml"
+        assert sidecar.exists()
+
+    def test_accepts_uppercase_sequential_session_key(
+        self,
+        artifact_client,
+        artifact_project_id,
+        artifact_project,
+    ):
+        r = artifact_client.post(
+            f"/api/projects/{artifact_project_id}"
+            "/sessions/TST-S1/artifacts/plan/approve",
+            json={"feedback": "looks good"},
+        )
+
+        assert r.status_code == 200
+        sidecar = artifact_project / "sessions" / "TST-S1" / "plan.approval.yaml"
         assert sidecar.exists()
 
     def test_no_feedback_body_ok(
@@ -186,6 +242,14 @@ class TestApproveArtifact:
         )
         assert r.status_code == 409
         assert r.json()["code"] == "artifact/no_gate"
+
+    def test_bad_session_id_returns_400(self, artifact_client, artifact_project_id):
+        r = artifact_client.post(
+            f"/api/projects/{artifact_project_id}/sessions/bad.value/artifacts/plan/approve",
+            json={},
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
 
 
 class TestRejectArtifact:
@@ -229,6 +293,14 @@ class TestRejectArtifact:
         )
         # Pydantic required-field rejection.
         assert r.status_code == 422
+
+    def test_bad_session_id_returns_400(self, artifact_client, artifact_project_id):
+        r = artifact_client.post(
+            f"/api/projects/{artifact_project_id}/sessions/bad.value/artifacts/plan/reject",
+            json={"feedback": "nope"},
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
 
 
 class TestOpenAPI:

@@ -2,11 +2,11 @@
 
 The hook lives at ``<worktree>/.git/hooks/pre-push`` and gates
 ``git push`` on the existence of a substantive ack marker for the
-self-review tripwire on this session. Two opt-outs:
+JIT prompt on this session. Two opt-outs:
 
-  * Per-call: ``tripwire session complete --no-tripwires`` writes an
+  * Per-call: ``tripwire session complete --no-jit-prompts`` writes an
     audit-log entry that the hook treats as bypass.
-  * Per-project: ``tripwires.enabled: false`` in project.yaml — the
+  * Per-project: ``jit_prompts.enabled: false`` in project.yaml — the
     hook checks the project config and short-circuits.
 """
 
@@ -32,7 +32,7 @@ def _project(project_dir: Path, *, enabled: bool = True) -> None:
         "next_issue_number": 1,
         "next_session_number": 1,
         "phase": "scoping",
-        "tripwires": {"enabled": enabled},
+        "jit_prompts": {"enabled": enabled},
     }
     (project_dir / "project.yaml").write_text(yaml.safe_dump(body), encoding="utf-8")
 
@@ -64,10 +64,10 @@ def test_install_writes_executable_hook(tmp_path: Path) -> None:
     assert mode & stat.S_IXUSR, "hook should be executable"
     body = hook.read_text(encoding="utf-8")
     assert "fixture-1" in body
-    assert "tripwires" in body.lower() or "tripwire" in body.lower()
+    assert "jit_prompts.enabled" in body
 
 
-def test_install_skipped_when_tripwires_disabled(tmp_path: Path) -> None:
+def test_install_skipped_when_jit_prompts_disabled(tmp_path: Path) -> None:
     project_dir = tmp_path / "proj"
     worktree = tmp_path / "wt"
     _project(project_dir, enabled=False)
@@ -130,7 +130,7 @@ def test_hook_passes_with_substantive_ack(tmp_path: Path) -> None:
     marker.write_text(
         json.dumps(
             {
-                "tripwire_id": "self-review",
+                "jit_prompt_id": "self-review",
                 "session_id": "fixture-1",
                 "fix_commits": ["abc123"],
                 "declared_no_findings": False,
@@ -156,8 +156,8 @@ def test_hook_passes_with_bypass_audit_entry(tmp_path: Path) -> None:
 
     audit_dir = project_dir / ".tripwire" / "audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
-    (audit_dir / "tripwire_bypass.log").write_text(
-        "2026-04-26T00:00:00+00:00\tsession.complete\tfixture-1\t--no-tripwires\n",
+    (audit_dir / "jit_prompt_bypass.log").write_text(
+        "2026-04-26T00:00:00+00:00\tsession.complete\tfixture-1\t--no-jit-prompts\n",
         encoding="utf-8",
     )
 
@@ -168,7 +168,7 @@ def test_hook_passes_with_bypass_audit_entry(tmp_path: Path) -> None:
 def test_hook_skipped_when_project_disabled_via_existing_install(
     tmp_path: Path,
 ) -> None:
-    """If a project flips `tripwires.enabled: false` AFTER spawn, the
+    """If a project flips `jit_prompts.enabled: false` AFTER spawn, the
     already-installed hook still short-circuits because it re-reads the
     project config at run time."""
     project_dir = tmp_path / "proj"

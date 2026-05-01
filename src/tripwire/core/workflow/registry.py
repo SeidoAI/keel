@@ -5,13 +5,13 @@ ask one module for the union of all known refs:
 
 - :func:`known_validator_ids` — populated by the ``@registers_at``
   decorator on validator check functions (KUI-120).
-- :func:`known_tripwire_ids` — populated by the ``at = (...)`` class
-  attribute on :class:`Tripwire` subclasses (KUI-121).
+- :func:`known_jit_prompt_ids` — populated by the ``at = (...)`` class
+  attribute on :class:`JitPrompt` subclasses (KUI-121).
 - :func:`known_prompt_check_ids` — populated by the ``fires_at:``
   frontmatter on PM-skill slash command files (KUI-122).
 
 The validator-id channel is module-import-time (decorator runs when
-the check module is loaded). Tripwires are instance-time (registry
+the check module is loaded). JIT prompts are instance-time (registry
 loaded when the manifest is parsed). Prompt-checks are
 filesystem-time (the slash command directory is enumerated).
 
@@ -90,35 +90,37 @@ def validators_for_station(workflow: str, station: str) -> list[str]:
 
 
 # ----------------------------------------------------------------------
-# Tripwire station registry (KUI-121)
+# JIT prompt station registry (KUI-121)
 # ----------------------------------------------------------------------
 
-_tripwire_stations: dict[str, tuple[str, str]] = {}
-"""Maps tripwire id → (workflow, station) declared via class ``at`` attr."""
+_jit_prompt_stations: dict[str, tuple[str, str]] = {}
+"""Maps JIT prompt id to (workflow, station) declared via class ``at`` attr."""
 
-_station_tripwires: dict[tuple[str, str], list[str]] = defaultdict(list)
+_station_jit_prompts: dict[tuple[str, str], list[str]] = defaultdict(list)
 
 
-def register_tripwire_station(tripwire_id: str, workflow: str, station: str) -> None:
-    """Record that ``tripwire_id`` is registered at ``(workflow, station)``.
+def register_jit_prompt_station(
+    jit_prompt_id: str, workflow: str, station: str
+) -> None:
+    """Record that ``jit_prompt_id`` is registered at ``(workflow, station)``.
 
-    Called by the tripwire loader when it instantiates a Tripwire whose
+    Called by the JIT prompt loader when it instantiates a JitPrompt whose
     class declares ``at = ("workflow", "station")``. Re-registration
     overwrites the previous mapping (last loader wins) so reloads work.
     """
-    _tripwire_stations[tripwire_id] = (workflow, station)
+    _jit_prompt_stations[jit_prompt_id] = (workflow, station)
     pair = (workflow, station)
-    if tripwire_id not in _station_tripwires[pair]:
-        _station_tripwires[pair].append(tripwire_id)
+    if jit_prompt_id not in _station_jit_prompts[pair]:
+        _station_jit_prompts[pair].append(jit_prompt_id)
 
 
-def known_tripwire_ids() -> set[str]:
-    """Return the set of tripwire ids registered against any station."""
-    return set(_tripwire_stations.keys())
+def known_jit_prompt_ids() -> set[str]:
+    """Return the set of JIT prompt ids registered against any station."""
+    return set(_jit_prompt_stations.keys())
 
 
-def tripwires_for_station(workflow: str, station: str) -> list[str]:
-    return list(_station_tripwires.get((workflow, station), []))
+def jit_prompts_for_station(workflow: str, station: str) -> list[str]:
+    return list(_station_jit_prompts.get((workflow, station), []))
 
 
 # ----------------------------------------------------------------------
@@ -158,12 +160,12 @@ def prompt_checks_for_station(project_dir: Path, station: str) -> list[str]:
 
 
 __all__ = [
+    "jit_prompts_for_station",
+    "known_jit_prompt_ids",
     "known_prompt_check_ids",
-    "known_tripwire_ids",
     "known_validator_ids",
     "prompt_checks_for_station",
-    "register_tripwire_station",
+    "register_jit_prompt_station",
     "registers_at",
-    "tripwires_for_station",
     "validators_for_station",
 ]

@@ -14,6 +14,7 @@ from tripwire.ui.services._audit import audit_log_path
 from tripwire.ui.services.action_service import (
     PhaseResult,
     RebuildResult,
+    SessionCompletionError,
     SessionResult,
     advance_phase,
     finalize_session,
@@ -369,10 +370,29 @@ class TestAdvancePhase:
 
 
 class TestFinalizeSession:
+    @staticmethod
+    def _complete_ok(project_dir: Path, session_id: str) -> None:
+        from datetime import datetime, timezone
+
+        from tripwire.core.session_store import load_session, save_session
+        from tripwire.models.enums import SessionStatus
+
+        session = load_session(project_dir, session_id)
+        now = datetime.now(tz=timezone.utc)
+        session.status = SessionStatus.COMPLETED
+        session.updated_at = now
+        for engagement in session.engagements:
+            if engagement.ended_at is None:
+                engagement.ended_at = now
+        save_session(project_dir, session)
+
     def test_updates_status_and_timestamp(
-        self, tmp_path_project: Path, save_test_session
+        self, tmp_path_project: Path, save_test_session, monkeypatch: pytest.MonkeyPatch
     ):
-        save_test_session(tmp_path_project, "s1", status="executing")
+        monkeypatch.setattr(
+            "tripwire.ui.services.action_service.complete_session", self._complete_ok
+        )
+        save_test_session(tmp_path_project, "s1", status="verified")
         result = finalize_session(tmp_path_project, "s1")
 
         assert isinstance(result, SessionResult)
@@ -386,13 +406,21 @@ class TestFinalizeSession:
         assert reloaded.status == "completed"
         assert reloaded.updated_at is not None
 
-    def test_closes_open_engagements(self, tmp_path_project: Path, save_test_session):
+    def test_delegates_to_complete_session_for_engagement_closeout(
+        self,
+        tmp_path_project: Path,
+        save_test_session,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
         from datetime import datetime
 
+        monkeypatch.setattr(
+            "tripwire.ui.services.action_service.complete_session", self._complete_ok
+        )
         save_test_session(
             tmp_path_project,
             "s1",
-            status="executing",
+            status="verified",
             engagements=[
                 {
                     "started_at": datetime(2026, 4, 14, 10, 0, 0).isoformat(),
@@ -427,18 +455,40 @@ class TestFinalizeSession:
         with pytest.raises(FileNotFoundError):
             finalize_session(tmp_path_project, "nope")
 
-    def test_audit_entry_written(self, tmp_path_project: Path, save_test_session):
+    def test_gate_failure_raises_completion_error(
+        self,
+        tmp_path_project: Path,
+        save_test_session,
+    ):
         save_test_session(tmp_path_project, "s1", status="executing")
+
+        with pytest.raises(SessionCompletionError) as exc:
+            finalize_session(tmp_path_project, "s1")
+        assert exc.value.code == "complete/not_active"
+
+    def test_audit_entry_written(
+        self,
+        tmp_path_project: Path,
+        save_test_session,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(
+            "tripwire.ui.services.action_service.complete_session", self._complete_ok
+        )
+        save_test_session(tmp_path_project, "s1", status="verified")
         finalize_session(tmp_path_project, "s1")
 
         log_path = audit_log_path(tmp_path_project)
         record = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
         assert record["action"] == "actions.finalize_session"
         assert record["extras"]["session_id"] == "s1"
-        assert record["before_state_snippet"] == {"status": "executing"}
+        assert record["before_state_snippet"] == {"status": "verified"}
 
     def test_changed_at_is_tz_aware_utc(
-        self, tmp_path_project: Path, save_test_session
+        self,
+        tmp_path_project: Path,
+        save_test_session,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         """Post-fix #6: finalize writes tz-aware UTC timestamps.
 
@@ -450,7 +500,10 @@ class TestFinalizeSession:
         """
         from datetime import timezone
 
-        save_test_session(tmp_path_project, "s1", status="executing")
+        monkeypatch.setattr(
+            "tripwire.ui.services.action_service.complete_session", self._complete_ok
+        )
+        save_test_session(tmp_path_project, "s1", status="verified")
         result = finalize_session(tmp_path_project, "s1")
 
         assert result.changed_at.tzinfo is not None

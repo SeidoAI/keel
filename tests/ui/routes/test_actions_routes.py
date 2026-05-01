@@ -44,6 +44,18 @@ def action_client(action_project: Path, save_test_session) -> TestClient:
     return TestClient(create_app(dev_mode=True))
 
 
+def _complete_ok(project_dir: Path, session_id: str) -> None:
+    from datetime import datetime, timezone
+
+    from tripwire.core.session_store import load_session, save_session
+    from tripwire.models.enums import SessionStatus
+
+    session = load_session(project_dir, session_id)
+    session.status = SessionStatus.COMPLETED
+    session.updated_at = datetime.now(tz=timezone.utc)
+    save_session(project_dir, session)
+
+
 class TestValidateUnknownProjectEnvelope:
     def test_unknown_project_returns_404_envelope(self, action_client):
         r = action_client.post(
@@ -121,7 +133,15 @@ class TestAdvancePhase:
 
 
 class TestFinalizeSession:
-    def test_happy_path(self, action_client, action_project_id):
+    def test_happy_path(
+        self,
+        action_client,
+        action_project_id,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        monkeypatch.setattr(
+            "tripwire.ui.services.action_service.complete_session", _complete_ok
+        )
         r = action_client.post(
             "/api/actions/finalize-session",
             json={
@@ -134,6 +154,52 @@ class TestFinalizeSession:
         assert body["session_id"] == "session-a"
         assert body["status"] == "completed"
         assert "changed_at" in body
+
+    def test_accepts_uppercase_sequential_session_key(
+        self,
+        action_client,
+        action_project,
+        action_project_id,
+        save_test_session,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        save_test_session(action_project, "TST-S1", status="planned")
+        monkeypatch.setattr(
+            "tripwire.ui.services.action_service.complete_session", _complete_ok
+        )
+
+        r = action_client.post(
+            "/api/actions/finalize-session",
+            json={
+                "project_id": action_project_id,
+                "session_id": "TST-S1",
+            },
+        )
+
+        assert r.status_code == 200
+        assert r.json()["session_id"] == "TST-S1"
+
+    def test_gate_failure_returns_409(self, action_client, action_project_id):
+        r = action_client.post(
+            "/api/actions/finalize-session",
+            json={
+                "project_id": action_project_id,
+                "session_id": "session-a",
+            },
+        )
+        assert r.status_code == 409
+        assert r.json()["code"] == "complete/not_active"
+
+    def test_bad_session_id_returns_400(self, action_client, action_project_id):
+        r = action_client.post(
+            "/api/actions/finalize-session",
+            json={
+                "project_id": action_project_id,
+                "session_id": "..",
+            },
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
 
     def test_unknown_session_returns_404(
         self,
