@@ -188,7 +188,7 @@ function LoadingState() {
 }
 
 function NotFound({ projectId }: { projectId?: string }) {
-  const sessionsHref = projectId ? `/p/${projectId}/sessions` : "/projects";
+  const sessionsHref = projectId ? `/p/${projectId}/sessions` : "/";
   return (
     <div className="p-8">
       <h1 className="font-sans font-semibold text-[20px] text-(--color-ink)">Session not found</h1>

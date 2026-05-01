@@ -104,6 +104,13 @@ class TestListSessionArtifacts:
         plan = next(a for a in body if a["spec"]["name"] == "plan")
         assert plan["present"] is True
 
+    def test_bad_session_id_returns_400(self, artifact_client, artifact_project_id):
+        r = artifact_client.get(
+            f"/api/projects/{artifact_project_id}/sessions/Bad/artifacts"
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
+
 
 class TestGetArtifact:
     def test_happy_path(self, artifact_client, artifact_project_id):
@@ -140,6 +147,13 @@ class TestGetArtifact:
             f"/api/projects/{artifact_project_id}/sessions/session-a/artifacts/ghost"
         )
         assert r.status_code == 404
+
+    def test_bad_session_id_returns_400(self, artifact_client, artifact_project_id):
+        r = artifact_client.get(
+            f"/api/projects/{artifact_project_id}/sessions/Bad/artifacts/plan"
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
 
 
 class TestApproveArtifact:
@@ -187,6 +201,14 @@ class TestApproveArtifact:
         assert r.status_code == 409
         assert r.json()["code"] == "artifact/no_gate"
 
+    def test_bad_session_id_returns_400(self, artifact_client, artifact_project_id):
+        r = artifact_client.post(
+            f"/api/projects/{artifact_project_id}/sessions/Bad/artifacts/plan/approve",
+            json={},
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
+
 
 class TestRejectArtifact:
     def test_happy_path_requires_feedback(
@@ -229,6 +251,14 @@ class TestRejectArtifact:
         )
         # Pydantic required-field rejection.
         assert r.status_code == 422
+
+    def test_bad_session_id_returns_400(self, artifact_client, artifact_project_id):
+        r = artifact_client.post(
+            f"/api/projects/{artifact_project_id}/sessions/Bad/artifacts/plan/reject",
+            json={"feedback": "nope"},
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "session/bad_slug"
 
 
 class TestOpenAPI:

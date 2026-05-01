@@ -278,18 +278,13 @@ def get_session(project_dir: Path, session_id: str) -> SessionDetail:
     summary = _build_summary(project_dir, session)
     manifest = _load_manifest(project_dir)
 
-    # TODO-v2: the engagements list is a v2-container-runtime placeholder.
-    # Per KUI-18 execution constraint: "v1 it's always empty. Do not guess
-    # at its shape — leave it as [] with a clear TODO-v2 comment." The
-    # `re_engagement_count` scalar is still derived from whatever the
-    # session.yaml has on disk (that's just a count).
     return SessionDetail(
         **summary.model_dump(),
         plan_md=_read_plan(project_dir, session_id),
         key_files=list(session.key_files),
         docs=list(session.docs or []),
         grouping_rationale=session.grouping_rationale,
-        engagements=[],
+        engagements=[entry.model_dump(mode="json") for entry in session.engagements],
         artifact_status=_artifact_status(project_dir, session_id, manifest),
     )
 

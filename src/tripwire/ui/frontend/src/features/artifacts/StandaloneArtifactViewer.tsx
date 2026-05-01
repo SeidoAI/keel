@@ -46,7 +46,7 @@ function StandaloneInner({
 }
 
 function NotFound({ projectId, sid }: { projectId?: string; sid?: string }) {
-  const sessionHref = projectId && sid ? `/p/${projectId}/sessions/${sid}` : "/projects";
+  const sessionHref = projectId && sid ? `/p/${projectId}/sessions/${sid}` : "/";
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold">Artifact not found</h1>

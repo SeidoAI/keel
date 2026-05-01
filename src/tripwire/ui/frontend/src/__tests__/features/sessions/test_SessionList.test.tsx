@@ -104,6 +104,43 @@ describe("SessionList", () => {
     expect(screen.getAllByText("Upstream").length).toBeGreaterThan(0);
   });
 
+  it("does not treat in_review blockers as actionable", () => {
+    const qc = makeTestQueryClient();
+    qc.setQueryData(queryKeys.sessions("p1"), [
+      makeSessionSummary({
+        id: "blocked",
+        name: "Blocked",
+        status: "planned",
+        blocked_by_sessions: ["reviewing"],
+      }),
+      makeSessionSummary({
+        id: "reviewing",
+        name: "Reviewing",
+        status: "in_review",
+        blocked_by_sessions: [],
+      }),
+      makeSessionSummary({
+        id: "verified",
+        name: "Verified downstream",
+        status: "planned",
+        blocked_by_sessions: ["done"],
+      }),
+      makeSessionSummary({
+        id: "done",
+        name: "Done blocker",
+        status: "verified",
+        blocked_by_sessions: [],
+      }),
+    ]);
+    renderWithProviders(<SessionList />, { queryClient: qc });
+
+    fireEvent.click(screen.getByLabelText(/Only actionable/));
+
+    expect(screen.queryAllByText("Blocked").length).toBe(0);
+    expect(screen.getAllByText("Reviewing").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Verified downstream").length).toBeGreaterThan(0);
+  });
+
   it("renders the empty state when there are no sessions", () => {
     const qc = makeTestQueryClient();
     qc.setQueryData(queryKeys.sessions("p1"), []);

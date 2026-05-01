@@ -26,6 +26,7 @@ from tripwire.ui.routes._common import envelope_exception
 from tripwire.ui.services.action_service import (
     PhaseResult,
     RebuildResult,
+    SessionCompletionError,
     SessionResult,
 )
 from tripwire.ui.services.project_service import get_project_dir
@@ -146,6 +147,9 @@ async def finalize_session(body: FinalizeSessionRequest) -> SessionResult:
     from tripwire.ui.services.action_service import finalize_session as svc
 
     project_dir = _resolve_project(body.project_id)
+    from tripwire.ui.routes._params import ensure_session_id
+
+    ensure_session_id(body.session_id)
     try:
         return await asyncio.to_thread(svc, project_dir, body.session_id)
     except FileNotFoundError as exc:
@@ -153,4 +157,10 @@ async def finalize_session(body: FinalizeSessionRequest) -> SessionResult:
             404,
             code="session/not_found",
             detail=f"Session {body.session_id!r} not found in this project.",
+        ) from exc
+    except SessionCompletionError as exc:
+        raise envelope_exception(
+            409,
+            code=exc.code,
+            detail=str(exc),
         ) from exc

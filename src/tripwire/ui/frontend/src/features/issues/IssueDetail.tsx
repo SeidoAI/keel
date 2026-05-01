@@ -80,7 +80,7 @@ function IssueDetailInner({ projectId, issueKey }: { projectId: string; issueKey
 }
 
 function NotFound({ projectId }: { projectId?: string }) {
-  const boardHref = projectId ? `/p/${projectId}/board` : "/projects";
+  const boardHref = projectId ? `/p/${projectId}/board` : "/";
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold text-foreground">Issue not found</h1>

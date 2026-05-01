@@ -12,12 +12,11 @@ no mutation in this module in v1.
 
 from __future__ import annotations
 
-import re
-
 from fastapi import APIRouter, Depends, Query
 
 from tripwire.ui.dependencies import ProjectContext, get_project
 from tripwire.ui.routes._common import envelope_exception
+from tripwire.ui.routes._params import ensure_session_id
 from tripwire.ui.services.action_service import (
     SessionResult,
     SessionRuntimeError,
@@ -37,21 +36,6 @@ from tripwire.ui.services.session_service import (
 
 router = APIRouter(prefix="/api/projects/{project_id}/sessions", tags=["sessions"])
 
-_SLUG_PATTERN = r"^[a-z][a-z0-9-]*$"
-_SLUG_RE = re.compile(_SLUG_PATTERN)
-
-
-def _ensure_sid(sid: str) -> None:
-    if not _SLUG_RE.match(sid):
-        raise envelope_exception(
-            400,
-            code="session/bad_slug",
-            detail=(
-                f"Session id {sid!r} does not match {_SLUG_PATTERN} "
-                "(lowercase letter first, then alphanumerics or hyphens)."
-            ),
-        )
-
 
 @router.get("", response_model=list[SessionSummary])
 async def list_sessions(
@@ -66,7 +50,7 @@ async def get_session(
     sid: str,
     project: ProjectContext = Depends(get_project),  # noqa: B008
 ) -> SessionDetail:
-    _ensure_sid(sid)
+    ensure_session_id(sid)
     try:
         return svc_get_session(project.project_dir, sid)
     except FileNotFoundError as exc:
@@ -89,7 +73,7 @@ async def pause_session_route(
     fall-through to ``failed``, same audit trail as the CLI's
     ``tripwire session pause``.
     """
-    _ensure_sid(sid)
+    ensure_session_id(sid)
     try:
         return pause_session(project.project_dir, sid)
     except FileNotFoundError as exc:

@@ -119,7 +119,7 @@ function StaleBanner() {
 }
 
 function NotFound({ projectId }: { projectId?: string }) {
-  const graphHref = projectId ? `/p/${projectId}/graph` : "/projects";
+  const graphHref = projectId ? `/p/${projectId}/graph` : "/";
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold text-foreground">Node not found</h1>

@@ -24,7 +24,7 @@ export function useProjectShell(): ProjectShellContextValue {
 
 export function ProjectShell() {
   const { projectId } = useParams();
-  if (!projectId) return <Navigate to="/projects" replace />;
+  if (!projectId) return <Navigate to="/" replace />;
   return <ProjectShellInner projectId={projectId} />;
 }
 
