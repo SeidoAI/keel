@@ -120,6 +120,26 @@ class TestListSessions:
         assert summary.task_progress.done == 1
         assert summary.task_progress.total == 2
 
+    def test_task_progress_ignores_root_level_checklist(
+        self,
+        tmp_path_project: Path,
+        save_test_session,
+    ):
+        save_test_session(tmp_path_project, "s1", plan=True)
+        checklist = (
+            "| # | Description | Status |\n"
+            "|---|-------------|--------|\n"
+            "| 1 | a           | done   |\n"
+        )
+        (paths.session_dir(tmp_path_project, "s1") / "task-checklist.md").write_text(
+            checklist,
+            encoding="utf-8",
+        )
+
+        [summary] = list_sessions(tmp_path_project)
+        assert summary.task_progress.done == 0
+        assert summary.task_progress.total == 0
+
 
 # ---------------------------------------------------------------------------
 # get_session
@@ -159,6 +179,18 @@ class TestGetSession:
         self, tmp_path_project: Path, save_test_session
     ):
         save_test_session(tmp_path_project, "s1", plan=False)
+        detail = get_session(tmp_path_project, "s1")
+        assert detail.artifact_status["plan"] == "missing"
+
+    def test_artifact_status_ignores_root_level_artifact(
+        self, tmp_path_project: Path, save_test_session
+    ):
+        save_test_session(tmp_path_project, "s1", plan=False)
+        (paths.session_dir(tmp_path_project, "s1") / "plan.md").write_text(
+            "# old layout\n",
+            encoding="utf-8",
+        )
+
         detail = get_session(tmp_path_project, "s1")
         assert detail.artifact_status["plan"] == "missing"
 

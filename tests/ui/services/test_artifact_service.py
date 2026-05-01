@@ -38,6 +38,12 @@ def _session_dir(project_dir: Path, session_id: str) -> Path:
     return sdir
 
 
+def _session_artifacts_dir(project_dir: Path, session_id: str) -> Path:
+    adir = _session_dir(project_dir, session_id) / "artifacts"
+    adir.mkdir(parents=True, exist_ok=True)
+    return adir
+
+
 @pytest.fixture
 def project_with_manifest(tmp_path_project: Path) -> Path:
     """Writes a realistic manifest covering a gated + ungated artifact."""
@@ -137,22 +143,22 @@ class TestListSessionArtifacts:
         assert all(s.size_bytes is None for s in statuses)
         assert all(s.last_modified is None for s in statuses)
 
-    def test_detects_present_artifact_at_root(self, project_with_manifest: Path):
+    def test_ignores_present_artifact_at_session_root(
+        self, project_with_manifest: Path
+    ):
         sdir = _session_dir(project_with_manifest, "s1")
         (sdir / "plan.md").write_text("# plan\n", encoding="utf-8")
 
         statuses = list_session_artifacts(project_with_manifest, "s1")
         plan = next(s for s in statuses if s.spec.name == "plan")
-        assert plan.present is True
-        assert plan.size_bytes == len("# plan\n")
-        assert plan.last_modified is not None
+        assert plan.present is False
+        assert plan.size_bytes is None
+        assert plan.last_modified is None
 
     def test_detects_present_artifact_in_artifacts_subdir(
         self, project_with_manifest: Path
     ):
-        sdir = _session_dir(project_with_manifest, "s1")
-        adir = sdir / "artifacts"
-        adir.mkdir()
+        adir = _session_artifacts_dir(project_with_manifest, "s1")
         (adir / "task-checklist.md").write_text("- [ ] x\n", encoding="utf-8")
 
         statuses = list_session_artifacts(project_with_manifest, "s1")
@@ -162,10 +168,10 @@ class TestListSessionArtifacts:
     def test_symlinked_artifact_not_treated_as_present(
         self, project_with_manifest: Path, tmp_path: Path
     ):
-        sdir = _session_dir(project_with_manifest, "s1")
+        adir = _session_artifacts_dir(project_with_manifest, "s1")
         real_target = tmp_path / "real.md"
         real_target.write_text("#\n", encoding="utf-8")
-        link = sdir / "plan.md"
+        link = adir / "plan.md"
         link.symlink_to(real_target)
 
         statuses = list_session_artifacts(project_with_manifest, "s1")
@@ -173,8 +179,8 @@ class TestListSessionArtifacts:
         assert plan.present is False
 
     def test_reports_approval_sidecar_when_present(self, project_with_manifest: Path):
-        sdir = _session_dir(project_with_manifest, "s1")
-        (sdir / "plan.md").write_text("# plan\n", encoding="utf-8")
+        adir = _session_artifacts_dir(project_with_manifest, "s1")
+        (adir / "plan.md").write_text("# plan\n", encoding="utf-8")
         # Pre-write a sidecar and confirm the status picks it up.
         approve_artifact(project_with_manifest, "s1", "plan", feedback="lgtm")
 
@@ -201,8 +207,8 @@ class TestListSessionArtifacts:
 
 class TestGetSessionArtifact:
     def test_returns_body_and_mtime(self, project_with_manifest: Path):
-        sdir = _session_dir(project_with_manifest, "s1")
-        (sdir / "plan.md").write_text("# plan content\n", encoding="utf-8")
+        adir = _session_artifacts_dir(project_with_manifest, "s1")
+        (adir / "plan.md").write_text("# plan content\n", encoding="utf-8")
 
         content = get_session_artifact(project_with_manifest, "s1", "plan")
         assert isinstance(content, ArtifactContent)
@@ -210,6 +216,15 @@ class TestGetSessionArtifact:
         assert content.body == "# plan content\n"
         assert content.file_path.endswith("plan.md")
         assert content.mtime is not None
+
+    def test_root_level_file_does_not_satisfy_artifact(
+        self, project_with_manifest: Path
+    ):
+        sdir = _session_dir(project_with_manifest, "s1")
+        (sdir / "plan.md").write_text("# old layout\n", encoding="utf-8")
+
+        with pytest.raises(FileNotFoundError):
+            get_session_artifact(project_with_manifest, "s1", "plan")
 
     def test_missing_file_raises(self, project_with_manifest: Path):
         _session_dir(project_with_manifest, "s1")
