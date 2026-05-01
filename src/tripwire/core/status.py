@@ -16,7 +16,8 @@ from tripwire.models.project import ProjectConfig
 # `backlog` in their enums but the transition graph still must have a node
 # that all issues are reachable from. We use the first declared status as
 # the starting state if `backlog` isn't present.
-DEFAULT_START_STATE = "backlog"
+# v0.9.4 canonical name; "backlog" still accepted on the legacy alias path.
+DEFAULT_START_STATE = "planned"
 
 
 class StatusError(ValueError):

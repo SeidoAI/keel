@@ -162,9 +162,9 @@ def repo_two_states(tmp_path: Path) -> tuple[Path, str, str]:
     _init_repo(repo)
     _write_project(repo)
 
-    _save_issue(repo, "FIX-1", status="todo")
-    _save_issue(repo, "FIX-2", status="in_progress")
-    _save_issue(repo, "FIX-3", status="done")
+    _save_issue(repo, "FIX-1", status="queued")
+    _save_issue(repo, "FIX-2", status="executing")
+    _save_issue(repo, "FIX-3", status="completed")
     _save_session(repo, "alpha", status="planned")
     _save_node(repo, "common-node", scope="local", origin="local")
 
@@ -172,9 +172,9 @@ def repo_two_states(tmp_path: Path) -> tuple[Path, str, str]:
 
     # Move FIX-1 todo→in_progress, FIX-2 in_progress→done; add FIX-4;
     # add a new node, promote common-node to workspace; transition session.
-    _save_issue(repo, "FIX-1", status="in_progress")
-    _save_issue(repo, "FIX-2", status="done")
-    _save_issue(repo, "FIX-4", status="todo")
+    _save_issue(repo, "FIX-1", status="executing")
+    _save_issue(repo, "FIX-2", status="completed")
+    _save_issue(repo, "FIX-4", status="queued")
     _save_session(repo, "alpha", status="executing")
     _save_node(repo, "new-node", scope="local", origin="local")
     _save_node(repo, "common-node", scope="workspace", origin="workspace")
@@ -206,13 +206,13 @@ def test_compute_detects_issue_status_changes(repo_two_states):
     summary = compute_pr_summary(repo, base_sha=base_sha, head_sha=head_sha)
 
     by_id = {c.id: c for c in summary.issues.changes}
-    assert by_id["FIX-1"].from_status == "todo"
-    assert by_id["FIX-1"].to_status == "in_progress"
-    assert by_id["FIX-2"].from_status == "in_progress"
-    assert by_id["FIX-2"].to_status == "done"
+    assert by_id["FIX-1"].from_status == "queued"
+    assert by_id["FIX-1"].to_status == "executing"
+    assert by_id["FIX-2"].from_status == "executing"
+    assert by_id["FIX-2"].to_status == "completed"
     # Newly added issue shows as appearing
     assert by_id["FIX-4"].from_status == "—"
-    assert by_id["FIX-4"].to_status == "todo"
+    assert by_id["FIX-4"].to_status == "queued"
 
 
 def test_compute_records_per_status_counts(repo_two_states):
@@ -259,7 +259,7 @@ def test_compute_handles_base_with_no_project(tmp_path: Path):
     base_sha = _commit_all(repo, "before tripwire")
 
     _write_project(repo)
-    _save_issue(repo, "FIX-1", status="todo")
+    _save_issue(repo, "FIX-1", status="queued")
     head_sha = _commit_all(repo, "tripwire init")
 
     summary = compute_pr_summary(repo, base_sha=base_sha, head_sha=head_sha)

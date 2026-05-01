@@ -31,7 +31,10 @@ from tripwire.templates import get_templates_dir
 # `done` and `canceled` are the explicit terminal states in the default
 # transitions; `verified` is debatable but most projects treat verified
 # as "closed enough".
-_CLOSED_ISSUE_STATUSES: frozenset[str] = frozenset({"done", "canceled"})
+# v0.9.4: canonical names ("completed", "abandoned") plus legacy aliases.
+_CLOSED_ISSUE_STATUSES: frozenset[str] = frozenset(
+    {"completed", "abandoned", "done", "canceled"}
+)
 
 # Default template lives under packaged templates.
 DEFAULT_TEMPLATE_RELPATH = "readme/default.md.j2"

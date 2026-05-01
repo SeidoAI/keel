@@ -31,63 +31,80 @@ from tripwire.models.session import AgentSession
 #   verified     → error on earlier
 #   done         → error on anything else
 
+# v0.9.4: keys here are canonical session-status values (post-rename).
+# Pre-v0.9.4 names ("active", "waiting_for_*", "re_engaged") normalise via
+# ``SessionStatus.__missing__`` before reaching this lookup.
 _SESSION_STATUS_TO_PHASE: dict[str, str] = {
     "planned": "planned",
-    # Working states (queued waiting to launch, executing locally, active
-    # in orchestrator) all represent the in_progress phase.
-    "queued": "in_progress",
-    "executing": "in_progress",
-    "active": "in_progress",
+    "queued": "executing",
+    "executing": "executing",
     "in_review": "in_review",
     "verified": "verified",
-    # completed = tripwire session's terminal state = phase `done`.
-    "completed": "done",
-    # Off-lifecycle statuses (failed, paused, abandoned, re_engaged,
-    # waiting_for_*) deliberately omitted — coherence is meaningless there.
+    "completed": "completed",
+    # Off-lifecycle statuses (failed, paused, abandoned) are deliberately
+    # omitted — coherence is meaningless there.
 }
 
+# v0.9.4: phase keys + issue-state keys are canonical (planned, queued,
+# executing, in_review, verified, completed). Legacy issue names
+# (backlog, todo, in_progress, done) are accepted via ``_resolve_issue_state``
+# below so callers don't need to pre-normalise.
 _COHERENCE_MATRIX: dict[str, dict[str, str]] = {
     "planned": {
-        "backlog": "ok",
-        "todo": "ok",
-        "in_progress": "ahead_warn",
+        "planned": "ok",
+        "queued": "ok",
+        "executing": "ahead_warn",
         "in_review": "ahead_warn",
         "verified": "ahead_warn",
-        "done": "ahead_warn",
+        "completed": "ahead_warn",
     },
-    "in_progress": {
-        "backlog": "behind_error",
-        "todo": "ok",
-        "in_progress": "ok",
+    "executing": {
+        "planned": "behind_error",
+        "queued": "ok",
+        "executing": "ok",
         "in_review": "ok",
         "verified": "ahead_warn",
-        "done": "ahead_warn",
+        "completed": "ahead_warn",
     },
     "in_review": {
-        "backlog": "behind_error",
-        "todo": "behind_error",
-        "in_progress": "behind_error",
+        "planned": "behind_error",
+        "queued": "behind_error",
+        "executing": "behind_error",
         "in_review": "ok",
         "verified": "ok",
-        "done": "ok",
+        "completed": "ok",
     },
     "verified": {
-        "backlog": "behind_error",
-        "todo": "behind_error",
-        "in_progress": "behind_error",
+        "planned": "behind_error",
+        "queued": "behind_error",
+        "executing": "behind_error",
         "in_review": "behind_error",
         "verified": "ok",
-        "done": "ok",
+        "completed": "ok",
     },
-    "done": {
-        "backlog": "behind_error",
-        "todo": "behind_error",
-        "in_progress": "behind_error",
+    "completed": {
+        "planned": "behind_error",
+        "queued": "behind_error",
+        "executing": "behind_error",
         "in_review": "behind_error",
         "verified": "behind_error",
-        "done": "ok",
+        "completed": "ok",
     },
 }
+
+
+def _resolve_issue_state(value: str) -> str:
+    """Map legacy / alias issue-status strings to canonical for matrix lookup."""
+    from tripwire.core.status_contract import normalize_issue_status
+
+    return normalize_issue_status(value)
+
+
+def _resolve_session_state(value: str) -> str:
+    """Map legacy / alias session-status strings to canonical for matrix lookup."""
+    from tripwire.core.status_contract import normalize_session_status
+
+    return normalize_session_status(value)
 
 
 @registers_at("coding-session", "executing")
@@ -180,7 +197,7 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
     issues_by_key = {entity.model.id: entity.model for entity in ctx.issues}
     for entity in ctx.sessions:
         session: AgentSession = entity.model
-        phase = _SESSION_STATUS_TO_PHASE.get(session.status)
+        phase = _SESSION_STATUS_TO_PHASE.get(_resolve_session_state(session.status))
         if phase is None:
             continue
         session_row = _COHERENCE_MATRIX[phase]
@@ -188,7 +205,7 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
             issue = issues_by_key.get(issue_key)
             if issue is None:
                 continue
-            verdict = session_row.get(issue.status, "ok")
+            verdict = session_row.get(_resolve_issue_state(issue.status), "ok")
             if verdict == "ok":
                 continue
             if verdict == "behind_error":

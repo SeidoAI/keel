@@ -59,7 +59,7 @@ def test_abandon_does_not_close_issues_as_done(
     """Critical contract: abandoning a session must not mark its
     issues `done`. The whole point of `abandoned` is that the work
     didn't ship."""
-    save_test_issue(tmp_path_project, "TMP-1", status="in_progress")
+    save_test_issue(tmp_path_project, "TMP-1", status="executing")
     save_test_session(tmp_path_project, "s1", status="planned", issues=["TMP-1"])
 
     abandon_session(tmp_path_project, "s1")
@@ -67,7 +67,7 @@ def test_abandon_does_not_close_issues_as_done(
     from tripwire.core.store import load_issue
 
     issue = load_issue(tmp_path_project, "TMP-1")
-    assert issue.status == "in_progress"  # unchanged
+    assert issue.status == "executing"  # unchanged
 
 
 def test_abandon_paused_session_skips_runtime_kill(

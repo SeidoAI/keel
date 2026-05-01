@@ -502,6 +502,7 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
         )
 
     if promote_issues:
+        from tripwire.core.status_contract import normalize_issue_status
         from tripwire.core.store import load_issue, save_issue
 
         promoted = 0
@@ -511,13 +512,16 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
             except FileNotFoundError:
                 click.echo(f"  ! issue {issue_key} not found — skipping")
                 continue
-            if issue.status == "backlog":
-                issue.status = "todo"
+            # v0.9.4: accept both canonical "planned" and legacy "backlog"
+            # on the source side; emit canonical "queued" on the sink side.
+            if normalize_issue_status(str(issue.status)) == "planned":
+                old_status = issue.status
+                issue.status = "queued"
                 save_issue(resolved, issue)
-                click.echo(f"  {issue_key}: backlog → todo")
+                click.echo(f"  {issue_key}: {old_status} → queued")
                 promoted += 1
         if promoted == 0:
-            click.echo("  (no issues in backlog to promote)")
+            click.echo("  (no issues at 'planned' to promote)")
 
     report = check_readiness(resolved, session_id, kind="queue")
     if not report.ready:

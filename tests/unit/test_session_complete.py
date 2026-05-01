@@ -169,7 +169,7 @@ def test_complete_closes_issues_and_transitions_session(
     from tripwire.core.store import load_issue
 
     issue = load_issue(tmp_path_project, "TMP-1")
-    assert issue.status == "done"
+    assert issue.status == "completed"
     session = load_session(tmp_path_project, "s1")
     assert session.status == "completed"
 

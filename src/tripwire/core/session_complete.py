@@ -102,8 +102,8 @@ def complete_session(
             issue = load_issue(project_dir, issue_key)
         except FileNotFoundError:
             continue
-        if issue.status != "done":
-            issue.status = "done"
+        if issue.status != "completed":
+            issue.status = "completed"
             save_issue(project_dir, issue)
             result.issues_closed.append(issue_key)
 

@@ -51,7 +51,7 @@ def client_with_rich(rich_project: Path, save_test_issue) -> TestClient:
     save_test_issue(
         rich_project,
         "KUI-1",
-        status="todo",
+        status="queued",
         priority="high",
         labels=["domain/backend"],
         executor="ai",
@@ -59,7 +59,7 @@ def client_with_rich(rich_project: Path, save_test_issue) -> TestClient:
     save_test_issue(
         rich_project,
         "KUI-2",
-        status="in_progress",
+        status="executing",
         priority="medium",
         labels=["domain/frontend"],
         executor="human",
@@ -118,7 +118,7 @@ class TestGetIssue:
         assert r.status_code == 200
         body = r.json()
         assert body["id"] == "KUI-1"
-        assert body["status"] == "todo"
+        assert body["status"] == "queued"
         assert "body" in body  # detail includes body
         assert "refs" in body
 
@@ -152,7 +152,7 @@ class TestPatchIssue:
             json={"status": "in_progress"},
         )
         assert r.status_code == 200
-        assert r.json()["status"] == "in_progress"
+        assert r.json()["status"] == "executing"
 
     def test_invalid_transition_returns_409(
         self,
@@ -202,7 +202,7 @@ class TestPatchIssue:
             json={},
         )
         assert r.status_code == 200
-        assert r.json()["status"] == "todo"
+        assert r.json()["status"] == "queued"
 
     def test_extra_field_returns_422(self, client_with_rich, rich_project_id):
         r = client_with_rich.patch(

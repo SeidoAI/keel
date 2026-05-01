@@ -1,11 +1,11 @@
 name: ArtifactPhase
-description: Stages at which artifacts are produced
+description: Stages at which artifacts are produced (v0.9.4 — aligned with IssueStatus)
 values:
   - id: planning
     label: Planning
-    description: PM scoping and plan writing
-  - id: in_progress
-    label: In progress
+    description: PM scoping and plan writing (session-only — no matching IssueStatus)
+  - id: executing
+    label: Executing
     description: Execution agent implementing
   - id: in_review
     label: In review
@@ -13,6 +13,6 @@ values:
   - id: verified
     label: Verified
     description: QA agent verifying tests + acceptance criteria
-  - id: done
-    label: Done
+  - id: completed
+    label: Completed
     description: Complete and merged

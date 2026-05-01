@@ -26,27 +26,32 @@ repos:
   {}
 {%- endif %}
 
-# Issue lifecycle statuses. These must match an entry in enums/issue_status.yaml.
-# Default 6-stage flow: backlog → todo → in_progress → in_review → verified → done.
+# Issue lifecycle statuses (v0.9.4 — aligned with SessionStatus). Must match
+# an entry in enums/issue_status.yaml. Canonical 7-stage flow:
+# planned → queued → executing → in_review → verified → completed.
+# `abandoned` is the not-claimed-success terminal; `deferred` is for
+# issues consciously skipped within a session that carry forward.
 statuses:
-  - backlog
-  - todo
-  - in_progress
+  - planned
+  - queued
+  - executing
   - in_review
   - verified
-  - done
-  - canceled
+  - completed
+  - abandoned
+  - deferred
 
 # Directed graph of allowed status transitions. The validator checks that
-# every issue's status is reachable from `backlog` via these transitions.
+# every issue's status is reachable from `planned` via these transitions.
 status_transitions:
-  backlog: [todo, canceled]
-  todo: [in_progress, backlog, canceled]
-  in_progress: [in_review, todo, canceled]
-  in_review: [verified, in_progress]
-  verified: [done, in_review]
-  done: []
-  canceled: [backlog]
+  planned: [queued, abandoned]
+  queued: [executing, planned, abandoned]
+  executing: [in_review, queued, abandoned]
+  in_review: [verified, executing]
+  verified: [completed, in_review]
+  completed: []
+  abandoned: [planned]
+  deferred: [planned, queued, abandoned]
 
 # Label categories for the validator to check against.
 label_categories:

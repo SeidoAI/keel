@@ -66,25 +66,25 @@ class TestUpdateIssueStatus:
     def test_valid_transition_updates_status(
         self, project_with_transitions, save_test_issue
     ):
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
 
         result = update_issue_status(project_with_transitions, "TMP-1", "in_progress")
 
         assert result.id == "TMP-1"
-        assert result.status == "in_progress"
+        assert result.status == "executing"
         # Confirmed on disk too.
         reloaded = load_issue(project_with_transitions, "TMP-1")
-        assert reloaded.status == "in_progress"
+        assert reloaded.status == "executing"
 
     def test_invalid_transition_raises(self, project_with_transitions, save_test_issue):
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
         with pytest.raises(ValueError, match="Invalid transition"):
             update_issue_status(project_with_transitions, "TMP-1", "done")
 
     def test_invalid_transition_mentions_allowed_list(
         self, project_with_transitions, save_test_issue
     ):
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
         with pytest.raises(ValueError, match="in_progress"):
             update_issue_status(project_with_transitions, "TMP-1", "done")
 
@@ -92,14 +92,14 @@ class TestUpdateIssueStatus:
         self, project_with_transitions, save_test_issue
     ):
         """PATCHing to the same status is idempotent, not an error."""
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
         result = update_issue_status(project_with_transitions, "TMP-1", "todo")
-        assert result.status == "todo"
+        assert result.status == "queued"
 
     def test_transition_from_terminal_status_raises(
         self, project_with_transitions, save_test_issue
     ):
-        save_test_issue(project_with_transitions, "TMP-1", status="done")
+        save_test_issue(project_with_transitions, "TMP-1", status="completed")
         with pytest.raises(ValueError, match="Invalid transition"):
             update_issue_status(project_with_transitions, "TMP-1", "in_progress")
 
@@ -108,7 +108,7 @@ class TestUpdateIssueStatus:
     ):
         from datetime import datetime, timedelta, timezone
 
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
 
         update_issue_status(project_with_transitions, "TMP-1", "in_progress")
 
@@ -121,7 +121,7 @@ class TestUpdateIssueStatus:
         assert datetime.now(tz=timezone.utc) - after < timedelta(minutes=1)
 
     def test_preserves_body(self, project_with_transitions, save_test_issue):
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
         original_body = load_issue(project_with_transitions, "TMP-1").body
 
         update_issue_status(project_with_transitions, "TMP-1", "in_progress")
@@ -135,7 +135,7 @@ class TestUpdateIssueStatus:
     def test_audit_log_entry_written_on_success(
         self, project_with_transitions, save_test_issue, tmp_path: Path
     ):
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
         update_issue_status(project_with_transitions, "TMP-1", "in_progress")
 
         log_path = audit_log_path(project_with_transitions)
@@ -151,7 +151,7 @@ class TestUpdateIssueStatus:
     def test_audit_log_entry_written_on_rejection(
         self, project_with_transitions, save_test_issue
     ):
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
         with pytest.raises(ValueError):
             update_issue_status(project_with_transitions, "TMP-1", "done")
 
@@ -166,10 +166,10 @@ class TestUpdateIssueStatus:
         self, project_with_transitions, save_test_issue
     ):
         """Transition check rejects before the save — status stays on todo."""
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
         with pytest.raises(ValueError):
             update_issue_status(project_with_transitions, "TMP-1", "done")
-        assert load_issue(project_with_transitions, "TMP-1").status == "todo"
+        assert load_issue(project_with_transitions, "TMP-1").status == "queued"
 
     def test_load_and_audit_happen_inside_project_lock(
         self,
@@ -185,7 +185,7 @@ class TestUpdateIssueStatus:
         lock-release. The audit write must happen before the lock
         releases.
         """
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
 
         events: list[str] = []
 
@@ -233,7 +233,7 @@ class TestUpdateIssueStatus:
         self, project_with_transitions, save_test_issue
     ):
         """Post-fix #6: updated_at is tz-aware UTC on every successful write."""
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
 
         update_issue_status(project_with_transitions, "TMP-1", "in_progress")
 
@@ -254,7 +254,7 @@ class TestUpdateIssueFields:
         save_test_issue(
             project_with_transitions,
             "TMP-1",
-            status="todo",
+            status="queued",
             priority="medium",
             labels=["domain/backend"],
         )
@@ -264,32 +264,32 @@ class TestUpdateIssueFields:
 
         # priority changed; status/labels untouched.
         assert result.priority == "high"
-        assert result.status == "todo"
+        assert result.status == "queued"
         assert result.labels == ["domain/backend"]
 
     def test_empty_patch_is_noop(self, project_with_transitions, save_test_issue):
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
         patch = IssuePatch()
         result = update_issue_fields(project_with_transitions, "TMP-1", patch)
-        assert result.status == "todo"
+        assert result.status == "queued"
         # No audit entry should be written for a literal no-op.
         assert not audit_log_path(project_with_transitions).exists()
 
     def test_status_patch_goes_through_transition_check(
         self, project_with_transitions, save_test_issue
     ):
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
-        patch = IssuePatch(status="done")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
+        patch = IssuePatch(status="completed")
         with pytest.raises(ValueError, match="Invalid transition"):
             update_issue_fields(project_with_transitions, "TMP-1", patch)
 
     def test_status_patch_valid_transition_succeeds(
         self, project_with_transitions, save_test_issue
     ):
-        save_test_issue(project_with_transitions, "TMP-1", status="todo")
-        patch = IssuePatch(status="in_progress")
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
+        patch = IssuePatch(status="executing")
         result = update_issue_fields(project_with_transitions, "TMP-1", patch)
-        assert result.status == "in_progress"
+        assert result.status == "executing"
 
     def test_invalid_priority_enum_raises(
         self, project_with_transitions, save_test_issue
@@ -322,11 +322,11 @@ class TestUpdateIssueFields:
 
     def test_multi_field_patch(self, project_with_transitions, save_test_issue):
         save_test_issue(
-            project_with_transitions, "TMP-1", status="todo", priority="medium"
+            project_with_transitions, "TMP-1", status="queued", priority="medium"
         )
-        patch = IssuePatch(status="in_progress", priority="high")
+        patch = IssuePatch(status="executing", priority="high")
         result = update_issue_fields(project_with_transitions, "TMP-1", patch)
-        assert result.status == "in_progress"
+        assert result.status == "executing"
         assert result.priority == "high"
 
     def test_audit_entry_on_success(self, project_with_transitions, save_test_issue):

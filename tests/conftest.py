@@ -17,8 +17,39 @@ def tmp_path_project(tmp_path: Path) -> Path:
     """
     project_dir = tmp_path / "proj"
     project_dir.mkdir()
+    # v0.9.4: include canonical statuses + transitions so issue-status
+    # validators (`status/unreachable`, `enum/issue_status`) pass without
+    # each test having to seed them. Mirrors the project.yaml shape that
+    # `tripwire init` writes out of the box.
     (project_dir / "project.yaml").write_text(
-        "name: tmp\nkey_prefix: TMP\nnext_issue_number: 1\nnext_session_number: 1\n"
+        yaml.safe_dump(
+            {
+                "name": "tmp",
+                "key_prefix": "TMP",
+                "next_issue_number": 1,
+                "next_session_number": 1,
+                "statuses": [
+                    "planned",
+                    "queued",
+                    "executing",
+                    "in_review",
+                    "verified",
+                    "completed",
+                    "abandoned",
+                    "deferred",
+                ],
+                "status_transitions": {
+                    "planned": ["queued", "abandoned"],
+                    "queued": ["executing", "abandoned", "planned"],
+                    "executing": ["in_review", "abandoned", "queued"],
+                    "in_review": ["verified", "executing"],
+                    "verified": ["completed", "in_review"],
+                    "completed": [],
+                    "abandoned": ["planned"],
+                    "deferred": ["planned", "queued", "abandoned"],
+                },
+            }
+        )
     )
     for sub in ("issues", "nodes", "sessions", "docs", "plans"):
         (project_dir / sub).mkdir()
@@ -67,7 +98,7 @@ def save_test_issue():
         fm: dict[str, Any] = {
             "id": key,
             "title": f"Test {key}",
-            "status": "todo",
+            "status": "queued",
             "priority": "medium",
             "executor": "ai",
             "verifier": "required",

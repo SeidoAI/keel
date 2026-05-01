@@ -13,20 +13,20 @@ from tripwire.core.validator import (
 
 
 def test_matrix_shape_matches_spec_5_phases():
-    """Matrix is keyed by spec §6.4's 5 phases — no extras."""
-    expected_phases = {"planned", "in_progress", "in_review", "verified", "done"}
+    """Matrix is keyed by canonical (v0.9.4) phases — no extras."""
+    expected_phases = {"planned", "executing", "in_review", "verified", "completed"}
     assert set(_COHERENCE_MATRIX.keys()) == expected_phases
 
 
 def test_matrix_rows_cover_all_issue_statuses():
-    """Every phase row must list every known issue status."""
+    """Every phase row must list every canonical issue status."""
     expected_issue_statuses = {
-        "backlog",
-        "todo",
-        "in_progress",
+        "planned",
+        "queued",
+        "executing",
         "in_review",
         "verified",
-        "done",
+        "completed",
     }
     for phase, row in _COHERENCE_MATRIX.items():
         missing = expected_issue_statuses - set(row.keys())
@@ -34,18 +34,19 @@ def test_matrix_rows_cover_all_issue_statuses():
 
 
 def test_session_status_to_phase_maps_all_in_lifecycle_statuses():
-    """Working states (queued/executing/active) collapse to in_progress; completed → done."""
+    """v0.9.4: queued/executing collapse to executing-phase; completed → completed."""
     assert _SESSION_STATUS_TO_PHASE["planned"] == "planned"
-    assert _SESSION_STATUS_TO_PHASE["queued"] == "in_progress"
-    assert _SESSION_STATUS_TO_PHASE["executing"] == "in_progress"
-    assert _SESSION_STATUS_TO_PHASE["active"] == "in_progress"
+    assert _SESSION_STATUS_TO_PHASE["queued"] == "executing"
+    assert _SESSION_STATUS_TO_PHASE["executing"] == "executing"
     assert _SESSION_STATUS_TO_PHASE["in_review"] == "in_review"
     assert _SESSION_STATUS_TO_PHASE["verified"] == "verified"
-    assert _SESSION_STATUS_TO_PHASE["completed"] == "done"
-    # Off-lifecycle statuses deliberately absent.
+    assert _SESSION_STATUS_TO_PHASE["completed"] == "completed"
+    # Off-lifecycle statuses deliberately absent (failed/paused/abandoned).
     assert "failed" not in _SESSION_STATUS_TO_PHASE
     assert "paused" not in _SESSION_STATUS_TO_PHASE
     assert "abandoned" not in _SESSION_STATUS_TO_PHASE
+    # Pruned dead aliases — no longer in the canonical SessionStatus enum.
+    assert "active" not in _SESSION_STATUS_TO_PHASE
     assert "re_engaged" not in _SESSION_STATUS_TO_PHASE
 
 

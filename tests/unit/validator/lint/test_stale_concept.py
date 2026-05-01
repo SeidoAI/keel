@@ -41,7 +41,7 @@ def test_stale_node_referenced_by_active_issue_warns(
     save_test_issue(
         tmp_path_project,
         key="TMP-1",
-        status="in_progress",
+        status="executing",
         body=(
             "## Context\n[[auth-system]]\n\n## Implements\nx\n\n"
             "## Repo scope\nx\n\n## Requirements\nx\n\n"
@@ -79,7 +79,7 @@ def test_fresh_node_with_references_no_warning(
     save_test_issue(
         tmp_path_project,
         key="TMP-1",
-        status="in_progress",
+        status="executing",
         body="## Context\n[[auth-system]]\n",
     )
     _stub_stale(monkeypatch, set())
@@ -96,7 +96,7 @@ def test_stale_node_referenced_only_by_done_issue_no_warning(
     save_test_issue(
         tmp_path_project,
         key="TMP-1",
-        status="done",
+        status="completed",
         body="## Context\n[[auth-system]]\n",
     )
     _stub_stale(monkeypatch, {"auth-system"})

@@ -22,7 +22,8 @@ if TYPE_CHECKING:
     from tripwire.core.validator import CheckResult, ValidationContext
 
 
-_INACTIVE_ISSUE = {"done", "canceled"}
+# v0.9.4: canonical names + legacy aliases.
+_INACTIVE_ISSUE = {"completed", "abandoned", "done", "canceled"}
 _MIN_ACTIVE_ISSUES = 5
 _PROJECT_YAML = "project.yaml"
 

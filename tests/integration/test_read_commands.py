@@ -133,7 +133,7 @@ def populate_project(runner: CliRunner, target: Path) -> None:
     write_node_file(target, "auth-endpoint", node_type="endpoint")
     write_issue_file(target, "TST-1")
     write_issue_file(target, "TST-2", blocked_by=["TST-1"])
-    write_issue_file(target, "TST-3", blocked_by=["TST-2"], status="in_progress")
+    write_issue_file(target, "TST-3", blocked_by=["TST-2"], status="executing")
 
 
 # ============================================================================
