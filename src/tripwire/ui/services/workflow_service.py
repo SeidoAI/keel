@@ -369,8 +369,7 @@ def _build_validators() -> list[dict[str, Any]]:
     """
     out: list[dict[str, Any]] = []
     for fn in validator.ALL_CHECKS:
-        name = fn.__name__
-        slug = name.removeprefix("check_")
+        slug = _validator_slug(fn)
         out.append(
             {
                 "id": f"v_{slug}",
@@ -382,6 +381,23 @@ def _build_validators() -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def _validator_slug(fn: Any) -> str:
+    """Return a stable workflow id slug for a validator function.
+
+    The themed checks use descriptive function names such as
+    ``check_uuid_present``. Lint rules intentionally expose a generic
+    ``check`` function from per-rule modules, so the module basename is
+    the unique rule id for that family.
+    """
+    name = getattr(fn, "__name__", "")
+    if name == "check":
+        module_name = getattr(fn, "__module__", "")
+        module_leaf = module_name.rsplit(".", 1)[-1]
+        if module_leaf and module_leaf != module_name:
+            return module_leaf
+    return name.removeprefix("check_")
 
 
 def _build_jit_prompts(*, is_pm_role: bool) -> list[dict[str, Any]]:

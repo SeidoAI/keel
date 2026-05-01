@@ -84,6 +84,15 @@ def test_build_workflow_enumerates_validators(tmp_path: Path) -> None:
     ids = {v["id"] for v in validators}
     assert "v_uuid_present" in ids
     assert "v_reference_integrity" in ids
+    assert "v_stale_concept" in ids
+
+
+def test_build_workflow_validator_ids_are_unique(tmp_path: Path) -> None:
+    project_dir = _write_project(tmp_path)
+    graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
+    ids = [v["id"] for v in graph["validators"]]
+    assert len(ids) == len(set(ids))
+    assert "v_check" not in ids
 
 
 def test_build_workflow_enumerates_jit_prompts(tmp_path: Path) -> None:
