@@ -147,13 +147,15 @@ class TestMermaidRendering:
 
     def test_status_coloring(self) -> None:
         issues = [
-            make_issue("TST-1", status="in_progress"),
-            make_issue("TST-2", status="done"),
+            make_issue("TST-1", status="executing"),
+            make_issue("TST-2", status="completed"),
         ]
         result = build_dependency_graph(issues)
         output = to_mermaid(result)
-        assert "classDef status_in_progress" in output
-        assert "classDef status_done" in output
+        # v0.9.4: canonical names replace legacy ("in_progress" → "executing",
+        # "done" → "completed").
+        assert "classDef status_executing" in output
+        assert "classDef status_completed" in output
 
 
 class TestDotRendering:

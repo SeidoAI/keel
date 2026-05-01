@@ -29,8 +29,9 @@ def test_falls_back_to_packaged_defaults_when_no_enums_dir(tmp_path: Path) -> No
     issue_status = registry.get("issue_status")
     assert issue_status is not None
     assert issue_status.source == "default"
-    assert "todo" in issue_status.value_ids()
-    assert "in_progress" in issue_status.value_ids()
+    # v0.9.4: canonical names replace legacy.
+    assert "queued" in issue_status.value_ids()
+    assert "executing" in issue_status.value_ids()
 
     agent_type = registry.get("agent_type")
     assert agent_type is not None

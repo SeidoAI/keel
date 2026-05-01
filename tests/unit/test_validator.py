@@ -51,23 +51,26 @@ def write_project_yaml(project_dir: Path, **overrides: Any) -> None:
         "name": "test",
         "key_prefix": "TST",
         "base_branch": "main",
+        # v0.9.4 canonical statuses + transitions.
         "statuses": [
-            "backlog",
-            "todo",
-            "in_progress",
+            "planned",
+            "queued",
+            "executing",
             "in_review",
             "verified",
-            "done",
-            "canceled",
+            "completed",
+            "abandoned",
+            "deferred",
         ],
         "status_transitions": {
-            "backlog": ["todo", "canceled"],
-            "todo": ["in_progress", "backlog", "canceled"],
-            "in_progress": ["in_review", "todo", "canceled"],
-            "in_review": ["verified", "in_progress"],
-            "verified": ["done", "in_review"],
-            "done": [],
-            "canceled": ["backlog"],
+            "planned": ["queued", "abandoned"],
+            "queued": ["executing", "planned", "abandoned"],
+            "executing": ["in_review", "queued", "abandoned"],
+            "in_review": ["verified", "executing"],
+            "verified": ["completed", "in_review"],
+            "completed": [],
+            "abandoned": ["planned"],
+            "deferred": ["planned", "queued", "abandoned"],
         },
         "next_issue_number": 1,
         "next_session_number": 1,
@@ -98,7 +101,7 @@ def write_issue(
         "uuid": str(_uuid.uuid4()),
         "id": key,
         "title": f"Test {key}",
-        "status": "todo",
+        "status": "queued",  # v0.9.4 canonical (was "todo")
         "priority": "medium",
         "executor": "ai",
         "verifier": "required",
@@ -443,7 +446,7 @@ class TestEnumValues:
         assert "enum/priority" in codes(report)
 
     def test_valid_status_passes(self, empty_project: Path) -> None:
-        write_issue(empty_project, "TST-1", status="in_progress")
+        write_issue(empty_project, "TST-1", status="executing")
         report = validate_project(empty_project)
         assert "enum/issue_status" not in codes(report)
 
@@ -605,7 +608,7 @@ class TestStatusTransitions:
             },
         )
         write_node(tmp_path, "user-model")
-        write_issue(tmp_path, "TST-1", status="canceled")
+        write_issue(tmp_path, "TST-1", status="abandoned")
         report = validate_project(tmp_path)
         assert "status/unreachable" in codes(report)
 

@@ -1,5 +1,5 @@
 name: SessionStatus
-description: Agent session lifecycle states
+description: Agent session lifecycle states (v0.9.4 — pruned dead values)
 values:
   - id: planned
     label: Planned
@@ -7,38 +7,20 @@ values:
   - id: queued
     label: Queued
     color: cyan
-  # executing: local spawn via `tripwire session spawn` (v0.6c)
+  # executing: agent actively working (local spawn or orchestrator-managed)
   - id: executing
     label: Executing
     color: blue
-  # active: orchestrator-managed sessions (container runtime)
-  - id: active
-    label: Active
-    color: blue
-  - id: waiting_for_ci
-    label: Waiting for CI
-    color: yellow
-  - id: waiting_for_review
-    label: Waiting for Review
-    color: yellow
-  - id: waiting_for_deploy
-    label: Waiting for Deploy
-    color: yellow
-  - id: re_engaged
-    label: Re-engaged
-    color: orange
-  # in_review: session PR opened, PM reviewing (v0.7b)
+  # in_review: session PR opened, PM reviewing
   - id: in_review
     label: In Review
     color: purple
-  # verified: PR verified (PM fills the QA role until a QA agent ships) (v0.7b)
+  # verified: PR verified (PM fills the QA role until a QA agent ships)
   - id: verified
     label: Verified
     color: green
-  # completed: canonical terminal-success state (KUI-110). `tripwire
-  # session complete` writes this; the legacy `done` value was dropped
-  # because it never made it into the upstream `SessionStatus` enum and
-  # let invalid sessions land on disk.
+  # completed: canonical terminal-success state. `tripwire session complete`
+  # writes this.
   - id: completed
     label: Completed
     color: green
@@ -48,7 +30,12 @@ values:
   - id: paused
     label: Paused
     color: yellow
-  # abandoned: terminal-but-not-claimed-success (v0.7.9 §A4)
+  # abandoned: terminal-but-not-claimed-success
   - id: abandoned
     label: Abandoned
     color: gray
+# v0.9.4 pruned 5 aspirational v0.7-era values that were never written or
+# in the transition table: active, waiting_for_ci, waiting_for_review,
+# waiting_for_deploy, re_engaged. Pre-v0.9.4 data with those values
+# loads via SessionStatus.__missing__ aliasing (collapsing to the
+# closest live state). Drop alias-on-read in v1.0.

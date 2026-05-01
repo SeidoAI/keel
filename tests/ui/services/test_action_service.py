@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 import yaml
 
-from tripwire.core.session_complete import CompleteError
 from tripwire.core.validator import ValidationReport
 from tripwire.ui.services._audit import audit_log_path
 from tripwire.ui.services.action_service import (
@@ -460,15 +459,8 @@ class TestFinalizeSession:
         self,
         tmp_path_project: Path,
         save_test_session,
-        monkeypatch: pytest.MonkeyPatch,
     ):
-        def refuse(_project_dir: Path, _session_id: str) -> None:
-            raise CompleteError("complete/not_active", "not ready")
-
-        monkeypatch.setattr(
-            "tripwire.ui.services.action_service.complete_session", refuse
-        )
-        save_test_session(tmp_path_project, "s1", status="active")
+        save_test_session(tmp_path_project, "s1", status="executing")
 
         with pytest.raises(SessionCompletionError) as exc:
             finalize_session(tmp_path_project, "s1")

@@ -60,9 +60,9 @@ class TestListSessions:
 
     def test_filter_by_status(self, tmp_path_project: Path, save_test_session):
         save_test_session(tmp_path_project, "a", status="planned")
-        save_test_session(tmp_path_project, "b", status="active")
+        save_test_session(tmp_path_project, "b", status="executing")
 
-        result = list_sessions(tmp_path_project, status="active")
+        result = list_sessions(tmp_path_project, status="executing")
         assert [s.id for s in result] == ["b"]
 
     def test_skips_hidden_dirs(self, tmp_path_project: Path, save_test_session):

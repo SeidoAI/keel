@@ -60,7 +60,7 @@ def write_issue_file(
     project_dir: Path,
     key: str,
     *,
-    status: str = "todo",
+    status: str = "queued",
     priority: str = "medium",
     executor: str = "ai",
     blocked_by: list[str] | None = None,
@@ -133,7 +133,7 @@ def populate_project(runner: CliRunner, target: Path) -> None:
     write_node_file(target, "auth-endpoint", node_type="endpoint")
     write_issue_file(target, "TST-1")
     write_issue_file(target, "TST-2", blocked_by=["TST-1"])
-    write_issue_file(target, "TST-3", blocked_by=["TST-2"], status="in_progress")
+    write_issue_file(target, "TST-3", blocked_by=["TST-2"], status="executing")
 
 
 # ============================================================================
@@ -385,7 +385,7 @@ class TestGraph:
                 "--project-dir",
                 str(target),
                 "--status-filter",
-                "in_progress",
+                "executing",
                 "--format",
                 "json",
             ],
@@ -664,7 +664,7 @@ class TestEnums:
         )
         payload = json.loads(result.output)
         assert "issue_status" in payload
-        assert "todo" in payload["issue_status"]["values"]
+        assert "queued" in payload["issue_status"]["values"]
 
     def test_show(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
@@ -674,8 +674,8 @@ class TestEnums:
             ["enums", "show", "issue_status", "--project-dir", str(target)],
         )
         assert result.exit_code == 0
-        assert "backlog" in result.output
-        assert "in_progress" in result.output
+        assert "planned" in result.output
+        assert "executing" in result.output
 
     def test_show_unknown(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
@@ -782,7 +782,7 @@ class TestArtifacts:
                         {
                             "name": "post-completion-comments",
                             "file": "post-completion-comments.md",
-                            "produced_at": "done",
+                            "produced_at": "completed",
                             "required": True,
                         },
                     ]

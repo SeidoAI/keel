@@ -33,7 +33,18 @@ PREVIOUS_PHASE: dict[str, str] = {
 # Issue statuses that count as "still open" — i.e. work the agent
 # hasn't finished yet. Mirrors the convention used by other validators
 # (verified, done, canceled are terminal; everything else is open).
-_OPEN_STATUSES = {"backlog", "todo", "in_progress", "in_review"}
+_OPEN_STATUSES = {
+    # Canonical (v0.9.4) — issue states that mean "still open / not done".
+    "planned",
+    "queued",
+    "executing",
+    "in_review",
+    # Legacy aliases — accepted on read for any pre-v0.9.4 PT data still
+    # in flight. Drop in v1.0 once the alias-on-read window closes.
+    "backlog",
+    "todo",
+    "in_progress",
+}
 
 # Label convention: issues are tagged with ``phase:<name>`` to scope
 # them to a project phase. The body of an Issue YAML uses

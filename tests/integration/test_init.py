@@ -124,8 +124,8 @@ class TestInitBasics:
         assert raw["base_branch"] == "main"
         assert raw["next_issue_number"] == 1
         assert raw["next_session_number"] == 1
-        assert "backlog" in raw["statuses"]
-        assert "todo" in raw["status_transitions"]["backlog"]
+        assert "planned" in raw["statuses"]
+        assert "queued" in raw["status_transitions"]["planned"]
 
     def test_claude_md_has_project_name_and_prefix(
         self, runner: CliRunner, tmp_path: Path

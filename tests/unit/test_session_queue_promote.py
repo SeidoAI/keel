@@ -25,8 +25,8 @@ class TestPromoteIssuesFlag:
         self, tmp_path_project, save_test_session, save_test_issue, write_handoff_yaml
     ):
         write_handoff_yaml(tmp_path_project, "s1")
-        save_test_issue(tmp_path_project, "TMP-1", status="backlog")
-        save_test_issue(tmp_path_project, "TMP-2", status="backlog")
+        save_test_issue(tmp_path_project, "TMP-1", status="planned")
+        save_test_issue(tmp_path_project, "TMP-2", status="planned")
         save_test_session(
             tmp_path_project,
             "s1",
@@ -48,18 +48,19 @@ class TestPromoteIssuesFlag:
         )
 
         assert result.exit_code == 0, result.output
-        assert "TMP-1: backlog → todo" in result.output
-        assert "TMP-2: backlog → todo" in result.output
-        assert load_issue(tmp_path_project, "TMP-1").status == "todo"
-        assert load_issue(tmp_path_project, "TMP-2").status == "todo"
+        # v0.9.4 canonical promotion: planned → queued.
+        assert "TMP-1: planned → queued" in result.output
+        assert "TMP-2: planned → queued" in result.output
+        assert load_issue(tmp_path_project, "TMP-1").status == "queued"
+        assert load_issue(tmp_path_project, "TMP-2").status == "queued"
 
     def test_promote_ignores_non_backlog(
         self, tmp_path_project, save_test_session, save_test_issue, write_handoff_yaml
     ):
         """Only `backlog` issues flip. in_progress / todo / done stay put."""
-        save_test_issue(tmp_path_project, "TMP-1", status="backlog")
-        save_test_issue(tmp_path_project, "TMP-2", status="in_progress")
-        save_test_issue(tmp_path_project, "TMP-3", status="done")
+        save_test_issue(tmp_path_project, "TMP-1", status="planned")
+        save_test_issue(tmp_path_project, "TMP-2", status="executing")
+        save_test_issue(tmp_path_project, "TMP-3", status="completed")
         save_test_session(
             tmp_path_project,
             "s1",
@@ -82,15 +83,15 @@ class TestPromoteIssuesFlag:
         )
 
         assert result.exit_code == 0, result.output
-        assert load_issue(tmp_path_project, "TMP-1").status == "todo"
-        assert load_issue(tmp_path_project, "TMP-2").status == "in_progress"
-        assert load_issue(tmp_path_project, "TMP-3").status == "done"
+        assert load_issue(tmp_path_project, "TMP-1").status == "queued"
+        assert load_issue(tmp_path_project, "TMP-2").status == "executing"
+        assert load_issue(tmp_path_project, "TMP-3").status == "completed"
 
     def test_queue_without_flag_leaves_issues_alone(
         self, tmp_path_project, save_test_session, save_test_issue, write_handoff_yaml
     ):
         """Regression — plain `queue` doesn't touch issue status."""
-        save_test_issue(tmp_path_project, "TMP-1", status="backlog")
+        save_test_issue(tmp_path_project, "TMP-1", status="planned")
         save_test_session(
             tmp_path_project,
             "s1",
@@ -107,12 +108,12 @@ class TestPromoteIssuesFlag:
         )
 
         assert result.exit_code == 0, result.output
-        assert load_issue(tmp_path_project, "TMP-1").status == "backlog"
+        assert load_issue(tmp_path_project, "TMP-1").status == "planned"
 
     def test_promote_with_no_backlog_issues_is_noop(
         self, tmp_path_project, save_test_session, save_test_issue, write_handoff_yaml
     ):
-        save_test_issue(tmp_path_project, "TMP-1", status="in_progress")
+        save_test_issue(tmp_path_project, "TMP-1", status="executing")
         save_test_session(
             tmp_path_project,
             "s1",
@@ -135,14 +136,14 @@ class TestPromoteIssuesFlag:
         )
 
         assert result.exit_code == 0, result.output
-        assert "no issues in backlog to promote" in result.output
+        assert "no issues at 'planned' to promote" in result.output
 
 
 class TestReadinessBacklogWarning:
     def test_readiness_warns_on_backlog_issue(
         self, tmp_path_project, save_test_session, save_test_issue, write_handoff_yaml
     ):
-        save_test_issue(tmp_path_project, "TMP-1", status="backlog")
+        save_test_issue(tmp_path_project, "TMP-1", status="planned")
         save_test_session(
             tmp_path_project,
             "s1",
@@ -166,7 +167,7 @@ class TestReadinessBacklogWarning:
     def test_readiness_quiet_when_issues_are_todo(
         self, tmp_path_project, save_test_session, save_test_issue
     ):
-        save_test_issue(tmp_path_project, "TMP-1", status="todo")
+        save_test_issue(tmp_path_project, "TMP-1", status="queued")
         save_test_session(
             tmp_path_project,
             "s1",
