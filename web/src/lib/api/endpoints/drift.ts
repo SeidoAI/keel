@@ -33,8 +33,7 @@ export interface DriftReport {
 }
 
 export const driftApi = {
-  get: (pid: string) =>
-    apiGet<DriftReport>(`/api/projects/${encodeURIComponent(pid)}/drift`),
+  get: (pid: string) => apiGet<DriftReport>(`/api/projects/${encodeURIComponent(pid)}/drift`),
 };
 
 export function useDriftReport(pid: string) {

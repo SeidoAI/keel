@@ -50,6 +50,8 @@ describe("DriftReport", () => {
     });
 
     expect(screen.getByTestId("drift-score")).toHaveTextContent("78");
+    expect(screen.getByTestId("drift-score")).toHaveTextContent("watch");
+    expect(screen.getByTestId("drift-score")).toHaveTextContent("out of 100");
     expect(screen.getByText("Stale pins")).toBeInTheDocument();
     expect(screen.getByText("Unresolved references")).toBeInTheDocument();
     expect(screen.getByText("Stale concepts")).toBeInTheDocument();
@@ -68,6 +70,7 @@ describe("DriftReport", () => {
       workflow_drift_findings: [],
     });
     expect(screen.getByTestId("drift-score")).toHaveTextContent("100");
+    expect(screen.getByTestId("drift-score")).toHaveTextContent("healthy");
     expect(screen.getByTestId("drift-drill-down")).toHaveTextContent(
       /no active workflow drift findings/i,
     );

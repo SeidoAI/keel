@@ -110,9 +110,7 @@ export const defaultHandlers = [
   ),
 
   // v0.9 — workflow events log + stats (KUI-155, KUI-156).
-  http.get("/api/projects/:pid/workflow-events", () =>
-    HttpResponse.json({ events: [], total: 0 }),
-  ),
+  http.get("/api/projects/:pid/workflow-events", () => HttpResponse.json({ events: [], total: 0 })),
   http.get("/api/projects/:pid/workflow-stats", () =>
     HttpResponse.json({ total: 0, by_kind: {}, by_instance: {}, top_rules: [] }),
   ),
