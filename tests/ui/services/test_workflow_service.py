@@ -120,10 +120,7 @@ def test_build_workflow_reveals_jit_prompt_when_pm(tmp_path: Path) -> None:
     graph = build_workflow(project_dir, project_id="x", is_pm_role=True)
     revealed_count = 0
     for prompt in graph["jit_prompts"]:
-        if (
-            isinstance(prompt["prompt_revealed"], str)
-            and prompt["prompt_revealed"]
-        ):
+        if isinstance(prompt["prompt_revealed"], str) and prompt["prompt_revealed"]:
             revealed_count += 1
     assert revealed_count > 0, (
         "expected at least one JIT prompt to expose its body in PM mode"

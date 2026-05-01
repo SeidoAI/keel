@@ -30,7 +30,9 @@ def test_null_emitter_satisfies_protocol() -> None:
 
 def test_file_emitter_satisfies_protocol(tmp_path: Path) -> None:
     emitter: EventEmitter = FileEmitter(tmp_path)
-    path = emitter.emit("jit_prompt_firings", {"session_id": "s1", "kind": "jit_prompt_fire"})
+    path = emitter.emit(
+        "jit_prompt_firings", {"session_id": "s1", "kind": "jit_prompt_fire"}
+    )
     assert path  # non-empty
     assert Path(path).is_file()
 
@@ -41,7 +43,9 @@ def test_file_emitter_writes_to_expected_layout(tmp_path: Path) -> None:
     path_str = emitter.emit("jit_prompt_firings", payload)
     path = Path(path_str)
 
-    expected_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "v0710-routing"
+    expected_dir = (
+        tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / "v0710-routing"
+    )
     assert path.parent == expected_dir
     assert path.name == "0001.json"
     written = json.loads(path.read_text(encoding="utf-8"))
@@ -119,7 +123,9 @@ def test_file_emitter_concurrent_threads_no_clobber(tmp_path: Path) -> None:
     def worker(i: int) -> None:
         barrier.wait()
         for j in range(per_thread):
-            p = emitter.emit("jit_prompt_firings", {"session_id": "s1", "thread": i, "n": j})
+            p = emitter.emit(
+                "jit_prompt_firings", {"session_id": "s1", "thread": i, "n": j}
+            )
             with paths_lock:
                 paths.append(p)
 

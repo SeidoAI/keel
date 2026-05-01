@@ -211,7 +211,9 @@ class ProjectConfig(BaseModel):
     # Defaults match the spec: enabled, no opt-outs, no extras. Setting
     # ``enabled: false`` disables ALL JIT prompts for this project (and
     # the pre-push hook installation in runtimes/prep.py).
-    jit_prompts: ProjectJitPromptsConfig = Field(default_factory=ProjectJitPromptsConfig)
+    jit_prompts: ProjectJitPromptsConfig = Field(
+        default_factory=ProjectJitPromptsConfig
+    )
 
     # v0.7b: per-project artifact manifest overrides layered on top of
     # templates/artifacts/manifest.yaml. Useful for adding project-specific

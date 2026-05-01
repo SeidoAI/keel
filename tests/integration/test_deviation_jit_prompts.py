@@ -151,7 +151,9 @@ def test_phase_transition_silent_when_clean(tmp_path: Path) -> None:
     result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert not any(jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result.fires)
+    assert not any(
+        jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result.fires
+    )
 
 
 # ---------- followups-not-filed (B5) --------------------------------------
@@ -175,7 +177,9 @@ def test_followups_not_filed_fires_on_missing_issue(tmp_path: Path) -> None:
     result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert any(jit_prompt_id == "followups-not-filed" for jit_prompt_id, _ in result.fires)
+    assert any(
+        jit_prompt_id == "followups-not-filed" for jit_prompt_id, _ in result.fires
+    )
 
 
 def test_followups_not_filed_silent_when_issue_present(tmp_path: Path) -> None:
@@ -197,7 +201,9 @@ def test_followups_not_filed_silent_when_issue_present(tmp_path: Path) -> None:
     result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert not any(jit_prompt_id == "followups-not-filed" for jit_prompt_id, _ in result.fires)
+    assert not any(
+        jit_prompt_id == "followups-not-filed" for jit_prompt_id, _ in result.fires
+    )
 
 
 # ---------- write-count (B7) ----------------------------------------------
@@ -257,7 +263,9 @@ def test_ack_suppresses_re_fire(tmp_path: Path) -> None:
     result1 = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert any(jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result1.fires)
+    assert any(
+        jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result1.fires
+    )
 
     # Ack it.
     _ack(tmp_path, "phase-transition", "alpha")
@@ -266,7 +274,9 @@ def test_ack_suppresses_re_fire(tmp_path: Path) -> None:
     result2 = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
     )
-    assert not any(jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result2.fires)
+    assert not any(
+        jit_prompt_id == "phase-transition" for jit_prompt_id, _ in result2.fires
+    )
 
 
 # ---------- self-review never silenced --------------------------------

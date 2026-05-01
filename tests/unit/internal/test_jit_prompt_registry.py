@@ -54,8 +54,12 @@ def test_jit_prompt_context_ack_path_layout(tmp_path: Path) -> None:
 
 
 def test_jit_prompt_context_variation_index_deterministic(tmp_path: Path) -> None:
-    ctx_a = JitPromptContext(project_dir=tmp_path, session_id="alpha", project_id="proj")
-    ctx_b = JitPromptContext(project_dir=tmp_path, session_id="alpha", project_id="proj")
+    ctx_a = JitPromptContext(
+        project_dir=tmp_path, session_id="alpha", project_id="proj"
+    )
+    ctx_b = JitPromptContext(
+        project_dir=tmp_path, session_id="alpha", project_id="proj"
+    )
     ctx_c = JitPromptContext(project_dir=tmp_path, session_id="beta", project_id="proj")
     assert ctx_a.variation_index(3) == ctx_b.variation_index(3)
     # Different session_id likely picks a different variation; assert at
@@ -68,7 +72,9 @@ def test_load_jit_prompt_registry_default_includes_self_review(tmp_path: Path) -
     _write_project_yaml(tmp_path)
     registry = load_jit_prompt_registry(tmp_path)
     self_review = [
-        prompt for prompt in registry.get("session.complete", []) if prompt.id == "self-review"
+        prompt
+        for prompt in registry.get("session.complete", [])
+        if prompt.id == "self-review"
     ]
     assert len(self_review) == 1
 
@@ -79,7 +85,9 @@ def test_load_jit_prompt_registry_disabled_returns_empty(tmp_path: Path) -> None
     assert registry == {}
 
 
-def test_load_jit_prompt_registry_opt_out_session_skips_at_fire_time(tmp_path: Path) -> None:
+def test_load_jit_prompt_registry_opt_out_session_skips_at_fire_time(
+    tmp_path: Path,
+) -> None:
     _write_project_yaml(tmp_path, {"opt_out": ["fixture-1"]})
     # Session-level opt-out is checked at fire_jit_prompt_event, not load_jit_prompt_registry,
     # so the registry itself still contains the jit_prompts.
@@ -87,7 +95,9 @@ def test_load_jit_prompt_registry_opt_out_session_skips_at_fire_time(tmp_path: P
     assert "session.complete" in registry
 
 
-def test_fire_jit_prompt_event_first_call_returns_prompt_and_blocks(tmp_path: Path) -> None:
+def test_fire_jit_prompt_event_first_call_returns_prompt_and_blocks(
+    tmp_path: Path,
+) -> None:
     _write_project_yaml(tmp_path)
     result = fire_jit_prompt_event(
         project_dir=tmp_path,
@@ -137,8 +147,12 @@ def test_fire_jit_prompt_event_session_opt_out(tmp_path: Path) -> None:
 
 def test_fire_jit_prompt_event_third_fire_escalates(tmp_path: Path) -> None:
     _write_project_yaml(tmp_path)
-    fire_jit_prompt_event(project_dir=tmp_path, event="session.complete", session_id="fixture-1")
-    fire_jit_prompt_event(project_dir=tmp_path, event="session.complete", session_id="fixture-1")
+    fire_jit_prompt_event(
+        project_dir=tmp_path, event="session.complete", session_id="fixture-1"
+    )
+    fire_jit_prompt_event(
+        project_dir=tmp_path, event="session.complete", session_id="fixture-1"
+    )
     result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="fixture-1"
     )

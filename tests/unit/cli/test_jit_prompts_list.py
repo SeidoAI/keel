@@ -73,9 +73,7 @@ def test_jit_prompts_list_disabled_project_says_disabled(
     runner = CliRunner()
     result = runner.invoke(cli, ["jit-prompts", "list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output
-    assert (
-        "disabled" in result.output.lower() or "no prompts" in result.output.lower()
-    )
+    assert "disabled" in result.output.lower() or "no prompts" in result.output.lower()
 
 
 def test_jit_prompts_list_requires_pm_role(

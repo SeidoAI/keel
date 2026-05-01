@@ -90,7 +90,9 @@ def _instantiate(entry: dict, *, project_dir: Path) -> JitPrompt:
         spec.loader.exec_module(module)
         cls = _find_jit_prompt_class(module, entry.get("id"))
     else:
-        raise ValueError(f"JIT prompt entry must declare `class` or `module`: {entry!r}")
+        raise ValueError(
+            f"JIT prompt entry must declare `class` or `module`: {entry!r}"
+        )
 
     if not isinstance(cls, type) or not issubclass(cls, JitPrompt):
         raise TypeError(f"{cls!r} is not a JitPrompt subclass")

@@ -52,13 +52,17 @@ def test_first_call_blocks_second_call_after_ack_proceeds(tmp_path: Path) -> Non
     _project(tmp_path)
     sid = "fixture-1"
 
-    first = fire_jit_prompt_event(project_dir=tmp_path, event="session.complete", session_id=sid)
+    first = fire_jit_prompt_event(
+        project_dir=tmp_path, event="session.complete", session_id=sid
+    )
     assert first.blocked is True
     assert len(first.prompts) == 1
 
     _write_substantive_marker(tmp_path, sid)
 
-    second = fire_jit_prompt_event(project_dir=tmp_path, event="session.complete", session_id=sid)
+    second = fire_jit_prompt_event(
+        project_dir=tmp_path, event="session.complete", session_id=sid
+    )
     assert second.blocked is False
     assert second.prompts == []
 
@@ -72,7 +76,9 @@ def test_marker_requires_substance(tmp_path: Path) -> None:
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text("{}", encoding="utf-8")
 
-    result = fire_jit_prompt_event(project_dir=tmp_path, event="session.complete", session_id=sid)
+    result = fire_jit_prompt_event(
+        project_dir=tmp_path, event="session.complete", session_id=sid
+    )
     # Marker exists but isn't substantive → still blocked.
     assert result.blocked is True
 
@@ -80,7 +86,9 @@ def test_marker_requires_substance(tmp_path: Path) -> None:
 def test_event_file_payload_shape(tmp_path: Path) -> None:
     _project(tmp_path)
     sid = "fixture-1"
-    fire_jit_prompt_event(project_dir=tmp_path, event="session.complete", session_id=sid)
+    fire_jit_prompt_event(
+        project_dir=tmp_path, event="session.complete", session_id=sid
+    )
     fire_dir = tmp_path / ".tripwire" / "events" / "jit_prompt_firings" / sid
     payload = json.loads((fire_dir / "0001.json").read_text(encoding="utf-8"))
     assert payload["kind"] == "jit_prompt_fire"
@@ -100,9 +108,15 @@ def test_loop_safety_third_fire_escalates(tmp_path: Path) -> None:
     """3rd fire of the same JIT prompt on same session escalates."""
     _project(tmp_path)
     sid = "fixture-loop"
-    r1 = fire_jit_prompt_event(project_dir=tmp_path, event="session.complete", session_id=sid)
-    r2 = fire_jit_prompt_event(project_dir=tmp_path, event="session.complete", session_id=sid)
-    r3 = fire_jit_prompt_event(project_dir=tmp_path, event="session.complete", session_id=sid)
+    r1 = fire_jit_prompt_event(
+        project_dir=tmp_path, event="session.complete", session_id=sid
+    )
+    r2 = fire_jit_prompt_event(
+        project_dir=tmp_path, event="session.complete", session_id=sid
+    )
+    r3 = fire_jit_prompt_event(
+        project_dir=tmp_path, event="session.complete", session_id=sid
+    )
     assert r1.escalated is False
     assert r2.escalated is False
     assert r3.escalated is True

@@ -25,8 +25,12 @@ def test_self_review_fires_returns_one_of_the_variations(tmp_path: Path) -> None
 
 def test_self_review_picks_same_variation_for_same_session(tmp_path: Path) -> None:
     tw = SelfReviewJitPrompt()
-    ctx_a = JitPromptContext(project_dir=tmp_path, session_id="alpha", project_id="proj")
-    ctx_b = JitPromptContext(project_dir=tmp_path, session_id="alpha", project_id="proj")
+    ctx_a = JitPromptContext(
+        project_dir=tmp_path, session_id="alpha", project_id="proj"
+    )
+    ctx_b = JitPromptContext(
+        project_dir=tmp_path, session_id="alpha", project_id="proj"
+    )
     assert tw.fire(ctx_a) == tw.fire(ctx_b)
 
 

@@ -59,9 +59,7 @@ def project_id(project_dir: Path) -> str:
     return _project_svc._project_id(project_dir.resolve())
 
 
-def test_no_header_redacts_jit_prompts(
-    client: TestClient, project_id: str
-) -> None:
+def test_no_header_redacts_jit_prompts(client: TestClient, project_id: str) -> None:
     resp = client.get(f"/api/projects/{project_id}/workflow")
     assert resp.status_code == 200, resp.text
     for prompt in resp.json()["jit_prompts"]:
@@ -69,9 +67,7 @@ def test_no_header_redacts_jit_prompts(
         assert prompt["prompt_redacted"]
 
 
-def test_pm_header_reveals_jit_prompts(
-    client: TestClient, project_id: str
-) -> None:
+def test_pm_header_reveals_jit_prompts(client: TestClient, project_id: str) -> None:
     resp = client.get(
         f"/api/projects/{project_id}/workflow",
         headers={"X-Tripwire-Role": "pm"},
