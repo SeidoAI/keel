@@ -233,7 +233,7 @@ function DrillDownPanel({
               <span className="text-[11px] text-(--color-ink-2)">
                 {finding.workflow}:{finding.instance}
               </span>
-              <span className="text-[11px] text-(--color-ink-3)">{finding.station ?? "-"}</span>
+              <span className="text-[11px] text-(--color-ink-3)">{finding.status ?? "-"}</span>
               <Stamp tone={finding.severity === "error" ? "tripwire" : "info"}>
                 {finding.severity}
               </Stamp>
@@ -265,7 +265,7 @@ function findingKey(finding: WorkflowDriftFinding): string {
     finding.code,
     finding.workflow,
     finding.instance,
-    finding.station ?? "-",
+    finding.status ?? "-",
     finding.severity,
     finding.message,
   ].join("|");

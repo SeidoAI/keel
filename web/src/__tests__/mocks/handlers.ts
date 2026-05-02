@@ -93,7 +93,12 @@ export const defaultHandlers = [
   // the Dashboard's "Recent Activity" feed render their empty state.
   // Tests asserting populated states `setQueryData` directly.
   http.get("/api/projects/:pid/workflow", () =>
-    HttpResponse.json({ events: [], next_cursor: null }),
+    HttpResponse.json({
+      project_id: "p1",
+      workflows: [],
+      registry: { validators: [], jit_prompts: [], prompt_checks: [] },
+      drift: { count: 0, findings: [] },
+    }),
   ),
   http.get("/api/projects/:pid/events", () => HttpResponse.json({ events: [], next_cursor: null })),
   http.get("/api/projects/:pid/drift", () =>

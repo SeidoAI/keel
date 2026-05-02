@@ -21,7 +21,7 @@ export interface WorkflowDriftFinding {
   code: string;
   workflow: string;
   instance: string;
-  station: string | null;
+  status: string | null;
   severity: "error" | "warning";
   message: string;
 }
