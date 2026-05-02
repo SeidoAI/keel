@@ -35,9 +35,17 @@ def test_jit_prompt_status_refs_come_from_workflow_yaml(tmp_path: Path) -> None:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
+                  - id: executing
+                    next: completed
                   - id: completed
                     terminal: true
-                    jit_prompts: [self-review]
+                routes:
+                  - id: executing-to-completed
+                    actor: pm-agent
+                    from: executing
+                    to: completed
+                    controls:
+                      jit_prompts: [self-review]
             """
         ),
         encoding="utf-8",
@@ -95,10 +103,10 @@ def test_default_workflow_declares_all_builtin_jit_prompts() -> None:
         encoding="utf-8"
     )
     parsed = yaml.safe_load(template)
-    declared = {
-        prompt
-        for workflow in parsed["workflows"].values()
-        for status in workflow["statuses"]
-        for prompt in status.get("jit_prompts", [])
-    }
+    declared = set()
+    for workflow in parsed["workflows"].values():
+        for status in workflow["statuses"]:
+            declared.update(status.get("jit_prompts", []))
+        for route in workflow.get("routes", []):
+            declared.update((route.get("controls") or {}).get("jit_prompts", []))
     assert known_jit_prompt_ids() - declared == set()

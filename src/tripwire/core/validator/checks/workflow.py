@@ -48,6 +48,8 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
         known_validators=_known_validators(),
         known_jit_prompts=_known_jit_prompts(ctx.project_dir),
         known_prompt_checks=_known_prompt_checks(ctx.project_dir),
+        known_commands=_known_commands(ctx.project_dir),
+        known_skills=_known_skills(ctx.project_dir),
     )
     for finding in findings:
         out.append(
@@ -85,3 +87,17 @@ def _known_prompt_checks(project_dir):  # type: ignore[no-untyped-def]
     from tripwire.core.workflow.registry import known_prompt_check_ids
 
     return known_prompt_check_ids(project_dir)
+
+
+def _known_commands(project_dir):  # type: ignore[no-untyped-def]
+    """Return implemented slash command ids."""
+    from tripwire.core.workflow.registry import known_command_ids
+
+    return known_command_ids(project_dir)
+
+
+def _known_skills(project_dir):  # type: ignore[no-untyped-def]
+    """Return implemented skill ids."""
+    from tripwire.core.workflow.registry import known_skill_ids
+
+    return known_skill_ids(project_dir)

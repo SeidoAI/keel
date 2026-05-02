@@ -1,8 +1,8 @@
 # Per-project workflow definitions. v0.9 ships `coding-session`; later
 # versions add `inbox-handling`, `issue-lifecycle`, `concept-freshness`,
-# `pr-lifecycle`. Each workflow is a typed lifecycle graph: statuses
-# with declared validators, JIT prompts, prompt-checks, proof artifacts,
-# transitions, and append-only events.
+# `pr-lifecycle`. Each workflow is a typed lifecycle graph: status
+# territory, routed controls, proof artifacts, transitions, and
+# append-only events.
 #
 # Conditional next: equality only (`==`, `!=`). Predicate fields are
 # dot-paths into the workflow context (e.g. `agent.role`).
@@ -14,31 +14,12 @@ workflows:
     statuses:
       - id: planned
         next: queued
-        prompt_checks:
-          - pm-session-create
-        validators:
-          - v_workflow_well_formed
-          - v_uuid_present
-          - v_id_format
-          - v_enum_values
-          - v_id_collisions
-          - v_sequence_drift
-          - v_timestamps
         artifacts:
           consumes:
             - id: issue-brief
               label: issue brief
       - id: queued
         next: executing
-        prompt_checks:
-          - pm-session-queue
-        validators:
-          - v_session_issue_coherence
-          - v_issue_session_status_compatibility
-          - v_reference_integrity
-          - v_bidirectional_related
-          - v_no_stale_pins
-          - v_status_transitions
         artifacts:
           produces:
             - id: plan
@@ -46,22 +27,6 @@ workflows:
               path: sessions/{session_id}/plan.md
       - id: executing
         next: in_review
-        prompt_checks:
-          - pm-session-spawn
-        validators:
-          - v_issue_body_structure
-          - v_project_standards
-          - v_freshness
-          - v_comment_provenance
-          - v_handoff_artifact
-          - v_worktree_paths_unique
-          - v_no_orphan_proj_branches
-          - v_stale_concept
-          - v_concept_name_prose
-          - v_semantic_coverage
-          - v_mega_issue
-          - v_node_ratio
-          - v_done_implies_session_completed
         artifacts:
           consumes:
             - id: plan
@@ -72,14 +37,6 @@ workflows:
               label: implementation diff
       - id: in_review
         next: verified
-        validators:
-          - v_manifest_schema
-          - v_manifest_phase_ownership_consistent
-          - v_artifact_presence
-          - v_coverage_heuristics
-          - v_phase_requirements
-          - v_quality_consistency
-          - v_issue_artifact_presence
         artifacts:
           consumes:
             - id: diff
@@ -89,29 +46,492 @@ workflows:
               label: review notes
       - id: verified
         next: completed
-        prompt_checks:
-          - pm-session-review
         artifacts:
           consumes:
             - id: review-notes
               label: review notes
       - id: completed
         terminal: true
-        prompt_checks:
-          - pm-session-complete
-        validators:
-          - v_pm_response_covers_self_review
-          - v_pm_response_followups_resolve
-          - v_done_implies_issue_artifacts_on_main
-          - v_self_review_implies_pm_response
-        jit_prompts:
-          - self-review
-          - phase-transition
-          - followups-not-filed
-          - stopped-to-ask
-          - write-count
-          - cost-ceiling
         artifacts:
           produces:
             - id: session-signature
               label: session signature
+    routes:
+      - id: session-create
+        actor: pm-agent
+        command: pm-session-create
+        trigger: command.pm-session-create
+        from: source:issue
+        to: planned
+        kind: forward
+        label: create session
+        controls:
+          prompt_checks: [pm-session-create]
+          validators:
+            - v_workflow_well_formed
+            - v_uuid_present
+            - v_id_format
+            - v_enum_values
+            - v_id_collisions
+            - v_sequence_drift
+            - v_timestamps
+        skills: [project-manager]
+        emits:
+          artifacts:
+            - id: session-yaml
+              label: session.yaml
+      - id: planned-to-queued
+        actor: pm-agent
+        command: pm-session-queue
+        trigger: command.pm-session-queue
+        from: planned
+        to: queued
+        kind: forward
+        label: queue session
+        controls:
+          prompt_checks: [pm-session-queue]
+          validators:
+            - v_session_issue_coherence
+            - v_issue_session_status_compatibility
+            - v_reference_integrity
+            - v_bidirectional_related
+            - v_no_stale_pins
+            - v_status_transitions
+        skills: [project-manager]
+        emits:
+          artifacts:
+            - id: plan
+              label: plan.md
+      - id: queued-to-executing
+        actor: pm-agent
+        command: pm-session-spawn
+        trigger: command.pm-session-spawn
+        from: queued
+        to: executing
+        kind: forward
+        label: spawn coding agent
+        controls:
+          prompt_checks: [pm-session-spawn]
+          validators:
+            - v_issue_body_structure
+            - v_project_standards
+            - v_freshness
+            - v_comment_provenance
+            - v_handoff_artifact
+            - v_worktree_paths_unique
+            - v_no_orphan_proj_branches
+            - v_stale_concept
+            - v_concept_name_prose
+            - v_semantic_coverage
+            - v_mega_issue
+            - v_node_ratio
+            - v_done_implies_session_completed
+        skills: [project-manager, backend-development, agent-messaging]
+        emits:
+          events: [session.spawn]
+      - id: executing-to-review
+        actor: coding-agent
+        trigger: command.tripwire-session-complete
+        from: executing
+        to: in_review
+        kind: forward
+        label: submit for review
+        controls:
+          validators:
+            - v_manifest_schema
+            - v_manifest_phase_ownership_consistent
+            - v_artifact_presence
+            - v_coverage_heuristics
+            - v_phase_requirements
+            - v_quality_consistency
+            - v_issue_artifact_presence
+        skills: [backend-development, agent-messaging]
+        emits:
+          artifacts:
+            - id: diff
+              label: implementation diff
+      - id: review-approved
+        actor: pm-agent
+        command: pm-session-review
+        trigger: review.outcome == approved
+        from: in_review
+        to: verified
+        kind: forward
+        label: approve review
+        controls:
+          prompt_checks: [pm-session-review]
+        skills: [project-manager, verification]
+        emits:
+          artifacts:
+            - id: review-notes
+              label: review notes
+      - id: review-changes-requested
+        actor: pm-agent
+        command: pm-session-review
+        trigger: review.outcome == changes_requested
+        from: in_review
+        to: executing
+        kind: return
+        label: request changes
+        skills: [project-manager, verification, backend-development]
+        emits:
+          comments: [changes-requested]
+      - id: verified-to-completed
+        actor: pm-agent
+        command: pm-session-complete
+        trigger: command.pm-session-complete
+        from: verified
+        to: completed
+        kind: forward
+        label: complete session
+        controls:
+          prompt_checks: [pm-session-complete]
+          validators:
+            - v_pm_response_covers_self_review
+            - v_pm_response_followups_resolve
+            - v_done_implies_issue_artifacts_on_main
+            - v_self_review_implies_pm_response
+          jit_prompts:
+            - self-review
+            - phase-transition
+            - followups-not-filed
+            - stopped-to-ask
+            - write-count
+            - cost-ceiling
+        skills: [project-manager, verification]
+        emits:
+          artifacts:
+            - id: session-signature
+              label: session signature
+      - id: completed-to-merged
+        actor: code
+        trigger: pr.merge
+        from: completed
+        to: sink:main
+        kind: terminal
+        label: merge to main
+        emits:
+          events: [pr.merged]
+
+  pm-session-management:
+    actor: pm-agent
+    trigger: command.pm-session-create
+    statuses:
+      - id: inspect
+        next: create
+      - id: create
+        next: queue
+      - id: queue
+        next: spawn
+      - id: spawn
+        next: monitor
+      - id: monitor
+        next: review
+      - id: review
+        next:
+          - if: review.outcome == changes_requested
+            then: monitor
+          - else: complete
+      - id: complete
+        terminal: true
+    routes:
+      - id: inspect-readiness
+        actor: pm-agent
+        command: pm-session-check
+        trigger: command.pm-session-check
+        from: source:session-request
+        to: inspect
+        kind: forward
+        label: inspect readiness
+        skills: [project-manager]
+      - id: create-session
+        actor: pm-agent
+        command: pm-session-create
+        trigger: command.pm-session-create
+        from: inspect
+        to: create
+        kind: forward
+        label: create
+        skills: [project-manager]
+      - id: queue-session
+        actor: pm-agent
+        command: pm-session-queue
+        trigger: command.pm-session-queue
+        from: create
+        to: queue
+        kind: forward
+        label: queue
+        skills: [project-manager]
+      - id: spawn-session
+        actor: pm-agent
+        command: pm-session-spawn
+        trigger: command.pm-session-spawn
+        from: queue
+        to: spawn
+        kind: forward
+        label: spawn
+        skills: [project-manager, backend-development]
+      - id: monitor-session
+        actor: pm-agent
+        command: pm-session-monitor
+        trigger: command.pm-session-monitor
+        from: spawn
+        to: monitor
+        kind: forward
+        label: monitor
+        skills: [project-manager]
+      - id: review-session
+        actor: pm-agent
+        command: pm-session-review
+        trigger: command.pm-session-review
+        from: monitor
+        to: review
+        kind: forward
+        label: review
+        skills: [project-manager, verification]
+      - id: review-rework-loop
+        actor: pm-agent
+        command: pm-session-review
+        trigger: review.outcome == changes_requested
+        from: review
+        to: monitor
+        kind: return
+        label: rework
+        skills: [project-manager, verification]
+      - id: complete-session
+        actor: pm-agent
+        command: pm-session-complete
+        trigger: command.pm-session-complete
+        from: review
+        to: complete
+        kind: forward
+        label: complete
+        skills: [project-manager, verification]
+
+  pm-scoping:
+    actor: pm-agent
+    trigger: command.pm-scope
+    statuses:
+      - id: intake
+        next: draft
+      - id: draft
+        next: validate
+      - id: validate
+        next:
+          - if: gaps.present == true
+            then: draft
+          - else: publish
+      - id: publish
+        terminal: true
+    routes:
+      - id: scope-intake
+        actor: pm-agent
+        command: pm-scope
+        trigger: command.pm-scope
+        from: source:intent
+        to: intake
+        kind: forward
+        label: intake intent
+        skills: [project-manager]
+      - id: draft-scope
+        actor: pm-agent
+        command: pm-scope
+        trigger: scoping.draft
+        from: intake
+        to: draft
+        kind: forward
+        label: draft artifacts
+        skills: [project-manager]
+      - id: validate-scope
+        actor: code
+        command: pm-validate
+        trigger: command.pm-validate
+        from: draft
+        to: validate
+        kind: forward
+        label: validate scope
+        skills: [project-manager]
+      - id: scope-gap-loop
+        actor: pm-agent
+        command: pm-rescope
+        trigger: gaps.present == true
+        from: validate
+        to: draft
+        kind: return
+        label: close gaps
+        skills: [project-manager]
+      - id: publish-scope
+        actor: pm-agent
+        command: pm-scope
+        trigger: gaps.present == false
+        from: validate
+        to: publish
+        kind: forward
+        label: publish
+        emits:
+          artifacts:
+            - id: scoped-issues
+              label: scoped issues and sessions
+
+  pm-triage:
+    actor: pm-agent
+    trigger: command.pm-triage
+    statuses:
+      - id: intake
+        next: classify
+      - id: classify
+        next: act
+      - id: act
+        next: close
+      - id: close
+        terminal: true
+    routes:
+      - id: triage-intake
+        actor: pm-agent
+        command: pm-triage
+        trigger: command.pm-triage
+        from: source:inbox
+        to: intake
+        kind: forward
+        label: intake
+        skills: [project-manager, agent-messaging]
+      - id: classify-item
+        actor: pm-agent
+        command: pm-triage
+        trigger: triage.classify
+        from: intake
+        to: classify
+        kind: forward
+        label: classify
+        skills: [project-manager]
+      - id: act-on-item
+        actor: pm-agent
+        command: pm-edit
+        trigger: triage.action
+        from: classify
+        to: act
+        kind: forward
+        label: act
+        skills: [project-manager]
+      - id: close-triage
+        actor: pm-agent
+        command: pm-triage
+        trigger: triage.close
+        from: act
+        to: close
+        kind: forward
+        label: close
+
+  pm-incremental-update:
+    actor: pm-agent
+    trigger: command.pm-edit
+    statuses:
+      - id: inspect
+        next: edit
+      - id: edit
+        next: validate
+      - id: validate
+        next:
+          - if: validation.clean == true
+            then: publish
+          - else: edit
+      - id: publish
+        terminal: true
+    routes:
+      - id: inspect-update
+        actor: pm-agent
+        command: pm-edit
+        trigger: command.pm-edit
+        from: source:change-request
+        to: inspect
+        kind: forward
+        label: inspect
+        skills: [project-manager]
+      - id: apply-update
+        actor: pm-agent
+        command: pm-edit
+        trigger: update.apply
+        from: inspect
+        to: edit
+        kind: forward
+        label: edit
+        skills: [project-manager]
+      - id: validate-update
+        actor: code
+        command: pm-validate
+        trigger: command.pm-validate
+        from: edit
+        to: validate
+        kind: forward
+        label: validate
+      - id: fix-update-loop
+        actor: pm-agent
+        command: pm-edit
+        trigger: validation.clean == false
+        from: validate
+        to: edit
+        kind: return
+        label: fix
+        skills: [project-manager]
+      - id: publish-update
+        actor: pm-agent
+        command: pm-issue-close
+        trigger: validation.clean == true
+        from: validate
+        to: publish
+        kind: forward
+        label: publish
+        skills: [project-manager]
+
+  project-maintenance:
+    actor: pm-agent
+    trigger: command.pm-status
+    statuses:
+      - id: inspect
+        next: report
+      - id: report
+        terminal: true
+    routes:
+      - id: status-report
+        actor: pm-agent
+        command: pm-status
+        trigger: command.pm-status
+        from: source:project
+        to: inspect
+        kind: forward
+        label: status
+        skills: [project-manager]
+      - id: agenda-report
+        actor: pm-agent
+        command: pm-agenda
+        trigger: command.pm-agenda
+        from: inspect
+        to: report
+        kind: forward
+        label: agenda
+        skills: [project-manager]
+      - id: graph-report
+        actor: pm-agent
+        command: pm-graph
+        trigger: command.pm-graph
+        from: inspect
+        to: report
+        kind: side
+        label: graph
+        skills: [project-manager]
+      - id: validate-report
+        actor: code
+        command: pm-validate
+        trigger: command.pm-validate
+        from: inspect
+        to: report
+        kind: side
+        label: validate
+      - id: sync-project
+        actor: code
+        command: pm-project-sync
+        trigger: command.pm-project-sync
+        from: inspect
+        to: report
+        kind: side
+        label: sync

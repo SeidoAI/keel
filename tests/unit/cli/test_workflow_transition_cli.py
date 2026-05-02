@@ -183,6 +183,47 @@ def test_transition_uses_target_status_validators(
     assert call["kwargs"]["status"] == "queued"
 
 
+def test_transition_uses_route_controls_when_routes_declared(
+    tmp_path: Path, clean_validator
+) -> None:
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    terminal: true
+                    validators: [v_status_only]
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    controls:
+                      validators: [v_route_only]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+
+    assert result.exit_code == 0, result.output
+    call = clean_validator.calls[-1]
+    assert call["kwargs"]["validator_ids"] == ["v_route_only"]
+
+
 def test_transition_prompt_check_gate_accepts_recorded_invocation(
     tmp_path: Path, clean_validator
 ) -> None:

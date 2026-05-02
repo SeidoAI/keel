@@ -33,11 +33,40 @@ export interface WorkflowStatus {
   artifacts: WorkflowStatusArtifacts;
 }
 
+export interface WorkflowRouteControls {
+  validators: string[];
+  jit_prompts: string[];
+  prompt_checks: string[];
+}
+
+export interface WorkflowRouteEmits {
+  artifacts: WorkflowArtifactRef[];
+  events: string[];
+  comments: string[];
+  status_changes: string[];
+}
+
+export interface WorkflowRoute {
+  id: string;
+  workflow_id: string;
+  actor: "pm-agent" | "coding-agent" | "code" | string;
+  from: string;
+  to: string;
+  kind: "forward" | "return" | "loop" | "side" | "terminal" | string;
+  label: string;
+  trigger?: string | null;
+  command?: string | null;
+  controls: WorkflowRouteControls;
+  skills: string[];
+  emits: WorkflowRouteEmits;
+}
+
 export interface WorkflowDefinition {
   id: string;
   actor: string;
   trigger: string;
   statuses: WorkflowStatus[];
+  routes: WorkflowRoute[];
 }
 
 export interface WorkflowRegistryEntry {
@@ -47,6 +76,7 @@ export interface WorkflowRegistryEntry {
   blocking?: boolean;
   workflow?: string;
   status?: string;
+  route?: string;
   source?: string;
   fires_on_event?: string;
   prompt_revealed?: string | null;
@@ -57,6 +87,8 @@ export interface WorkflowRegistry {
   validators: WorkflowRegistryEntry[];
   jit_prompts: WorkflowRegistryEntry[];
   prompt_checks: WorkflowRegistryEntry[];
+  commands: WorkflowRegistryEntry[];
+  skills: WorkflowRegistryEntry[];
 }
 
 export interface WorkflowDriftFinding {

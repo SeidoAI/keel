@@ -29,6 +29,23 @@ The shape:
               consumes:
                 - id: <artifact-id>
                   label: <display-label>
+        routes:
+          - id: <route-id>
+            actor: pm-agent | coding-agent | code
+            from: <status-id> | source:<name>
+            to: <status-id> | sink:<name>
+            kind: forward | return | loop | side | terminal
+            command: <optional-command-id>
+            trigger: <optional-event-or-condition>
+            controls:
+              validators: [<id>, ...]
+              prompt_checks: [<id>, ...]
+              jit_prompts: [<id>, ...]
+            skills: [<skill-id>, ...]
+            emits:
+              artifacts:
+                - id: <artifact-id>
+                  label: <display-label>
 
 Conditional predicates are equality-only for v0.9 (locked decision in
 ``backlog-architecture.md``): ``<dot-path> (==|!=) <bare-value>``.
@@ -45,6 +62,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Literal
+
+KNOWN_ROUTE_ACTORS = frozenset({"pm-agent", "coding-agent", "code"})
+ROUTE_KINDS = frozenset({"forward", "return", "loop", "side", "terminal"})
 
 # ----------------------------------------------------------------------
 # Predicate — equality-only for v0.9
@@ -179,15 +199,57 @@ class WorkflowStatus:
 
 
 @dataclass(frozen=True)
+class WorkflowRouteControls:
+    validators: list[str] = field(default_factory=list)
+    jit_prompts: list[str] = field(default_factory=list)
+    prompt_checks: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class WorkflowRouteEmits:
+    artifacts: list[WorkflowArtifactRef] = field(default_factory=list)
+    events: list[str] = field(default_factory=list)
+    comments: list[str] = field(default_factory=list)
+    status_changes: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class WorkflowRoute:
+    """One routed process segment in a workflow map.
+
+    ``from_ref`` and ``to_ref`` are status ids or boundary ports such as
+    ``source:issue`` and ``sink:merged``. The API serializes them back to
+    ``from`` and ``to`` so ``workflow.yaml`` remains readable.
+    """
+
+    id: str
+    actor: str
+    from_ref: str
+    to_ref: str
+    kind: Literal["forward", "return", "loop", "side", "terminal"]
+    label: str
+    trigger: str | None = None
+    command: str | None = None
+    controls: WorkflowRouteControls = field(default_factory=WorkflowRouteControls)
+    skills: list[str] = field(default_factory=list)
+    emits: WorkflowRouteEmits = field(default_factory=WorkflowRouteEmits)
+
+
+@dataclass(frozen=True)
 class Workflow:
     id: str
     actor: str
     trigger: str
     statuses: list[WorkflowStatus]
+    routes: list[WorkflowRoute] = field(default_factory=list)
 
     @property
     def statuses_by_id(self) -> dict[str, WorkflowStatus]:
         return {s.id: s for s in self.statuses}
+
+    @property
+    def routes_by_id(self) -> dict[str, WorkflowRoute]:
+        return {r.id: r for r in self.routes}
 
 
 @dataclass(frozen=True)
@@ -236,6 +298,8 @@ def validate_workflow_spec(
     known_validators: set[str],
     known_jit_prompts: set[str],
     known_prompt_checks: set[str],
+    known_commands: set[str] | None = None,
+    known_skills: set[str] | None = None,
 ) -> list[WorkflowFinding]:
     """Run well-formedness checks against a parsed :class:`WorkflowSpec`.
 
@@ -265,6 +329,8 @@ def validate_workflow_spec(
                 known_validators=known_validators,
                 known_jit_prompts=known_jit_prompts,
                 known_prompt_checks=known_prompt_checks,
+                known_commands=known_commands,
+                known_skills=known_skills,
             )
         )
     return findings
@@ -351,6 +417,8 @@ def _check_refs(
     known_validators: set[str],
     known_jit_prompts: set[str],
     known_prompt_checks: set[str],
+    known_commands: set[str] | None,
+    known_skills: set[str] | None,
 ) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
     for status in wf.statuses:
@@ -393,7 +461,156 @@ def _check_refs(
                         ),
                     )
                 )
+    out.extend(
+        _check_route_refs(
+            wf_id,
+            wf,
+            known_validators=known_validators,
+            known_jit_prompts=known_jit_prompts,
+            known_prompt_checks=known_prompt_checks,
+            known_commands=known_commands,
+            known_skills=known_skills,
+        )
+    )
     return out
+
+
+def _check_route_refs(
+    wf_id: str,
+    wf: Workflow,
+    *,
+    known_validators: set[str],
+    known_jit_prompts: set[str],
+    known_prompt_checks: set[str],
+    known_commands: set[str] | None,
+    known_skills: set[str] | None,
+) -> list[WorkflowFinding]:
+    out: list[WorkflowFinding] = []
+    declared_statuses = set(wf.statuses_by_id)
+    seen_routes: set[str] = set()
+    for route in wf.routes:
+        status = _finding_status_for_route(route, declared_statuses)
+        if route.id in seen_routes:
+            out.append(
+                WorkflowFinding(
+                    code="workflow/duplicate_route_id",
+                    workflow=wf_id,
+                    status=status,
+                    message=f"route id {route.id!r} declared more than once",
+                )
+            )
+        seen_routes.add(route.id)
+        if route.actor not in KNOWN_ROUTE_ACTORS:
+            out.append(
+                WorkflowFinding(
+                    code="workflow/unknown_actor",
+                    workflow=wf_id,
+                    status=status,
+                    message=(
+                        f"route {route.id!r} actor {route.actor!r} is not one of "
+                        f"{sorted(KNOWN_ROUTE_ACTORS)}"
+                    ),
+                )
+            )
+        for label, ref in (("from", route.from_ref), ("to", route.to_ref)):
+            if not ref:
+                out.append(
+                    WorkflowFinding(
+                        code="workflow/missing_route_endpoint",
+                        workflow=wf_id,
+                        status=status,
+                        message=f"route {route.id!r} has no `{label}:` endpoint",
+                    )
+                )
+            elif not _is_boundary_ref(ref) and ref not in declared_statuses:
+                out.append(
+                    WorkflowFinding(
+                        code="workflow/unknown_route_status",
+                        workflow=wf_id,
+                        status=status,
+                        message=(
+                            f"route {route.id!r} `{label}: {ref}` does not name a "
+                            f"declared status or boundary port"
+                        ),
+                    )
+                )
+        if known_commands is not None and route.command and route.command not in known_commands:
+            out.append(
+                WorkflowFinding(
+                    code="workflow/unknown_command",
+                    workflow=wf_id,
+                    status=status,
+                    message=(
+                        f"route {route.id!r} references command {route.command!r} "
+                        f"which is not implemented"
+                    ),
+                )
+            )
+        for skill in route.skills:
+            if known_skills is not None and skill not in known_skills:
+                out.append(
+                    WorkflowFinding(
+                        code="workflow/unknown_skill",
+                        workflow=wf_id,
+                        status=status,
+                        message=(
+                            f"route {route.id!r} references skill {skill!r} "
+                            f"which is not implemented"
+                        ),
+                    )
+                )
+        for ref in route.controls.validators:
+            if known_validators and ref not in known_validators:
+                out.append(
+                    WorkflowFinding(
+                        code="workflow/unknown_validator",
+                        workflow=wf_id,
+                        status=status,
+                        message=(
+                            f"route {route.id!r} references validator {ref!r} "
+                            f"which is not implemented"
+                        ),
+                    )
+                )
+        for ref in route.controls.jit_prompts:
+            if known_jit_prompts and ref not in known_jit_prompts:
+                out.append(
+                    WorkflowFinding(
+                        code="workflow/unknown_jit_prompt",
+                        workflow=wf_id,
+                        status=status,
+                        message=(
+                            f"route {route.id!r} references JIT prompt {ref!r} "
+                            f"which is not implemented"
+                        ),
+                    )
+                )
+        for ref in route.controls.prompt_checks:
+            if known_prompt_checks and ref not in known_prompt_checks:
+                out.append(
+                    WorkflowFinding(
+                        code="workflow/unknown_prompt_check",
+                        workflow=wf_id,
+                        status=status,
+                        message=(
+                            f"route {route.id!r} references prompt-check {ref!r} "
+                            f"which is not implemented"
+                        ),
+                    )
+                )
+    return out
+
+
+def _finding_status_for_route(route: WorkflowRoute, statuses: set[str]) -> str | None:
+    if route.to_ref in statuses:
+        return route.to_ref
+    if route.from_ref in statuses:
+        return route.from_ref
+    return None
+
+
+def _is_boundary_ref(ref: str) -> bool:
+    return ref.startswith("source:") or ref.startswith("sink:")
 
 
 __all__ = [
@@ -403,6 +620,9 @@ __all__ = [
     "Workflow",
     "WorkflowArtifactRef",
     "WorkflowFinding",
+    "WorkflowRoute",
+    "WorkflowRouteControls",
+    "WorkflowRouteEmits",
     "WorkflowSpec",
     "WorkflowStatus",
     "WorkflowStatusArtifacts",

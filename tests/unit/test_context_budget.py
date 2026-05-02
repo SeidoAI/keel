@@ -81,7 +81,7 @@ def test_pm_skill_md_under_budget() -> None:
 
 
 def test_total_templates_under_budget() -> None:
-    """Everything `tripwire init` copies must stay under 332KB total.
+    """Everything `tripwire init` copies must stay under the total budget.
 
     v0.2 was ~217KB. v0.6a bumped to 275KB. v0.7b bumped to 285KB for
     spawn/defaults.yaml + issue_artifacts + /pm-issue-artifact. v0.7.2
@@ -93,13 +93,15 @@ def test_total_templates_under_budget() -> None:
     monitor invocation fields. v0.7.10 §D (KUI-95) bumps to 325KB for
     the codex-review workflow + codex-reviewer agent + protocol doc.
     v0.8x bumps to 332KB for the inbox primitive (SCHEMA_INBOX.md
-    reference doc + the SKILL.md inbox-authoring section). v0.9.6 bumps
-    to 335KB for workflow.yaml source-of-truth gates and prompt-check
-    invocation instructions.
+    reference doc + the SKILL.md inbox-authoring section). v0.9.6 first
+    bumped to 335KB for workflow.yaml source-of-truth gates and prompt-check
+    invocation instructions, then to 345KB when the default process map
+    started declaring PM workflows, routes, commands, skills, and emitted
+    artifacts as first-class workflow.yaml data.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 335_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 335KB."
+    assert total < 345_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 345KB."
     )
 
 

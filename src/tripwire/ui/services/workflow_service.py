@@ -15,7 +15,9 @@ from tripwire.core.workflow.drift import detect_drift
 from tripwire.core.workflow.loader import load_workflows
 from tripwire.core.workflow.prompt_checks import collect_prompt_checks
 from tripwire.core.workflow.registry import (
+    known_command_ids,
     known_jit_prompt_ids,
+    known_skill_ids,
     validator_catalog,
     validator_description_for,
     validator_label_for,
@@ -25,6 +27,7 @@ from tripwire.core.workflow.schema import (
     Workflow,
     WorkflowArtifactRef,
     WorkflowFinding,
+    WorkflowRoute,
     validate_workflow_spec,
 )
 from tripwire.ui.services.role_gate import (
@@ -51,6 +54,8 @@ def build_workflow(
         known_validators={entry["id"] for entry in registry["validators"]},
         known_jit_prompts={entry["id"] for entry in registry["jit_prompts"]},
         known_prompt_checks={entry["id"] for entry in registry["prompt_checks"]},
+        known_commands={entry["id"] for entry in registry["commands"]},
+        known_skills={entry["id"] for entry in registry["skills"]},
     )
     runtime_findings = detect_drift(project_dir)
     drift_findings = [
@@ -94,6 +99,7 @@ def _workflow_to_dict(workflow: Workflow) -> dict[str, Any]:
             }
             for status in workflow.statuses
         ],
+        "routes": [_route_to_dict(workflow.id, route) for route in workflow.routes],
     }
 
 
@@ -102,6 +108,32 @@ def _artifact_ref_to_dict(ref: WorkflowArtifactRef) -> dict[str, Any]:
     if ref.path:
         out["path"] = ref.path
     return out
+
+
+def _route_to_dict(workflow_id: str, route: WorkflowRoute) -> dict[str, Any]:
+    return {
+        "id": route.id,
+        "workflow_id": workflow_id,
+        "actor": route.actor,
+        "from": route.from_ref,
+        "to": route.to_ref,
+        "kind": route.kind,
+        "label": route.label,
+        "trigger": route.trigger,
+        "command": route.command,
+        "controls": {
+            "validators": list(route.controls.validators),
+            "jit_prompts": list(route.controls.jit_prompts),
+            "prompt_checks": list(route.controls.prompt_checks),
+        },
+        "skills": list(route.skills),
+        "emits": {
+            "artifacts": [_artifact_ref_to_dict(ref) for ref in route.emits.artifacts],
+            "events": list(route.emits.events),
+            "comments": list(route.emits.comments),
+            "status_changes": list(route.emits.status_changes),
+        },
+    }
 
 
 def _next_spec_to_dict(next_spec: Any) -> dict[str, Any]:
@@ -136,6 +168,8 @@ def _build_registry(
             is_pm_role=is_pm_role,
         ),
         "prompt_checks": _build_prompt_check_registry(project_dir),
+        "commands": _build_command_registry(project_dir),
+        "skills": _build_skill_registry(project_dir),
     }
 
 
@@ -227,6 +261,77 @@ def _build_prompt_check_registry(project_dir: Path) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def _build_command_registry(project_dir: Path) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for command in collect_prompt_checks(project_dir):
+        out.append(
+            {
+                "id": command.id,
+                "label": command.id.replace("-", " "),
+                "description": command.description,
+                "source": str(command.source),
+                "blocking": False,
+            }
+        )
+    # Keep this defensive: if future command discovery differs from
+    # prompt-check discovery, route validation can still resolve the id.
+    for command_id in sorted(known_command_ids(project_dir) - {entry["id"] for entry in out}):
+        out.append(
+            {
+                "id": command_id,
+                "label": command_id.replace("-", " "),
+                "description": "",
+                "source": "",
+                "blocking": False,
+            }
+        )
+    return out
+
+
+def _build_skill_registry(project_dir: Path) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for skill_id in sorted(known_skill_ids(project_dir)):
+        source = _skill_source(project_dir, skill_id)
+        out.append(
+            {
+                "id": skill_id,
+                "label": skill_id.replace("-", " "),
+                "description": _skill_description(source) if source else "",
+                "source": str(source) if source else "",
+                "blocking": False,
+            }
+        )
+    return out
+
+
+def _skill_source(project_dir: Path, skill_id: str) -> Path | None:
+    import tripwire
+
+    candidates = [
+        project_dir / ".tripwire" / "skills" / skill_id / "SKILL.md",
+        Path(tripwire.__file__).parent / "templates" / "skills" / skill_id / "SKILL.md",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _skill_description(path: Path | None) -> str:
+    if path is None:
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    for paragraph in text.split("\n\n"):
+        cleaned = paragraph.strip()
+        if not cleaned or cleaned.startswith("#"):
+            continue
+        return cleaned.replace("\n", " ")
+    return ""
 
 
 def _workflow_findings_to_dicts(

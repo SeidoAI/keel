@@ -6,17 +6,20 @@ import type {
   WorkflowRegistryEntry,
   WorkflowStatus,
 } from "@/lib/api/endpoints/workflow";
-import type { GateCluster } from "./useWorkflowLayout";
+import type { CommandMarker, GateCluster, ProcessRoute, SkillMarker } from "./useWorkflowLayout";
 
 export type WorkflowSelection =
   | { kind: "status"; entity: WorkflowStatus; complexity: number }
+  | { kind: "route"; entity: ProcessRoute }
+  | { kind: "command"; entity: CommandMarker }
+  | { kind: "skill"; entity: SkillMarker }
   | { kind: "gate"; entity: GateCluster }
   | { kind: "jit_prompt"; entity: WorkflowRegistryEntry }
   | {
       kind: "artifact";
       entity: WorkflowArtifactRef;
       statusId: string;
-      direction: "produces" | "consumes";
+      direction: "produces" | "consumes" | "emits";
     }
   | { kind: "drift"; entity: WorkflowDriftFinding };
 
@@ -71,9 +74,7 @@ function renderContents(
       header: (
         <div className="flex items-center gap-2">
           <Stamp tone="gate">GATE</Stamp>
-          <span className="font-mono text-[11px] text-(--color-ink-3)">
-            status · {gate.statusId}
-          </span>
+          <span className="font-mono text-[11px] text-(--color-ink-3)">route · {gate.routeId}</span>
         </div>
       ),
       body: (
@@ -84,6 +85,103 @@ function renderContents(
           </DefinitionBlock>
           <ControlList title="Validators" entries={gate.validators} />
           <ControlList title="Prompt checks" entries={gate.promptChecks} />
+        </div>
+      ),
+    };
+  }
+
+  if (selection.kind === "route") {
+    const route = selection.entity;
+    return {
+      title: route.label,
+      header: (
+        <div className="flex items-center gap-2">
+          <Stamp tone="info">ROUTE</Stamp>
+          <span className="font-mono text-[11px] text-(--color-ink-3)">
+            {route.actor} · {route.source} to {route.target}
+          </span>
+        </div>
+      ),
+      body: (
+        <div className="flex flex-col gap-4">
+          <DefinitionBlock>
+            A <strong>route</strong> is process movement across status territory. It owns actor,
+            trigger, command, and branch meaning.
+          </DefinitionBlock>
+          <FieldBlock label="Kind">
+            <span className="font-mono text-[12px] text-(--color-ink)">{route.kind}</span>
+          </FieldBlock>
+          <FieldBlock label="Trigger">
+            <span className="font-mono text-[12px] text-(--color-ink-2)">
+              {route.trigger ?? "-"}
+            </span>
+          </FieldBlock>
+        </div>
+      ),
+    };
+  }
+
+  if (selection.kind === "command") {
+    const marker = selection.entity;
+    return {
+      title: marker.command.label,
+      header: (
+        <div className="flex items-center gap-2">
+          <Stamp tone="rule">COMMAND</Stamp>
+          <span className="font-mono text-[11px] text-(--color-ink-3)">
+            route · {marker.routeId}
+          </span>
+        </div>
+      ),
+      body: (
+        <div className="flex flex-col gap-4">
+          <DefinitionBlock>
+            A <strong>command</strong> is an invocation point. It activates part of the workflow
+            rather than sitting outside it.
+          </DefinitionBlock>
+          <FieldBlock label="ID">
+            <span className="font-mono text-[12px] text-(--color-ink)">{marker.command.id}</span>
+          </FieldBlock>
+          <FieldBlock label="Source">
+            <span className="font-mono text-[12px] text-(--color-ink-2)">
+              {marker.command.source ?? "-"}
+            </span>
+          </FieldBlock>
+        </div>
+      ),
+    };
+  }
+
+  if (selection.kind === "skill") {
+    const marker = selection.entity;
+    return {
+      title: marker.skill.label,
+      header: (
+        <div className="flex items-center gap-2">
+          <Stamp tone="info">SKILL</Stamp>
+          <span className="font-mono text-[11px] text-(--color-ink-3)">
+            route · {marker.routeId}
+          </span>
+        </div>
+      ),
+      body: (
+        <div className="flex flex-col gap-4">
+          <DefinitionBlock>
+            A <strong>skill</strong> is an instruction source. It attaches to actor routes; it is
+            not a workflow state.
+          </DefinitionBlock>
+          <FieldBlock label="Source">
+            <span className="font-mono text-[12px] text-(--color-ink-2)">
+              {marker.skill.source ?? "-"}
+            </span>
+          </FieldBlock>
+          {marker.skill.description ? (
+            <FieldBlock label="Description">
+              <p className="font-sans text-[13px] leading-snug text-(--color-ink-2)">
+                {marker.skill.description}
+              </p>
+            </FieldBlock>
+          ) : null}
         </div>
       ),
     };

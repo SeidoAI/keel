@@ -176,6 +176,66 @@ def test_loader_parses_status_artifacts(tmp_path: Path) -> None:
     assert status.artifacts.produces[0].path == "sessions/{session_id}/plan.md"
 
 
+def test_loader_parses_explicit_routes(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: executing
+                  - id: executing
+                    terminal: true
+                routes:
+                  - id: planned-to-executing
+                    actor: pm-agent
+                    command: pm-session-spawn
+                    trigger: command.pm-session-spawn
+                    from: planned
+                    to: executing
+                    label: spawn
+                    controls:
+                      validators: [v_uuid_present]
+                      jit_prompts: [self-review]
+                      prompt_checks: [pm-session-spawn]
+                    skills: [project-manager, backend-development]
+                    emits:
+                      artifacts:
+                        - id: plan
+                          label: plan.md
+                          path: sessions/{session_id}/plan.md
+                      events: [session.spawn]
+                      comments: [spawned]
+                      status_changes: [executing]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    route = load_workflows(tmp_path).workflows["coding-session"].routes[0]
+
+    assert route.id == "planned-to-executing"
+    assert route.actor == "pm-agent"
+    assert route.command == "pm-session-spawn"
+    assert route.trigger == "command.pm-session-spawn"
+    assert route.from_ref == "planned"
+    assert route.to_ref == "executing"
+    assert route.kind == "forward"
+    assert route.controls.validators == ["v_uuid_present"]
+    assert route.controls.jit_prompts == ["self-review"]
+    assert route.controls.prompt_checks == ["pm-session-spawn"]
+    assert route.skills == ["project-manager", "backend-development"]
+    assert [artifact.id for artifact in route.emits.artifacts] == ["plan"]
+    assert route.emits.events == ["session.spawn"]
+    assert route.emits.comments == ["spawned"]
+    assert route.emits.status_changes == ["executing"]
+
+
 def test_loader_reports_stale_stations_key(tmp_path: Path) -> None:
     from tripwire.core.workflow.loader import load_workflows
     from tripwire.core.workflow.schema import validate_workflow_spec
@@ -377,6 +437,63 @@ def test_validator_rejects_undeclared_prompt_check_ref(tmp_path: Path) -> None:
         known_prompt_checks={"pm-session-launch"},
     )
     codes = [f.code for f in findings]
+    assert "workflow/unknown_prompt_check" in codes
+
+
+def test_validator_rejects_bad_route_refs(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: planned
+                    next: completed
+                  - id: completed
+                    terminal: true
+                routes:
+                  - id: bad-route
+                    actor: outsider
+                    command: pm-missing
+                    from: planned
+                    to: missing
+                    controls:
+                      validators: [v_missing]
+                      jit_prompts: [missing-prompt]
+                      prompt_checks: [pm-missing-check]
+                    skills: [missing-skill]
+                  - id: bad-route
+                    actor: pm-agent
+                    from: ""
+                    to: completed
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_validators={"v_uuid_present"},
+        known_jit_prompts={"self-review"},
+        known_prompt_checks={"pm-session-spawn"},
+        known_commands={"pm-session-spawn"},
+        known_skills={"project-manager"},
+    )
+
+    codes = [f.code for f in findings]
+    assert "workflow/duplicate_route_id" in codes
+    assert "workflow/unknown_actor" in codes
+    assert "workflow/missing_route_endpoint" in codes
+    assert "workflow/unknown_route_status" in codes
+    assert "workflow/unknown_command" in codes
+    assert "workflow/unknown_skill" in codes
+    assert "workflow/unknown_validator" in codes
+    assert "workflow/unknown_jit_prompt" in codes
     assert "workflow/unknown_prompt_check" in codes
 
 

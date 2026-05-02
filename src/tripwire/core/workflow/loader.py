@@ -28,6 +28,9 @@ from tripwire.core.workflow.schema import (
     Workflow,
     WorkflowArtifactRef,
     WorkflowFinding,
+    WorkflowRoute,
+    WorkflowRouteControls,
+    WorkflowRouteEmits,
     WorkflowSpec,
     WorkflowStatus,
     WorkflowStatusArtifacts,
@@ -107,7 +110,17 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
         status, sfindings = _parse_status(wf_id, entry)
         statuses.append(status)
         findings.extend(sfindings)
-    return Workflow(id=wf_id, actor=actor, trigger=trigger, statuses=statuses), findings
+    routes = _parse_routes(wf_id, raw.get("routes"), statuses)
+    return (
+        Workflow(
+            id=wf_id,
+            actor=actor,
+            trigger=trigger,
+            statuses=statuses,
+            routes=routes,
+        ),
+        findings,
+    )
 
 
 def _parse_status(
@@ -261,6 +274,82 @@ def _parse_artifact_refs(value: Any) -> list[WorkflowArtifactRef]:
             )
         )
     return out
+
+
+def _parse_routes(
+    wf_id: str, value: Any, statuses: list[WorkflowStatus]
+) -> list[WorkflowRoute]:
+    if not isinstance(value, list):
+        return []
+    status_index = {status.id: idx for idx, status in enumerate(statuses)}
+    routes: list[WorkflowRoute] = []
+    for idx, entry in enumerate(value):
+        if not isinstance(entry, dict):
+            continue
+        from_ref = str(entry.get("from", "")).strip()
+        to_ref = str(entry.get("to", "")).strip()
+        route_id = str(entry.get("id") or f"{from_ref or 'unknown'}-to-{to_ref or idx}")
+        kind = str(entry.get("kind") or "").strip()
+        if kind not in {"forward", "return", "loop", "side", "terminal"}:
+            kind = _classify_route_kind(from_ref, to_ref, status_index)
+        label = str(entry.get("label") or entry.get("command") or route_id).strip()
+        command = entry.get("command")
+        trigger = entry.get("trigger")
+        routes.append(
+            WorkflowRoute(
+                id=route_id,
+                actor=str(entry.get("actor", "")).strip(),
+                from_ref=from_ref,
+                to_ref=to_ref,
+                kind=kind,  # type: ignore[arg-type]
+                label=label,
+                trigger=str(trigger).strip() if trigger else None,
+                command=str(command).strip() if command else None,
+                controls=_parse_route_controls(entry.get("controls")),
+                skills=_str_list(entry.get("skills")),
+                emits=_parse_route_emits(entry.get("emits")),
+            )
+        )
+    return routes
+
+
+def _classify_route_kind(
+    from_ref: str, to_ref: str, status_index: dict[str, int]
+) -> str:
+    if to_ref.startswith("sink:"):
+        return "terminal"
+    if from_ref == to_ref and from_ref:
+        return "loop"
+    from_idx = status_index.get(from_ref)
+    to_idx = status_index.get(to_ref)
+    if from_idx is None or to_idx is None:
+        return "side"
+    if to_idx > from_idx:
+        return "forward"
+    if to_idx < from_idx:
+        return "return"
+    return "side"
+
+
+def _parse_route_controls(value: Any) -> WorkflowRouteControls:
+    if not isinstance(value, dict):
+        return WorkflowRouteControls()
+    return WorkflowRouteControls(
+        validators=_str_list(value.get("validators")),
+        jit_prompts=_str_list(value.get("jit_prompts")),
+        prompt_checks=_str_list(value.get("prompt_checks")),
+    )
+
+
+def _parse_route_emits(value: Any) -> WorkflowRouteEmits:
+    if not isinstance(value, dict):
+        return WorkflowRouteEmits()
+    return WorkflowRouteEmits(
+        artifacts=_parse_artifact_refs(value.get("artifacts")),
+        events=_str_list(value.get("events")),
+        comments=_str_list(value.get("comments")),
+        status_changes=_str_list(value.get("status_changes")),
+    )
 
 
 __all__ = [

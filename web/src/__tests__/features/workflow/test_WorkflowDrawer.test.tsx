@@ -35,6 +35,7 @@ describe("WorkflowDrawer", () => {
           kind: "gate",
           entity: {
             id: "in_review:gate",
+            routeId: "executing-to-review",
             statusId: "in_review",
             blocking: true,
             validators: [{ id: "v_artifact_presence", label: "artifact presence" }],

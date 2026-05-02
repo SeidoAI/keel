@@ -90,6 +90,51 @@ def test_drift_detects_missing_prompt_check(tmp_path: Path) -> None:
     assert "drift/prompt_check_missing" in codes
 
 
+def test_drift_uses_route_controls_when_routes_declared(tmp_path: Path) -> None:
+    from tripwire.core.events.log import emit_event
+    from tripwire.core.workflow.drift import detect_drift
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    terminal: true
+                    prompt_checks: [status-only-check]
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    controls:
+                      prompt_checks: [pm-session-queue]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    emit_event(
+        pd,
+        workflow="coding-session",
+        instance="test-session",
+        status="queued",
+        event="transition.completed",
+        details={"from_status": "planned", "to_status": "queued"},
+    )
+
+    findings = detect_drift(pd, instance="test-session")
+    messages = [finding.message for finding in findings]
+    assert any("pm-session-queue" in message for message in messages)
+    assert not any("status-only-check" in message for message in messages)
+
+
 def test_drift_clears_when_prompt_check_invoked(tmp_path: Path) -> None:
     from tripwire.core.events.log import emit_event
     from tripwire.core.workflow.drift import detect_drift

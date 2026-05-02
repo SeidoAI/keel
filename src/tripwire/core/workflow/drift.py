@@ -33,7 +33,7 @@ from typing import Literal
 
 from tripwire.core.events.log import read_events
 from tripwire.core.workflow.loader import load_workflows
-from tripwire.core.workflow.schema import NextSpec, Workflow
+from tripwire.core.workflow.schema import NextSpec, Workflow, WorkflowRouteControls
 
 
 @dataclass(frozen=True)
@@ -88,15 +88,22 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
                 continue
             details = row.get("details") or {}
             to_status = details.get("to_status")
+            from_status = details.get("from_status")
             if not isinstance(to_status, str):
                 continue
             status = statuses_by_id.get(to_status)
             if status is None:
                 continue
+            controls = _controls_for_observed_transition(
+                workflow,
+                from_status=from_status if isinstance(from_status, str) else None,
+                to_status=to_status,
+                status=status,
+            )
             stay_rows = inst_rows[stay_start:idx]
             invoked_pcs = _ids_for_event(stay_rows, "prompt_check.invoked")
             fired_prompts = _ids_for_event(stay_rows, "jit_prompt.fired")
-            for pc in status.prompt_checks:
+            for pc in controls.prompt_checks:
                 if pc not in invoked_pcs:
                     out.append(
                         DriftFinding(
@@ -111,7 +118,7 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
                             ),
                         )
                     )
-            for prompt_id in status.jit_prompts:
+            for prompt_id in controls.jit_prompts:
                 if prompt_id not in fired_prompts:
                     out.append(
                         DriftFinding(
@@ -128,6 +135,20 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
                     )
             stay_start = idx + 1
     return out
+
+
+def _controls_for_observed_transition(
+    workflow: Workflow, *, from_status: str | None, to_status: str, status
+) -> WorkflowRouteControls:
+    if from_status is not None:
+        for route in workflow.routes:
+            if route.from_ref == from_status and route.to_ref == to_status:
+                return route.controls
+    return WorkflowRouteControls(
+        validators=list(status.validators),
+        jit_prompts=list(status.jit_prompts),
+        prompt_checks=list(status.prompt_checks),
+    )
 
 
 def _ids_for_event(rows: Iterable[dict], event: str) -> set[str]:
@@ -177,7 +198,7 @@ def _scan_unexpected_transitions(
         last_status = workflow.statuses_by_id.get(last_to)
         if last_status is None:
             continue
-        if _is_reachable_via(last_status.next, actual):
+        if _is_reachable(workflow, last_status.next, from_status=last_to, target=actual):
             continue  # legitimate single-step move; the gate just hasn't
             # logged a `transition.completed` for it yet.
         out.append(
@@ -190,7 +211,7 @@ def _scan_unexpected_transitions(
                     f"session {inst!r} session.yaml status={actual!r} but "
                     f"last logged transition.completed was to "
                     f"{last_to!r}, and {actual!r} is not reachable from "
-                    f"{last_to!r} via workflow.yaml's `next:` declaration "
+                    f"{last_to!r} via workflow.yaml's route declaration "
                     f"— suggests a gate-bypass status flip"
                 ),
             )
@@ -198,7 +219,14 @@ def _scan_unexpected_transitions(
     return out
 
 
-def _is_reachable_via(spec: NextSpec, target: str) -> bool:
+def _is_reachable(
+    workflow: Workflow, spec: NextSpec, *, from_status: str, target: str
+) -> bool:
+    if workflow.routes:
+        return any(
+            route.from_ref == from_status and route.to_ref == target
+            for route in workflow.routes
+        )
     if spec.kind == "single":
         return spec.single == target
     if spec.kind == "conditional" and spec.conditional is not None:

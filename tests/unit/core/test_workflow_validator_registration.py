@@ -71,6 +71,41 @@ def test_declared_validator_ids_come_from_workflow_yaml(tmp_path: Path) -> None:
     ]
 
 
+def test_declared_validator_ids_prefer_route_controls(tmp_path: Path) -> None:
+    from tripwire.core.workflow.registry import declared_validator_ids
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: queued
+                    next: executing
+                    validators: [v_status_only]
+                  - id: executing
+                    terminal: true
+                routes:
+                  - id: queued-to-executing
+                    actor: pm-agent
+                    from: queued
+                    to: executing
+                    controls:
+                      validators: [v_route_only, v_status_only]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    assert declared_validator_ids(tmp_path) == [
+        "v_workflow_well_formed",
+        "v_route_only",
+        "v_status_only",
+    ]
+
+
 def test_no_validator_placement_decorators_remain() -> None:
     root = Path("src/tripwire")
     offenders: list[str] = []

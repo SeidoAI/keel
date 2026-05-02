@@ -102,12 +102,12 @@ def test_default_workflow_declares_lifecycle_prompt_checks() -> None:
         encoding="utf-8"
     )
     parsed = yaml.safe_load(template)
-    declared = {
-        prompt_check
-        for workflow in parsed["workflows"].values()
-        for status in workflow["statuses"]
-        for prompt_check in status.get("prompt_checks", [])
-    }
+    declared = set()
+    for workflow in parsed["workflows"].values():
+        for status in workflow["statuses"]:
+            declared.update(status.get("prompt_checks", []))
+        for route in workflow.get("routes", []):
+            declared.update((route.get("controls") or {}).get("prompt_checks", []))
     assert LIFECYCLE_PROMPT_CHECK_IDS - declared == set()
 
 
