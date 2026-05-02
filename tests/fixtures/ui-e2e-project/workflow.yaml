@@ -2,7 +2,7 @@ workflows:
   coding-session:
     actor: coding-agent
     trigger: session.spawn
-    stations:
+    statuses:
       - id: planned
         next: queued
       - id: queued

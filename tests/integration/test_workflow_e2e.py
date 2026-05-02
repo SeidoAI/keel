@@ -40,7 +40,7 @@ def _project_dir(tmp_path: Path) -> Path:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
                     next: queued
                   - id: queued
@@ -115,8 +115,8 @@ def test_full_lifecycle_drives_via_transition_only(
     pd = _project_dir(tmp_path)
     runner = CliRunner()
 
-    stations = ["queued", "executing", "in_review", "verified", "completed"]
-    for target in stations:
+    statuses = ["queued", "executing", "in_review", "verified", "completed"]
+    for target in statuses:
         # Mirror the agent's real-world drive: before crossing into
         # `verified`, the self-review tripwire (registered at
         # `coding-session:verified` via its class-level `at = (...)`)
@@ -146,7 +146,7 @@ def test_full_lifecycle_drives_via_transition_only(
     events = list(read_events(pd, instance="e2e-session"))
     completed = [e for e in events if e["event"] == "transition.completed"]
     assert len(completed) == 5
-    assert [e["details"]["to_station"] for e in completed] == stations
+    assert [e["details"]["to_status"] for e in completed] == statuses
 
     # Drift findings (KUI-124 / workflow gate) is clean.
     # Note: `tripwire drift report` (KUI-128 / coherence score, from #74)
@@ -197,7 +197,7 @@ def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
                     next: queued
                   - id: queued
@@ -220,9 +220,9 @@ def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="e2e-session",
-        station="executing",
+        status="executing",
         event="transition.completed",
-        details={"from_station": "queued", "to_station": "executing"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     runner = CliRunner()
     result = runner.invoke(

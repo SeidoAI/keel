@@ -37,7 +37,7 @@ def _project_dir(tmp_path: Path) -> Path:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
                     next: queued
                   - id: queued
@@ -82,9 +82,9 @@ def test_drift_detects_missing_prompt_check(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="test-session",
-        station="executing",
+        status="executing",
         event="transition.completed",
-        details={"from_station": "queued", "to_station": "executing"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     findings = detect_drift(pd, instance="test-session")
     codes = [f.code for f in findings]
@@ -100,7 +100,7 @@ def test_drift_clears_when_prompt_check_invoked(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="test-session",
-        station="queued",
+        status="queued",
         event="prompt_check.invoked",
         details={"id": "pm-session-queue"},
     )
@@ -108,9 +108,9 @@ def test_drift_clears_when_prompt_check_invoked(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="test-session",
-        station="executing",
+        status="executing",
         event="transition.completed",
-        details={"from_station": "queued", "to_station": "executing"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     findings = detect_drift(pd, instance="test-session")
     codes = [f.code for f in findings]
@@ -130,9 +130,9 @@ def test_drift_detects_should_have_fired_jit_prompt(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="test-session",
-        station="in_review",
+        status="in_review",
         event="transition.completed",
-        details={"from_station": "executing", "to_station": "in_review"},
+        details={"from_status": "executing", "to_status": "in_review"},
     )
     findings = detect_drift(pd, instance="test-session")
     codes = [f.code for f in findings]
@@ -141,7 +141,7 @@ def test_drift_detects_should_have_fired_jit_prompt(tmp_path: Path) -> None:
 
 def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
     """If session.status currently sits at a station that's NOT reachable
-    from the last `transition.completed` to_station, surface
+    from the last `transition.completed` to_status, surface
     `drift/unexpected_transition`. Simulates a gate-bypass write that
     flipped session.yaml without going through `tripwire transition`."""
     from tripwire.core.events.log import emit_event
@@ -170,7 +170,7 @@ def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="test-session",
-        station="queued",
+        status="queued",
         event="prompt_check.invoked",
         details={"id": "pm-session-queue"},
     )
@@ -178,15 +178,15 @@ def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="test-session",
-        station="executing",
+        status="executing",
         event="transition.completed",
-        details={"from_station": "queued", "to_station": "executing"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     emit_event(
         pd,
         workflow="coding-session",
         instance="test-session",
-        station="executing",
+        status="executing",
         event="jit_prompt.fired",
         details={"id": "self-review"},
     )
@@ -215,9 +215,9 @@ def test_cli_drift_report_surfaces_findings(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="test-session",
-        station="executing",
+        status="executing",
         event="transition.completed",
-        details={"from_station": "queued", "to_station": "executing"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     runner = CliRunner()
     result = runner.invoke(drift_cmd, ["findings", "--project-dir", str(pd)])
@@ -236,9 +236,9 @@ def test_cli_drift_report_filters_by_instance(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="dirty",
-        station="executing",
+        status="executing",
         event="transition.completed",
-        details={"from_station": "queued", "to_station": "executing"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     runner = CliRunner()
     # Filter to a clean instance — no findings.

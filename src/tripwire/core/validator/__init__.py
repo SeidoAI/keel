@@ -807,9 +807,9 @@ def _emit_check_result(
     validator id mirrors `workflow_service`: `v_<slug>` where `<slug>` is
     the function name with the `check_` prefix stripped.
 
-    Reads ``check_fn.__tripwire_workflow_station__`` (set by
+    Reads ``check_fn.__tripwire_workflow_status__`` (set by
     :func:`tripwire.core.workflow.registry.registers_at`) so the
-    payload carries the (workflow, station) the check is registered
+    payload carries the (workflow, status) the check is registered
     against — the runtime gates and drift report consume this. KUI-120
     is the registry-consume contract.
     """
@@ -820,7 +820,7 @@ def _emit_check_result(
     fired_at = _isoformat_z(datetime.now(timezone.utc))
     kind = "validator_fail" if has_error else "validator_pass"
     event_id = f"evt-{fired_at}-{kind}-{slug}-{session_id}"
-    pair = getattr(check_fn, "__tripwire_workflow_station__", None)
+    pair = getattr(check_fn, "__tripwire_workflow_status__", None)
     payload: dict[str, Any] = {
         "id": event_id,
         "kind": kind,
@@ -831,7 +831,7 @@ def _emit_check_result(
     }
     if pair is not None:
         payload["workflow"] = pair[0]
-        payload["station"] = pair[1]
+        payload["status"] = pair[1]
     try:
         emitter.emit("validator_runs", payload)
     except Exception:
@@ -849,15 +849,15 @@ def _emit_workflow_event(
     """Append one ``validator.run`` row to the workflow events log
     (KUI-123) for *check_fn*.
 
-    Skipped silently if the check has no ``__tripwire_workflow_station__``
+    Skipped silently if the check has no ``__tripwire_workflow_status__``
     attribute (legacy / unregistered) — the workflow log demands
-    ``workflow`` + ``station``. Failures are logged and swallowed; the
+    ``workflow`` + ``status``. Failures are logged and swallowed; the
     log is best-effort, not load-bearing.
     """
-    pair = getattr(check_fn, "__tripwire_workflow_station__", None)
+    pair = getattr(check_fn, "__tripwire_workflow_status__", None)
     if pair is None:
         return
-    workflow, station = pair
+    workflow, status = pair
     slug = check_fn.__name__.removeprefix("check_")
     has_error = any(r.severity == "error" for r in results)
     outcome = "fail" if has_error else "pass"
@@ -868,7 +868,7 @@ def _emit_workflow_event(
             project_dir,
             workflow=workflow,
             instance=session_id,
-            station=station,
+            status=status,
             event="validator.run",
             details={
                 "id": f"v_{slug}",

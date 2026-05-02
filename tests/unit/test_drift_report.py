@@ -56,7 +56,7 @@ def _write_workflow(project_dir: Path) -> None:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: queued
                     next: executing
                     prompt_checks: [pm-session-queue]
@@ -124,9 +124,9 @@ def test_workflow_drift_findings_drop_the_score(tmp_path: Path) -> None:
         tmp_path,
         workflow="coding-session",
         instance="session-a",
-        station="executing",
+        status="executing",
         event="transition.completed",
-        details={"from_station": "queued", "to_station": "executing"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     runner = CliRunner()
     result = runner.invoke(

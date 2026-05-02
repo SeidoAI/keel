@@ -35,7 +35,7 @@ def _project_dir(tmp_path: Path) -> Path:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
                     next: queued
                   - id: queued
@@ -129,7 +129,7 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
     session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
     assert "status: queued" in session_yaml
     # Station-instance id present.
-    assert "current_station_instance:" in session_yaml
+    assert "current_status_instance:" in session_yaml
     assert "coding-session:test-session:queued:1" in session_yaml
 
     # transition.requested + transition.completed emitted (no .rejected).
@@ -167,7 +167,7 @@ def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
     assert rows[0]["details"]["reason"].startswith("transition_not_reachable")
 
 
-def test_transition_increments_station_instance_n(
+def test_transition_increments_status_instance_n(
     tmp_path: Path, clean_validator
 ) -> None:
     """Repeat visits to a station bump the {n} suffix."""
@@ -208,10 +208,10 @@ def test_transition_unknown_station_errors(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(
         transition_cmd,
-        ["test-session", "nonexistent-station", "--project-dir", str(pd)],
+        ["test-session", "nonexistent-status", "--project-dir", str(pd)],
     )
     assert result.exit_code != 0
-    assert "unknown station" in result.output.lower()
+    assert "unknown status" in result.output.lower()
 
 
 def test_transition_lockfile_serialises_concurrent(
@@ -229,7 +229,7 @@ def test_transition_lockfile_serialises_concurrent(
     assert (pd / ".tripwire").is_dir()
 
 
-def test_transition_completed_event_carries_station_instance(
+def test_transition_completed_event_carries_status_instance(
     tmp_path: Path, clean_validator
 ) -> None:
     from tripwire.cli.transition import transition_cmd
@@ -246,7 +246,7 @@ def test_transition_completed_event_carries_station_instance(
     )
     assert len(completed) == 1
     assert (
-        completed[0]["details"]["station_instance"]
+        completed[0]["details"]["status_instance"]
         == "coding-session:test-session:queued:1"
     )
 
@@ -362,7 +362,7 @@ def test_transition_reloads_session_inside_lock(
     # queued → executing is reachable, so this should succeed.
     assert result.exit_code == 0, result.output
 
-    # The transition.completed event records `from_station: queued`,
+    # The transition.completed event records `from_status: queued`,
     # which is what was on disk INSIDE the lock — not whatever
     # pre-lock snapshot some prior call to load_session captured.
     completed = [
@@ -371,5 +371,5 @@ def test_transition_reloads_session_inside_lock(
         if e["event"] == "transition.completed"
     ]
     assert completed
-    assert completed[-1]["details"]["from_station"] == "queued"
-    assert completed[-1]["details"]["to_station"] == "executing"
+    assert completed[-1]["details"]["from_status"] == "queued"
+    assert completed[-1]["details"]["to_status"] == "executing"

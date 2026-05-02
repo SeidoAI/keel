@@ -24,11 +24,11 @@ def test_self_review_jit_prompt_declares_at() -> None:
 
 
 def test_loading_registry_populates_jit_prompt_station(tmp_path: Path) -> None:
-    """Loading the manifest must call ``register_jit_prompt_station`` for
+    """Loading the manifest must call ``register_jit_prompt_status`` for
     each JitPrompt whose class declares ``at``."""
     from tripwire._internal.jit_prompts.loader import load_jit_prompt_registry
     from tripwire.core.workflow.registry import (
-        jit_prompts_for_station,
+        jit_prompts_for_status,
         known_jit_prompt_ids,
     )
 
@@ -41,7 +41,7 @@ def test_loading_registry_populates_jit_prompt_station(tmp_path: Path) -> None:
     )
     load_jit_prompt_registry(tmp_path)
     assert "self-review" in known_jit_prompt_ids()
-    assert "self-review" in jit_prompts_for_station("coding-session", "verified")
+    assert "self-review" in jit_prompts_for_status("coding-session", "verified")
 
 
 def test_jit_prompt_base_class_accepts_at_attribute() -> None:

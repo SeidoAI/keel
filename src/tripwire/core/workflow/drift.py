@@ -3,17 +3,17 @@
 Drift is the gap between the workflow.yaml-declared lifecycle and what
 the events log records actually happened. Three classes of drift:
 
-- ``drift/prompt_check_missing`` — a station declared
-  ``prompt_checks: [...]`` but the session left the station without a
+- ``drift/prompt_check_missing`` — a status declared
+  ``prompt_checks: [...]`` but the session left the status without a
   ``prompt_check.invoked`` event for one of the declared ids. The PM
   forgot to run a required check.
-- ``drift/jit_prompt_should_have_fired`` — a station declared
+- ``drift/jit_prompt_should_have_fired`` — a status declared
   ``jit_prompts: [...]`` but the session left without a
   ``jit_prompt.fired`` event for one of them. Either the JIT prompt is
   miswired or the gate runner skipped it.
 - ``drift/unexpected_transition`` — session.yaml currently sits at a
-  station that's NOT reachable from the last
-  ``transition.completed.to_station``. Means somebody (or some tool)
+  status that's NOT reachable from the last
+  ``transition.completed.to_status``. Means somebody (or some tool)
   flipped session.status directly without going through
   ``tripwire transition``.
 
@@ -21,7 +21,7 @@ Surfaced via :func:`detect_drift` (returns
 :class:`DriftFinding` list) and the ``tripwire drift report`` CLI.
 
 The reader walks the events log chronologically, partitions events by
-station-stay (each ``transition.completed`` ends one stay), and for
+status-stay (each ``transition.completed`` ends one stay), and for
 each completed stay checks the declared prompt-checks/JIT prompts.
 """
 
@@ -44,7 +44,7 @@ class DriftFinding:
     code: str
     workflow: str
     instance: str
-    station: str | None
+    status: str | None
     message: str
     severity: Literal["error", "warning"] = "error"
 
@@ -74,12 +74,12 @@ def detect_drift(
 
 
 def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]:
-    """For each `transition.completed` row, look at the FROM station's
+    """For each `transition.completed` row, look at the FROM status's
     declared prompt-checks + JIT prompts and confirm one of each was
     observed during the stay.
 
     A "stay" is the contiguous run of events on a session at a given
-    station, ending in `transition.completed.from_station == <station>`.
+    status, ending in `transition.completed.from_status == <status>`.
     The opening boundary is either the previous `transition.completed`
     (same instance) or the start of the events log.
     """
@@ -89,48 +89,48 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
         inst = row.get("instance") or ""
         by_instance.setdefault(inst, []).append(row)
 
-    stations_by_id = workflow.stations_by_id
+    statuses_by_id = workflow.statuses_by_id
     for inst, inst_rows in by_instance.items():
         stay_start = 0
         for idx, row in enumerate(inst_rows):
             if row.get("event") != "transition.completed":
                 continue
             details = row.get("details") or {}
-            from_station = details.get("from_station")
-            if not isinstance(from_station, str):
+            from_status = details.get("from_status")
+            if not isinstance(from_status, str):
                 continue
-            station = stations_by_id.get(from_station)
-            if station is None:
+            status = statuses_by_id.get(from_status)
+            if status is None:
                 continue
             stay_rows = inst_rows[stay_start:idx]
             invoked_pcs = _ids_for_event(stay_rows, "prompt_check.invoked")
             fired_prompts = _ids_for_event(stay_rows, "jit_prompt.fired")
-            for pc in station.prompt_checks:
+            for pc in status.prompt_checks:
                 if pc not in invoked_pcs:
                     out.append(
                         DriftFinding(
                             code="drift/prompt_check_missing",
                             workflow=workflow.id,
                             instance=inst,
-                            station=from_station,
+                            status=from_status,
                             message=(
-                                f"session {inst!r} left station "
-                                f"{from_station!r} without invoking required "
+                                f"session {inst!r} left status "
+                                f"{from_status!r} without invoking required "
                                 f"prompt-check {pc!r}"
                             ),
                         )
                     )
-            for prompt_id in station.jit_prompts:
+            for prompt_id in status.jit_prompts:
                 if prompt_id not in fired_prompts:
                     out.append(
                         DriftFinding(
                             code="drift/jit_prompt_should_have_fired",
                             workflow=workflow.id,
                             instance=inst,
-                            station=from_station,
+                            status=from_status,
                             message=(
-                                f"session {inst!r} left station "
-                                f"{from_station!r} without firing declared "
+                                f"session {inst!r} left status "
+                                f"{from_status!r} without firing declared "
                                 f"JIT prompt {prompt_id!r}"
                             ),
                         )
@@ -156,8 +156,8 @@ def _scan_unexpected_transitions(
     project_dir: Path, rows: list[dict], workflow: Workflow
 ) -> list[DriftFinding]:
     """Compare session.yaml's current status against the last
-    `transition.completed.to_station` from the events log. If the
-    session sits at a station NOT reachable from the last logged stop,
+    `transition.completed.to_status` from the events log. If the
+    session sits at a status NOT reachable from the last logged stop,
     surface `drift/unexpected_transition` — somebody flipped status
     directly.
 
@@ -171,10 +171,10 @@ def _scan_unexpected_transitions(
         if row.get("event") != "transition.completed":
             continue
         details = row.get("details") or {}
-        to_station = details.get("to_station")
+        to_status = details.get("to_status")
         inst = row.get("instance") or ""
-        if isinstance(to_station, str) and inst:
-            last_to_by_instance[inst] = to_station
+        if isinstance(to_status, str) and inst:
+            last_to_by_instance[inst] = to_status
 
     for inst, last_to in last_to_by_instance.items():
         actual = _read_session_status(project_dir, inst)
@@ -183,10 +183,10 @@ def _scan_unexpected_transitions(
         if actual == last_to:
             continue  # in sync
         # Reachable-from-last-stop?
-        last_station = workflow.stations_by_id.get(last_to)
-        if last_station is None:
+        last_status = workflow.statuses_by_id.get(last_to)
+        if last_status is None:
             continue
-        if _is_reachable_via(last_station.next, actual):
+        if _is_reachable_via(last_status.next, actual):
             continue  # legitimate single-step move; the gate just hasn't
             # logged a `transition.completed` for it yet.
         out.append(
@@ -194,7 +194,7 @@ def _scan_unexpected_transitions(
                 code="drift/unexpected_transition",
                 workflow=workflow.id,
                 instance=inst,
-                station=actual,
+                status=actual,
                 message=(
                     f"session {inst!r} session.yaml status={actual!r} but "
                     f"last logged transition.completed was to "

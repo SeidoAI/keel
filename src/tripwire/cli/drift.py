@@ -10,7 +10,7 @@ Two subcommands, both shipped in v0.9:
 - ``tripwire drift findings`` (KUI-124) — list every workflow drift
   finding (missing required prompt-checks, JIT prompts that
   should-have-fired, unexpected transitions). Output is one finding
-  per line as ``<code> <workflow>:<instance> <station?> :: <message>``
+  per line as ``<code> <workflow>:<instance> <status?> :: <message>``
   so it pipes cleanly into agents and log greppers; exit non-zero on
   any finding.
 
@@ -85,10 +85,10 @@ def report_cmd(project_dir: Path, output_format: str) -> None:
         click.echo("")
         click.echo("Workflow drift findings:")
         for finding in result.workflow_drift_findings:
-            station = finding.station or "-"
+            status = finding.status or "-"
             click.echo(
                 f"  {finding.code} {finding.workflow}:{finding.instance} "
-                f"{station} :: {finding.message}"
+                f"{status} :: {finding.message}"
             )
 
 
@@ -121,8 +121,8 @@ def findings_cmd(project_dir: Path, instance: str | None, workflow_id: str) -> N
         click.echo("no drift detected")
         return
     for f in findings:
-        station = f.station or "-"
-        click.echo(f"{f.code} {f.workflow}:{f.instance} {station} :: {f.message}")
+        status = f.status or "-"
+        click.echo(f"{f.code} {f.workflow}:{f.instance} {status} :: {f.message}")
     raise click.exceptions.Exit(code=1)
 
 

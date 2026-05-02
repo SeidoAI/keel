@@ -152,7 +152,7 @@ def drift_finding_to_dict(finding: DriftFinding) -> dict[str, str | None]:
         "code": finding.code,
         "workflow": finding.workflow,
         "instance": finding.instance,
-        "station": finding.station,
+        "status": finding.status,
         "severity": finding.severity,
         "message": finding.message,
     }

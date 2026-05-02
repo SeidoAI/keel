@@ -1,8 +1,8 @@
 # Per-project workflow definitions. v0.9 ships `coding-session`; later
 # versions add `inbox-handling`, `issue-lifecycle`, `concept-freshness`,
-# `pr-lifecycle`. Each workflow is a typed lifecycle graph: stations
-# with declared validators, JIT prompts, and prompt-checks; transitions
-# between stations gated by the runtime; an append-only events log
+# `pr-lifecycle`. Each workflow is a typed lifecycle graph: statuses
+# with declared validators, JIT prompts, prompt-checks, and expected
+# proof artifacts; transitions between statuses gated by the runtime; an append-only events log
 # substrate.
 #
 # Schema reference: docs/specs/2026-04-30-v09-workflow-substrate.md
@@ -14,23 +14,55 @@ workflows:
   coding-session:
     actor: coding-agent
     trigger: session.spawn
-    stations:
+    statuses:
       - id: planned
         next: queued
+        artifacts:
+          consumes:
+            - id: issue-brief
+              label: issue brief
       - id: queued
         next: executing
+        artifacts:
+          produces:
+            - id: plan
+              label: plan.md
+              path: sessions/{session_id}/plan.md
       - id: executing
         next: in_review
+        artifacts:
+          consumes:
+            - id: plan
+              label: plan.md
+              path: sessions/{session_id}/plan.md
+          produces:
+            - id: diff
+              label: implementation diff
       - id: in_review
         next: verified
+        artifacts:
+          consumes:
+            - id: diff
+              label: implementation diff
+          produces:
+            - id: review-notes
+              label: review notes
       - id: verified
         next: completed
+        artifacts:
+          consumes:
+            - id: review-notes
+              label: review notes
       - id: completed
         terminal: true
+        artifacts:
+          produces:
+            - id: session-signature
+              label: session signature
     # NOTE: v0.9 ships the gate runner (KUI-159) that READS
     # `prompt_check.invoked` events, but no caller in this codebase
     # yet EMITS them. The PM slash-commands wired with `fires_at:`
-    # (KUI-122) carry the station mapping but not the per-invocation
+    # (KUI-122) carry the status mapping but not the per-invocation
     # event emit. Until the producer side lands (v0.9.x follow-up),
     # declaring `prompt_checks: [...]` here would make every real
     # `tripwire transition` reject with `prompt_checks_missing`.

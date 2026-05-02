@@ -68,7 +68,7 @@ def _write_workflow(project_dir: Path) -> None:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: queued
                     next: executing
                     prompt_checks: [pm-session-queue]
@@ -119,9 +119,9 @@ def test_drift_route_includes_workflow_drift_findings_from_events_log(
         project_dir,
         workflow="coding-session",
         instance="session-a",
-        station="executing",
+        status="executing",
         event="transition.completed",
-        details={"from_station": "queued", "to_station": "executing"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     resp = client.get(f"/api/projects/{project_id}/drift")
     assert resp.status_code == 200

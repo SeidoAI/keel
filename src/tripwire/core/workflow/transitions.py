@@ -1,12 +1,12 @@
 """Transition-token runtime — the workflow gate runner (KUI-159).
 
-A transition is a request to move a session from its current station
-to a target station. The runtime:
+A transition is a request to move a session from its current status
+to a target status. The runtime:
 
 1. Loads ``<project>/workflow.yaml``, finds the workflow the session
    belongs to (``coding-session`` for v0.9; future workflows look up
    by ``trigger:`` against the spawn event).
-2. Verifies the target station is reachable from the current station
+2. Verifies the target status is reachable from the current status
    (single-id ``next:`` matches, or one of the conditional branches
    resolves to it).
 3. Runs the gate:
@@ -16,16 +16,16 @@ to a target station. The runtime:
       same code path the KUI-110 edit-time hook drives (no parallel
       hook surface).
    b. **JIT prompts** — for every JIT prompt registered at the target
-      station (``at = (workflow, station)``), confirm
+      status (``at = (workflow, status)``), confirm
       :meth:`JitPrompt.is_acknowledged` returns True. An unack'd
       blocking JIT prompt fails the gate.
    c. **Prompt-checks** — for every prompt-check declared at the
-      *current* station, query the events log to verify it was
-      invoked since the session entered the current station. Missing
+      *current* status, query the events log to verify it was
+      invoked since the session entered the current status. Missing
       ones fail the gate. (Verifies the PM ran the required check
       before the agent transitioned away.)
 
-4. On pass: session.status = target, ``current_station_instance``
+4. On pass: session.status = target, ``current_status_instance``
    bumped, ``transition.completed`` emitted.
 5. On fail: ``transition.rejected`` emitted with a structured
    ``reason``; session stays put.
@@ -46,7 +46,7 @@ from tripwire.core.events.log import emit_event, read_events
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
 from tripwire.core.workflow.loader import load_workflows
-from tripwire.core.workflow.registry import jit_prompts_for_station
+from tripwire.core.workflow.registry import jit_prompts_for_status
 from tripwire.core.workflow.schema import (
     NextSpec,
     Workflow,
@@ -67,11 +67,11 @@ class TransitionResult:
     ok: bool
     reason: str | None  # structured reason code; None on pass
     message: str | None  # human-readable detail
-    station_instance: str | None  # `{workflow}:{instance}:{station}:{n}` on pass
+    status_instance: str | None  # `{workflow}:{instance}:{status}:{n}` on pass
 
 
 class TransitionError(Exception):
-    """Raised for unrecoverable input errors (unknown session/station)."""
+    """Raised for unrecoverable input errors (unknown session/status)."""
 
 
 def _isoformat_z(dt: datetime) -> str:
@@ -104,10 +104,10 @@ def _is_reachable(current: str, target: str, next_spec: NextSpec) -> bool:
     return False  # terminal — nothing reachable
 
 
-def _next_station_instance_n(
-    project_dir: Path, workflow: str, instance: str, station: str
+def _next_status_instance_n(
+    project_dir: Path, workflow: str, instance: str, status: str
 ) -> int:
-    """Count prior `transition.completed` events for this station and
+    """Count prior `transition.completed` events for this status and
     return n+1, where n is the number of prior visits."""
     n = 0
     for row in read_events(
@@ -117,7 +117,7 @@ def _next_station_instance_n(
         event="transition.completed",
     ):
         details = row.get("details") or {}
-        if details.get("to_station") == station:
+        if details.get("to_status") == status:
             n += 1
     return n + 1
 
@@ -126,7 +126,7 @@ def request_transition(
     project_dir: Path,
     *,
     session_id: str,
-    target_station: str,
+    target_status: str,
     now: datetime | None = None,
 ) -> TransitionResult:
     """Run the gate and apply the transition.
@@ -134,21 +134,21 @@ def request_transition(
     Always emits ``transition.requested`` first, then either
     ``transition.completed`` (pass) or ``transition.rejected`` (fail).
     Raises :class:`TransitionError` for input errors that don't
-    correspond to a gate verdict (unknown session / station).
+    correspond to a gate verdict (unknown session / status).
     """
     when = now or datetime.now(tz=timezone.utc)
 
     spec = load_workflows(project_dir)
     workflow = _resolve_workflow(spec)
-    stations_by_id = workflow.stations_by_id
-    if target_station not in stations_by_id:
+    statuses_by_id = workflow.statuses_by_id
+    if target_status not in statuses_by_id:
         raise TransitionError(
-            f"unknown station {target_station!r} in workflow {WORKFLOW_ID!r}; "
-            f"valid stations: {sorted(stations_by_id)}"
+            f"unknown status {target_status!r} in workflow {WORKFLOW_ID!r}; "
+            f"valid statuses: {sorted(statuses_by_id)}"
         )
 
     # Pre-lock load: just to populate `transition.requested`'s
-    # `from_station` field with the caller's perspective. The gate
+    # `from_status` field with the caller's perspective. The gate
     # body re-loads inside the lock to evaluate against fresh state
     # (see codex P1 on PR #73 — concurrent transitions could otherwise
     # both validate against the same stale snapshot).
@@ -157,16 +157,16 @@ def request_transition(
     except FileNotFoundError as exc:
         raise TransitionError(f"session {session_id!r} not found") from exc
 
-    pre_lock_station = pre_lock_session.status.value
+    pre_lock_status = pre_lock_session.status.value
 
     # Always emit `transition.requested` first.
     emit_event(
         project_dir,
         workflow=WORKFLOW_ID,
         instance=session_id,
-        station=target_station,
+        status=target_status,
         event="transition.requested",
-        details={"from_station": pre_lock_station, "to_station": target_station},
+        details={"from_status": pre_lock_status, "to_status": target_status},
         now=when,
     )
 
@@ -175,19 +175,19 @@ def request_transition(
         with project_lock(project_dir, name=lock_name):
             # Re-read session state INSIDE the lock — stale snapshots
             # before the lock could let two concurrent transitions
-            # validate against the same source station and both emit
+            # validate against the same source status and both emit
             # `transition.completed`. Fresh read here is the
             # serialization point.
             session = load_session(project_dir, session_id)
-            current_station = session.status.value
-            current = stations_by_id.get(current_station)
+            current_status = session.status.value
+            current = statuses_by_id.get(current_status)
             return _run_gate(
                 project_dir,
                 session=session,
                 current=current,
-                current_station=current_station,
-                target_station=target_station,
-                stations_by_id=stations_by_id,
+                current_status=current_status,
+                target_status=target_status,
+                statuses_by_id=statuses_by_id,
                 when=when,
             )
     except LockTimeout as exc:
@@ -195,13 +195,13 @@ def request_transition(
             ok=False,
             reason="lock_timeout",
             message=str(exc),
-            station_instance=None,
+            status_instance=None,
         )
         emit_event(
             project_dir,
             workflow=WORKFLOW_ID,
             instance=session_id,
-            station=target_station,
+            status=target_status,
             event="transition.rejected",
             details={"reason": result.reason, "message": result.message},
             now=datetime.now(tz=timezone.utc),
@@ -214,9 +214,9 @@ def _run_gate(
     *,
     session,
     current,
-    current_station: str,
-    target_station: str,
-    stations_by_id: dict,
+    current_status: str,
+    target_status: str,
+    statuses_by_id: dict,
     when: datetime,
 ) -> TransitionResult:
     """The gate body. Caller holds the per-session transition lock."""
@@ -226,17 +226,17 @@ def _run_gate(
         return _reject(
             project_dir,
             session_id,
-            target_station,
-            reason=f"transition_not_reachable: current station "
-            f"{current_station!r} is not declared in workflow.yaml",
+            target_status,
+            reason=f"transition_not_reachable: current status "
+            f"{current_status!r} is not declared in workflow.yaml",
         )
-    if not _is_reachable(current_station, target_station, current.next):
+    if not _is_reachable(current_status, target_status, current.next):
         return _reject(
             project_dir,
             session_id,
-            target_station,
+            target_status,
             reason=f"transition_not_reachable: cannot move from "
-            f"{current_station!r} to {target_station!r} via declared `next:`",
+            f"{current_status!r} to {target_status!r} via declared `next:`",
         )
 
     # 2. Validators — KUI-110's edit-time validate_project surface.
@@ -248,55 +248,55 @@ def _run_gate(
         return _reject(
             project_dir,
             session_id,
-            target_station,
+            target_status,
             reason=f"validators_failed: {first.code}: {first.message}",
         )
 
-    # 3. JIT prompts — every prompt registered at the target station
+    # 3. JIT prompts — every prompt registered at the target status
     # must be acknowledged. Unack'd blocking prompts fail the gate.
-    jit_prompt_ids = jit_prompts_for_station(WORKFLOW_ID, target_station)
+    jit_prompt_ids = jit_prompts_for_status(WORKFLOW_ID, target_status)
     if jit_prompt_ids:
         from tripwire._internal.jit_prompts.loader import load_jit_prompt_registry
 
         # The registry indexes by `fires_on` event; we want the
-        # subset that registered at this station via class-level `at`.
+        # subset that registered at this status via class-level `at`.
         registry = load_jit_prompt_registry(project_dir)
-        unacked = _unacked_station_jit_prompts(
+        unacked = _unacked_status_jit_prompts(
             project_dir, registry, session_id=session_id, want_ids=set(jit_prompt_ids)
         )
         if unacked:
             return _reject(
                 project_dir,
                 session_id,
-                target_station,
+                target_status,
                 reason=f"jit_prompts_not_acknowledged: {sorted(unacked)}",
             )
 
-    # 4. Required prompt-checks declared on the current station in
+    # 4. Required prompt-checks declared on the current status in
     # workflow.yaml must have been invoked since the session entered
-    # the current station. We use the workflow.yaml declaration
+    # the current status. We use the workflow.yaml declaration
     # (`current.prompt_checks`), NOT the global registry, so a project
     # can keep prompt-checks defined-but-unrequired without forcing
     # them on every transition.
     required_pcs = list(current.prompt_checks)
     if required_pcs:
-        invoked = _invoked_prompt_checks_at_station(
-            project_dir, instance=session_id, station=current_station
+        invoked = _invoked_prompt_checks_at_status(
+            project_dir, instance=session_id, status=current_status
         )
         missing = [pc for pc in required_pcs if pc not in invoked]
         if missing:
             return _reject(
                 project_dir,
                 session_id,
-                target_station,
+                target_status,
                 reason=f"prompt_checks_missing: {missing}",
             )
 
-    # 5. Pass — assign station-instance id, save session, emit completed.
-    n = _next_station_instance_n(project_dir, WORKFLOW_ID, session_id, target_station)
-    station_instance = f"{WORKFLOW_ID}:{session_id}:{target_station}:{n}"
-    session.status = SessionStatus(target_station)
-    session.current_station_instance = station_instance
+    # 5. Pass — assign status-instance id, save session, emit completed.
+    n = _next_status_instance_n(project_dir, WORKFLOW_ID, session_id, target_status)
+    status_instance = f"{WORKFLOW_ID}:{session_id}:{target_status}:{n}"
+    session.status = SessionStatus(target_status)
+    session.current_status_instance = status_instance
     session.updated_at = when
     save_session(project_dir, session)
 
@@ -304,12 +304,12 @@ def _run_gate(
         project_dir,
         workflow=WORKFLOW_ID,
         instance=session_id,
-        station=target_station,
+        status=target_status,
         event="transition.completed",
         details={
-            "from_station": current_station,
-            "to_station": target_station,
-            "station_instance": station_instance,
+            "from_status": current_status,
+            "to_status": target_status,
+            "status_instance": status_instance,
         },
         now=datetime.now(tz=timezone.utc),
     )
@@ -317,14 +317,14 @@ def _run_gate(
         ok=True,
         reason=None,
         message=None,
-        station_instance=station_instance,
+        status_instance=status_instance,
     )
 
 
 def _reject(
     project_dir: Path,
     session_id: str,
-    target_station: str,
+    target_status: str,
     *,
     reason: str,
 ) -> TransitionResult:
@@ -332,7 +332,7 @@ def _reject(
         project_dir,
         workflow=WORKFLOW_ID,
         instance=session_id,
-        station=target_station,
+        status=target_status,
         event="transition.rejected",
         details={"reason": reason},
     )
@@ -340,11 +340,11 @@ def _reject(
         ok=False,
         reason=reason.split(":", 1)[0],
         message=reason,
-        station_instance=None,
+        status_instance=None,
     )
 
 
-def _unacked_station_jit_prompts(
+def _unacked_status_jit_prompts(
     project_dir: Path,
     registry: dict,
     *,
@@ -376,18 +376,18 @@ def _unacked_station_jit_prompts(
     return unacked
 
 
-def _invoked_prompt_checks_at_station(
-    project_dir: Path, *, instance: str, station: str
+def _invoked_prompt_checks_at_status(
+    project_dir: Path, *, instance: str, status: str
 ) -> set[str]:
-    """Return prompt-check ids invoked for ``instance`` at ``station``
-    since the session entered the station — derived by walking the
+    """Return prompt-check ids invoked for ``instance`` at ``status``
+    since the session entered the status — derived by walking the
     events log for `prompt_check.invoked` events filtered by
-    instance/station."""
+    instance/status."""
     invoked: set[str] = set()
     for row in read_events(
         project_dir,
         instance=instance,
-        station=station,
+        status=status,
         event="prompt_check.invoked",
     ):
         details = row.get("details") or {}

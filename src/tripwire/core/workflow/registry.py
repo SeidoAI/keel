@@ -1,4 +1,4 @@
-"""Station registry — what runs at each workflow station.
+"""Status registry — what runs at each workflow status.
 
 Three sub-registries co-live here so the well-formedness validator can
 ask one module for the union of all known refs:
@@ -28,20 +28,20 @@ from pathlib import Path
 from typing import TypeVar
 
 # ----------------------------------------------------------------------
-# Validator station registry (KUI-120)
+# Validator status registry (KUI-120)
 # ----------------------------------------------------------------------
 
-_validator_stations: dict[str, list[tuple[str, str]]] = {}
-"""Maps validator id (`v_<slug>`) → list of (workflow, station) pairs."""
+_validator_statuses: dict[str, list[tuple[str, str]]] = {}
+"""Maps validator id (`v_<slug>`) -> list of (workflow, status) pairs."""
 
-_station_validators: dict[tuple[str, str], list[str]] = defaultdict(list)
-"""Inverse: (workflow, station) → list of validator ids registered there."""
+_status_validators: dict[tuple[str, str], list[str]] = defaultdict(list)
+"""Inverse: (workflow, status) -> list of validator ids registered there."""
 
 F = TypeVar("F", bound=Callable[..., object])
 
 
-def registers_at(workflow: str, station: str) -> Callable[[F], F]:
-    """Decorator marking a validator check function as registered at a station.
+def registers_at(workflow: str, status: str) -> Callable[[F], F]:
+    """Decorator marking a validator check function as registered at a status.
 
     Idempotent across module reloads — a re-import just refreshes the
     registry entry. The decorator returns the function unchanged; only
@@ -58,15 +58,15 @@ def registers_at(workflow: str, station: str) -> Callable[[F], F]:
     def _decorator(fn: F) -> F:
         slug = fn.__name__.removeprefix("check_")
         validator_id = f"v_{slug}"
-        pairs = _validator_stations.setdefault(validator_id, [])
-        pair = (workflow, station)
+        pairs = _validator_statuses.setdefault(validator_id, [])
+        pair = (workflow, status)
         if pair not in pairs:
             pairs.append(pair)
-        if validator_id not in _station_validators[pair]:
-            _station_validators[pair].append(validator_id)
+        if validator_id not in _status_validators[pair]:
+            _status_validators[pair].append(validator_id)
         # Stash the metadata on the function for introspection.
         try:
-            fn.__tripwire_workflow_station__ = pair  # type: ignore[attr-defined]
+            fn.__tripwire_workflow_status__ = pair  # type: ignore[attr-defined]
         except AttributeError:  # pragma: no cover — function-likes
             pass
         return fn
@@ -75,52 +75,52 @@ def registers_at(workflow: str, station: str) -> Callable[[F], F]:
 
 
 def known_validator_ids() -> set[str]:
-    """Return the set of validator ids registered against any station.
+    """Return the set of validator ids registered against any status.
 
     Empty before KUI-120 wires the decorator on existing check
     functions. The schema validator treats an empty set as "skip the
     ref-existence check".
     """
-    return set(_validator_stations.keys())
+    return set(_validator_statuses.keys())
 
 
-def validators_for_station(workflow: str, station: str) -> list[str]:
-    """Return the validator ids declared at ``(workflow, station)``."""
-    return list(_station_validators.get((workflow, station), []))
+def validators_for_status(workflow: str, status: str) -> list[str]:
+    """Return the validator ids declared at ``(workflow, status)``."""
+    return list(_status_validators.get((workflow, status), []))
 
 
 # ----------------------------------------------------------------------
-# JIT prompt station registry (KUI-121)
+# JIT prompt status registry (KUI-121)
 # ----------------------------------------------------------------------
 
-_jit_prompt_stations: dict[str, tuple[str, str]] = {}
-"""Maps JIT prompt id to (workflow, station) declared via class ``at`` attr."""
+_jit_prompt_statuses: dict[str, tuple[str, str]] = {}
+"""Maps JIT prompt id to (workflow, status) declared via class ``at`` attr."""
 
-_station_jit_prompts: dict[tuple[str, str], list[str]] = defaultdict(list)
+_status_jit_prompts: dict[tuple[str, str], list[str]] = defaultdict(list)
 
 
-def register_jit_prompt_station(
-    jit_prompt_id: str, workflow: str, station: str
+def register_jit_prompt_status(
+    jit_prompt_id: str, workflow: str, status: str
 ) -> None:
-    """Record that ``jit_prompt_id`` is registered at ``(workflow, station)``.
+    """Record that ``jit_prompt_id`` is registered at ``(workflow, status)``.
 
     Called by the JIT prompt loader when it instantiates a JitPrompt whose
-    class declares ``at = ("workflow", "station")``. Re-registration
+    class declares ``at = ("workflow", "status")``. Re-registration
     overwrites the previous mapping (last loader wins) so reloads work.
     """
-    _jit_prompt_stations[jit_prompt_id] = (workflow, station)
-    pair = (workflow, station)
-    if jit_prompt_id not in _station_jit_prompts[pair]:
-        _station_jit_prompts[pair].append(jit_prompt_id)
+    _jit_prompt_statuses[jit_prompt_id] = (workflow, status)
+    pair = (workflow, status)
+    if jit_prompt_id not in _status_jit_prompts[pair]:
+        _status_jit_prompts[pair].append(jit_prompt_id)
 
 
 def known_jit_prompt_ids() -> set[str]:
-    """Return the set of JIT prompt ids registered against any station."""
-    return set(_jit_prompt_stations.keys())
+    """Return the set of JIT prompt ids registered against any status."""
+    return set(_jit_prompt_statuses.keys())
 
 
-def jit_prompts_for_station(workflow: str, station: str) -> list[str]:
-    return list(_station_jit_prompts.get((workflow, station), []))
+def jit_prompts_for_status(workflow: str, status: str) -> list[str]:
+    return list(_status_jit_prompts.get((workflow, status), []))
 
 
 # ----------------------------------------------------------------------
@@ -144,8 +144,8 @@ def known_prompt_check_ids(project_dir: Path) -> set[str]:
     return {pc.id for pc in collect_prompt_checks(project_dir)}
 
 
-def prompt_checks_for_station(project_dir: Path, station: str) -> list[str]:
-    """Return the prompt-check ids whose ``fires_at:`` matches ``station``.
+def prompt_checks_for_status(project_dir: Path, status: str) -> list[str]:
+    """Return the prompt-check ids whose ``fires_at:`` matches ``status``.
 
     Resolution mirrors :func:`known_prompt_check_ids`: project-local
     overrides win over packaged defaults.
@@ -154,18 +154,18 @@ def prompt_checks_for_station(project_dir: Path, station: str) -> list[str]:
 
     out: list[str] = []
     for pc in collect_prompt_checks(project_dir):
-        if pc.fires_at == station and pc.id not in out:
+        if pc.fires_at == status and pc.id not in out:
             out.append(pc.id)
     return out
 
 
 __all__ = [
-    "jit_prompts_for_station",
+    "jit_prompts_for_status",
     "known_jit_prompt_ids",
     "known_prompt_check_ids",
     "known_validator_ids",
-    "prompt_checks_for_station",
-    "register_jit_prompt_station",
+    "prompt_checks_for_status",
+    "register_jit_prompt_status",
     "registers_at",
-    "validators_for_station",
+    "validators_for_status",
 ]

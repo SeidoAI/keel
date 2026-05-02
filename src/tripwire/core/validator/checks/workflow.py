@@ -9,7 +9,7 @@ This first cut runs with empty ``known_validators`` /
 ref-existence checks short-circuit. Subsequent v0.9 sessions tighten
 the contract by populating those sets from the station registries
 (KUI-120 validators, KUI-121 JIT prompts, KUI-122 prompt-checks). The
-schema-shape checks (unknown_next_station, terminal_with_next, …)
+schema-shape checks (unknown_next_status, terminal_with_next, …)
 fire today.
 """
 
@@ -63,8 +63,8 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
                 file=WORKFLOW_FILENAME,
                 message=finding.message,
                 field=(
-                    f"{finding.workflow}.{finding.station}"
-                    if finding.station is not None
+                    f"{finding.workflow}.{finding.status}"
+                    if finding.status is not None
                     else finding.workflow
                 ),
             )

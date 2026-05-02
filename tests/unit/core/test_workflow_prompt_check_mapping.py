@@ -62,12 +62,12 @@ def test_known_prompt_check_ids_returns_packaged_set(tmp_path: Path) -> None:
     assert "pm-session-review" in ids
 
 
-def test_prompt_checks_for_station_groups_by_fires_at(tmp_path: Path) -> None:
-    from tripwire.core.workflow.registry import prompt_checks_for_station
+def test_prompt_checks_for_status_groups_by_fires_at(tmp_path: Path) -> None:
+    from tripwire.core.workflow.registry import prompt_checks_for_status
 
-    queued = prompt_checks_for_station(tmp_path, "queued")
+    queued = prompt_checks_for_status(tmp_path, "queued")
     assert "pm-session-queue" in queued
-    in_review = prompt_checks_for_station(tmp_path, "in_review")
+    in_review = prompt_checks_for_status(tmp_path, "in_review")
     assert "pm-session-review" in in_review
 
 
@@ -107,7 +107,7 @@ def test_workflow_well_formed_resolves_prompt_check_refs(tmp_path: Path) -> None
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
                     next: s2
                     prompt_checks: [pm-session-queue, does-not-exist]

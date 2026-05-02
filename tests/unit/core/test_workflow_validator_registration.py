@@ -20,7 +20,7 @@ def test_every_check_in_all_checks_is_registered() -> None:
     undecorated = [
         fn.__name__
         for fn in ALL_CHECKS
-        if not getattr(fn, "__tripwire_workflow_station__", None)
+        if not getattr(fn, "__tripwire_workflow_status__", None)
     ]
     assert not undecorated, (
         f"checks missing @registers_at: {undecorated}. Each ALL_CHECKS "
@@ -50,12 +50,12 @@ def test_register_at_populates_validator_registry() -> None:
         assert vid in ids, f"{vid} missing from validator registry: {sorted(ids)}"
 
 
-def test_validators_for_station_returns_registered_ids() -> None:
+def test_validators_for_status_returns_registered_ids() -> None:
     import tripwire.core.validator.checks  # noqa: F401
-    from tripwire.core.workflow.registry import validators_for_station
+    from tripwire.core.workflow.registry import validators_for_status
 
-    executing = validators_for_station("coding-session", "executing")
-    in_review = validators_for_station("coding-session", "in_review")
+    executing = validators_for_status("coding-session", "executing")
+    in_review = validators_for_status("coding-session", "in_review")
 
     assert "v_uuid_present" in executing
     assert "v_artifact_presence" in in_review

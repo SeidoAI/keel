@@ -168,12 +168,12 @@ def _emit_workflow_event(
     event: str,
     escalated: bool,
 ) -> None:
-    """Append a ``jit_prompt.fired`` row when a prompt declares a station."""
+    """Append a ``jit_prompt.fired`` row when a prompt declares a status."""
     pair = getattr(jit_prompt.__class__, "at", ())
     if not isinstance(pair, tuple) or len(pair) != 2:
         return
-    workflow, station = pair
-    if not isinstance(workflow, str) or not isinstance(station, str):
+    workflow, status = pair
+    if not isinstance(workflow, str) or not isinstance(status, str):
         return
     try:
         from tripwire.core.events.log import emit_event as _emit
@@ -182,7 +182,7 @@ def _emit_workflow_event(
             project_dir,
             workflow=workflow,
             instance=session_id,
-            station=station,
+            status=status,
             event="jit_prompt.fired",
             details={
                 "id": jit_prompt.id,
