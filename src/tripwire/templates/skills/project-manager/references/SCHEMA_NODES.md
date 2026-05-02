@@ -12,7 +12,7 @@ coherence in an agent-driven project. The canonical examples are under
 | `uuid` | UUID4 | yes | Canonical identity. Agent-generated. |
 | `id` | string | yes | Lowercase slug, letter-first, hyphenated. Must match filename. |
 | `type` | string | yes | Must be in `enums/node_type.yaml`. |
-| `name` | string | yes | Human-readable name. |
+| `name` | string | yes | Short label for the concept graph (3–5 words, ≤40 chars). See **Naming the node** below. |
 | `description` | string | no | One-line summary. |
 | `source` | NodeSource | no | Where the concept lives in code. Optional for `planned` nodes. |
 | `related` | list[string] | no | Other node ids this connects to. **Bi-directional**. |
@@ -21,6 +21,35 @@ coherence in an agent-driven project. The canonical examples are under
 | `created_at` | ISO datetime | yes | |
 | `updated_at` | ISO datetime | yes | |
 | `created_by` | string | no | |
+
+## Naming the node (`name:`)
+
+The `name:` field is the **label that renders on the concept graph**.
+It must be scannable at a glance — long sentence-style names crowd the
+graph and lose meaning at typical zoom.
+
+Rules:
+
+- **3–5 words, ≤40 characters, Title Case, noun phrase.** What you'd
+  point at on a whiteboard.
+- **No type prefixes** (`DEC:`, `REQ:`, `Use …`, `Drop …`). The node's
+  `type` is already a field — render it as a badge, don't repeat it
+  in the label.
+- **Concrete artifact, not its rationale.** The name says *what the
+  node is*; the rationale lives in the body or `description`.
+- **No conjunctions joining two concepts** (`+`, `;`, "and"). If
+  you're tempted, the node is two nodes.
+
+Use `description:` for the one-line tagline that hover-previews can
+show when more context is needed.
+
+| Type | ✓ Good | ✗ Avoid |
+|---|---|---|
+| decision | `Cream paper theme` | `DEC: cream paper + ink + rule canonical; dark mode fast-follow` |
+| decision | `Hand-rolled SVG graph` | `DEC: drop @xyflow/react in favour of hand-rolled SVG` |
+| service | `FastAPI backend` | `Use FastAPI for the tripwire.ui backend` |
+| endpoint | `POST /auth/token` | `Auth token issuance endpoint` |
+| config | `JWT_SECRET` | `JWT signing secret env var` |
 
 ## NodeSource fields
 
