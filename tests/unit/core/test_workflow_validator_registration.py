@@ -6,6 +6,31 @@ from pathlib import Path
 from textwrap import dedent
 
 
+def test_every_source_check_function_is_in_catalog() -> None:
+    import ast
+
+    from tripwire.core.validator import ALL_CHECKS
+    from tripwire.core.workflow.registry import validator_id_for
+
+    root = Path("src/tripwire/core/validator/checks")
+    source_ids: set[str] = set()
+    for path in sorted(root.glob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        module = ast.parse(path.read_text(encoding="utf-8"))
+        for node in module.body:
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("check"):
+                ident = (
+                    f"v_{path.stem}"
+                    if node.name == "check"
+                    else f"v_{node.name.removeprefix('check_')}"
+                )
+                source_ids.add(ident)
+
+    catalog_ids = {validator_id_for(fn) for fn in ALL_CHECKS}
+    assert sorted(source_ids - catalog_ids) == []
+
+
 def test_every_check_has_unique_workflow_catalog_id() -> None:
     from tripwire.core.validator import ALL_CHECKS
     from tripwire.core.workflow.registry import validator_id_for

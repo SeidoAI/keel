@@ -136,19 +136,21 @@ def workflow_catalog_drift(project_dir: Path) -> list[dict[str, Any]]:
     """Return catalog/config mismatch findings for workflow-adjacent UIs.
 
     Referenced-missing controls are reported by ``validate_workflow_spec``.
-    This helper reports validator implementations that are present but
-    not referenced by any workflow status. JIT prompts and prompt checks
-    may be dormant implementation options, so they are not catalog drift
-    unless a workflow references a missing id.
+    This helper reports implemented workflow controls that must be
+    placed by ``workflow.yaml`` but are not referenced by any status.
     """
     spec = load_workflows(project_dir)
     if not spec.workflows:
         return []
 
     used_validators: set[str] = set()
+    used_jit_prompts: set[str] = set()
+    used_prompt_checks: set[str] = set()
     for workflow in spec.workflows.values():
         for status in workflow.statuses:
             used_validators.update(status.validators)
+            used_jit_prompts.update(status.jit_prompts)
+            used_prompt_checks.update(status.prompt_checks)
 
     findings: list[dict[str, Any]] = []
     for ident in sorted(known_validator_ids() - used_validators):
@@ -160,6 +162,35 @@ def workflow_catalog_drift(project_dir: Path) -> list[dict[str, Any]]:
                 "status": None,
                 "message": (
                     f"validator {ident!r} is implemented but not referenced in workflow.yaml"
+                ),
+                "severity": "warning",
+            }
+        )
+    for ident in sorted(known_jit_prompt_ids(project_dir) - used_jit_prompts):
+        findings.append(
+            {
+                "source": "catalog",
+                "code": "workflow/unreferenced_jit_prompt",
+                "workflow": None,
+                "status": None,
+                "message": (
+                    f"JIT prompt {ident!r} is implemented but not referenced in workflow.yaml"
+                ),
+                "severity": "warning",
+            }
+        )
+
+    from tripwire.core.workflow.prompt_checks import LIFECYCLE_PROMPT_CHECK_IDS
+
+    for ident in sorted(LIFECYCLE_PROMPT_CHECK_IDS - used_prompt_checks):
+        findings.append(
+            {
+                "source": "catalog",
+                "code": "workflow/unreferenced_prompt_check",
+                "workflow": None,
+                "status": None,
+                "message": (
+                    f"prompt-check {ident!r} is implemented but not referenced in workflow.yaml"
                 ),
                 "severity": "warning",
             }

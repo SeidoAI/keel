@@ -14,6 +14,8 @@ workflows:
     statuses:
       - id: planned
         next: queued
+        prompt_checks:
+          - pm-session-create
         validators:
           - v_workflow_well_formed
           - v_uuid_present
@@ -28,8 +30,11 @@ workflows:
               label: issue brief
       - id: queued
         next: executing
+        prompt_checks:
+          - pm-session-queue
         validators:
           - v_session_issue_coherence
+          - v_issue_session_status_compatibility
           - v_reference_integrity
           - v_bidirectional_related
           - v_no_stale_pins
@@ -41,6 +46,8 @@ workflows:
               path: sessions/{session_id}/plan.md
       - id: executing
         next: in_review
+        prompt_checks:
+          - pm-session-spawn
         validators:
           - v_issue_body_structure
           - v_project_standards
@@ -54,6 +61,7 @@ workflows:
           - v_semantic_coverage
           - v_mega_issue
           - v_node_ratio
+          - v_done_implies_session_completed
         artifacts:
           consumes:
             - id: plan
@@ -81,12 +89,16 @@ workflows:
               label: review notes
       - id: verified
         next: completed
+        prompt_checks:
+          - pm-session-review
         artifacts:
           consumes:
             - id: review-notes
               label: review notes
       - id: completed
         terminal: true
+        prompt_checks:
+          - pm-session-complete
         validators:
           - v_pm_response_covers_self_review
           - v_pm_response_followups_resolve
@@ -94,6 +106,11 @@ workflows:
           - v_self_review_implies_pm_response
         jit_prompts:
           - self-review
+          - phase-transition
+          - followups-not-filed
+          - stopped-to-ask
+          - write-count
+          - cost-ceiling
         artifacts:
           produces:
             - id: session-signature

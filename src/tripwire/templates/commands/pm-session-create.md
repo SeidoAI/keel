@@ -39,8 +39,10 @@ Workflow:
    - `open_questions` = anything you couldn't answer during scoping
    - `context_to_preserve` = decisions made during scoping
 8. Run `tripwire validate --strict`. Fix any errors.
-9. Commit: `session: create <session-key> for <issue-key>`.
-10. Report the session directory path and run
+9. Record the workflow prompt-check:
+   `tripwire prompt-check invoke pm-session-create <session-key> --status planned`.
+10. Commit: `session: create <session-key> for <issue-key>`.
+11. Report the session directory path and run
     `/pm-session-check <session-key>` so the user sees readiness.
 
 Do NOT create `task-checklist.md`, `recommended-testing-plan.md`, or

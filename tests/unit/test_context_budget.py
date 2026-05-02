@@ -93,11 +93,13 @@ def test_total_templates_under_budget() -> None:
     monitor invocation fields. v0.7.10 §D (KUI-95) bumps to 325KB for
     the codex-review workflow + codex-reviewer agent + protocol doc.
     v0.8x bumps to 332KB for the inbox primitive (SCHEMA_INBOX.md
-    reference doc + the SKILL.md inbox-authoring section).
+    reference doc + the SKILL.md inbox-authoring section). v0.9.6 bumps
+    to 335KB for workflow.yaml source-of-truth gates and prompt-check
+    invocation instructions.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 332_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 332KB."
+    assert total < 335_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 335KB."
     )
 
 

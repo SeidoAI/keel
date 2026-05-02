@@ -30,6 +30,7 @@ from tripwire.cli.node import node_cmd
 from tripwire.cli.plan import plan_cmd
 from tripwire.cli.pr import pr_cmd
 from tripwire.cli.pr_summary import pr_summary_cmd
+from tripwire.cli.prompt_check import prompt_check_cmd
 from tripwire.cli.queue import queue_cmd
 from tripwire.cli.readme import readme_cmd
 from tripwire.cli.refresh import refresh_cmd
@@ -125,6 +126,7 @@ cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
 cli.add_command(jit_prompts_cmd)
 cli.add_command(test_jit_prompt_cmd)
+cli.add_command(prompt_check_cmd)
 cli.add_command(events_cmd)
 cli.add_command(transition_cmd)
 cli.add_command(drift_cmd)

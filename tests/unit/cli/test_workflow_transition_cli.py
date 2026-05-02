@@ -183,6 +183,60 @@ def test_transition_uses_target_status_validators(
     assert call["kwargs"]["status"] == "queued"
 
 
+def test_transition_prompt_check_gate_accepts_recorded_invocation(
+    tmp_path: Path, clean_validator
+) -> None:
+    from tripwire.cli.prompt_check import prompt_check_cmd
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    next: executing
+                    prompt_checks: [pm-session-queue]
+                  - id: executing
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+
+    rejected = runner.invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+    assert rejected.exit_code != 0
+    assert "prompt_checks_missing" in rejected.output
+
+    invoked = runner.invoke(
+        prompt_check_cmd,
+        [
+            "invoke",
+            "pm-session-queue",
+            "test-session",
+            "--project-dir",
+            str(pd),
+        ],
+    )
+    assert invoked.exit_code == 0, invoked.output
+
+    accepted = runner.invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+    assert accepted.exit_code == 0, accepted.output
+
+
 def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
     """Rejecting an unreachable status emits transition.rejected with
     a structured reason naming the gate check that failed."""
