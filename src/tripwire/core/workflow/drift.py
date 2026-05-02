@@ -3,12 +3,11 @@
 Drift is the gap between the workflow.yaml-declared lifecycle and what
 the events log records actually happened. Three classes of drift:
 
-- ``drift/prompt_check_missing`` — a status declared
-  ``prompt_checks: [...]`` but the session left the status without a
-  ``prompt_check.invoked`` event for one of the declared ids. The PM
-  forgot to run a required check.
-- ``drift/jit_prompt_should_have_fired`` — a status declared
-  ``jit_prompts: [...]`` but the session left without a
+- ``drift/prompt_check_missing`` — a target status declared
+  ``prompt_checks: [...]`` but the session entered that status without a
+  ``prompt_check.invoked`` event for one of the declared ids.
+- ``drift/jit_prompt_should_have_fired`` — a target status declared
+  ``jit_prompts: [...]`` but the session entered it without a
   ``jit_prompt.fired`` event for one of them. Either the JIT prompt is
   miswired or the gate runner skipped it.
 - ``drift/unexpected_transition`` — session.yaml currently sits at a
@@ -20,9 +19,9 @@ the events log records actually happened. Three classes of drift:
 Surfaced via :func:`detect_drift` (returns
 :class:`DriftFinding` list) and the ``tripwire drift report`` CLI.
 
-The reader walks the events log chronologically, partitions events by
-status-stay (each ``transition.completed`` ends one stay), and for
-each completed stay checks the declared prompt-checks/JIT prompts.
+The reader walks the events log chronologically and checks each
+``transition.completed`` row against the target status entry gate
+declared in ``workflow.yaml``.
 """
 
 from __future__ import annotations
@@ -74,15 +73,7 @@ def detect_drift(
 
 
 def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]:
-    """For each `transition.completed` row, look at the FROM status's
-    declared prompt-checks + JIT prompts and confirm one of each was
-    observed during the stay.
-
-    A "stay" is the contiguous run of events on a session at a given
-    status, ending in `transition.completed.from_status == <status>`.
-    The opening boundary is either the previous `transition.completed`
-    (same instance) or the start of the events log.
-    """
+    """Check each completed transition's target-status entry controls."""
     out: list[DriftFinding] = []
     by_instance: dict[str, list[dict]] = {}
     for row in rows:
@@ -96,10 +87,10 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
             if row.get("event") != "transition.completed":
                 continue
             details = row.get("details") or {}
-            from_status = details.get("from_status")
-            if not isinstance(from_status, str):
+            to_status = details.get("to_status")
+            if not isinstance(to_status, str):
                 continue
-            status = statuses_by_id.get(from_status)
+            status = statuses_by_id.get(to_status)
             if status is None:
                 continue
             stay_rows = inst_rows[stay_start:idx]
@@ -112,10 +103,10 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
                             code="drift/prompt_check_missing",
                             workflow=workflow.id,
                             instance=inst,
-                            status=from_status,
+                            status=to_status,
                             message=(
-                                f"session {inst!r} left status "
-                                f"{from_status!r} without invoking required "
+                                f"session {inst!r} entered status "
+                                f"{to_status!r} without invoking required "
                                 f"prompt-check {pc!r}"
                             ),
                         )
@@ -127,10 +118,10 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
                             code="drift/jit_prompt_should_have_fired",
                             workflow=workflow.id,
                             instance=inst,
-                            status=from_status,
+                            status=to_status,
                             message=(
-                                f"session {inst!r} left status "
-                                f"{from_status!r} without firing declared "
+                                f"session {inst!r} entered status "
+                                f"{to_status!r} without firing declared "
                                 f"JIT prompt {prompt_id!r}"
                             ),
                         )

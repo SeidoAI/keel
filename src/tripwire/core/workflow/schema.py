@@ -252,7 +252,8 @@ def validate_workflow_spec(
       status (every workflow must converge)
     - ``workflow/unknown_validator`` / ``workflow/unknown_jit_prompt`` /
       ``workflow/unknown_prompt_check`` — a status references a
-      validator / JIT prompt / prompt-check that isn't registered
+      validator / JIT prompt / prompt-check implementation that does
+      not exist
     """
     findings: list[WorkflowFinding] = list(spec.load_findings)
     for wf_id, wf in spec.workflows.items():
@@ -362,7 +363,7 @@ def _check_refs(
                         status=status.id,
                         message=(
                             f"status {status.id!r} references validator "
-                            f"{ref!r} which is not registered"
+                            f"{ref!r} which is not implemented"
                         ),
                     )
                 )
@@ -375,7 +376,7 @@ def _check_refs(
                         status=status.id,
                         message=(
                             f"status {status.id!r} references JIT prompt "
-                            f"{ref!r} which is not registered"
+                            f"{ref!r} which is not implemented"
                         ),
                     )
                 )
@@ -388,7 +389,7 @@ def _check_refs(
                         status=status.id,
                         message=(
                             f"status {status.id!r} references prompt-check "
-                            f"{ref!r} which is not registered"
+                            f"{ref!r} which is not implemented"
                         ),
                     )
                 )

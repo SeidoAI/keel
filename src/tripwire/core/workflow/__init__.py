@@ -17,9 +17,9 @@ Public surface:
   the typed dataclass tree.
 - :func:`tripwire.core.workflow.schema.validate_workflow_spec` —
   well-formedness validator surfaced through ``tripwire validate``.
-- :mod:`tripwire.core.workflow.registry` — status-to-validator and
-  status-to-JIT-prompt registry indexed by ``@registers_at`` /
-  ``at = (...)`` declarations.
+- :mod:`tripwire.core.workflow.registry` — implementation catalogs for
+  validator, JIT prompt, and prompt-check ids referenced by
+  ``workflow.yaml``.
 
 The architecture overlay
 (``backlog-architecture.md``) locks every shape in this module:

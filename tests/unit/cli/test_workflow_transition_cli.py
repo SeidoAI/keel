@@ -104,9 +104,13 @@ def clean_validator(monkeypatch):
     fetched, which test fixtures aren't)."""
     from tripwire.core.validator._types import ValidationReport
 
+    calls = []
+
     def _clean(*args, **kwargs):
+        calls.append({"args": args, "kwargs": kwargs})
         return ValidationReport(exit_code=0, errors=[], warnings=[])
 
+    _clean.calls = calls
     monkeypatch.setattr("tripwire.cli.transition.validate_project", _clean)
     return _clean
 
@@ -138,6 +142,45 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
     assert "transition.requested" in kinds
     assert "transition.completed" in kinds
     assert "transition.rejected" not in kinds
+
+
+def test_transition_uses_target_status_validators(
+    tmp_path: Path, clean_validator
+) -> None:
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                    validators: [v_id_format]
+                  - id: queued
+                    next: executing
+                    validators: [v_uuid_present]
+                  - id: executing
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+
+    assert result.exit_code == 0, result.output
+    call = clean_validator.calls[-1]
+    assert call["kwargs"]["validator_ids"] == ["v_uuid_present"]
+    assert call["kwargs"]["workflow"] == "coding-session"
+    assert call["kwargs"]["status"] == "queued"
 
 
 def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:

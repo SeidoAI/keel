@@ -11,10 +11,16 @@ import inspect
 from pathlib import Path
 from typing import Any
 
-from tripwire.core import validator
 from tripwire.core.workflow.drift import detect_drift
 from tripwire.core.workflow.loader import load_workflows
 from tripwire.core.workflow.prompt_checks import collect_prompt_checks
+from tripwire.core.workflow.registry import (
+    known_jit_prompt_ids,
+    validator_catalog,
+    validator_description_for,
+    validator_label_for,
+    workflow_catalog_drift,
+)
 from tripwire.core.workflow.schema import (
     Workflow,
     WorkflowArtifactRef,
@@ -49,6 +55,7 @@ def build_workflow(
     runtime_findings = detect_drift(project_dir)
     drift_findings = [
         *_workflow_findings_to_dicts(definition_findings),
+        *workflow_catalog_drift(project_dir),
         *[_runtime_drift_to_dict(finding) for finding in runtime_findings],
     ]
 
@@ -135,23 +142,16 @@ def _build_registry(
 def _build_validator_registry() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for fn in validator.ALL_CHECKS:
-        slug = _validator_slug(fn)
-        validator_id = f"v_{slug}"
+    for validator_id, fn in validator_catalog().items():
         if validator_id in seen:
             continue
         seen.add(validator_id)
-        pair = getattr(fn, "__tripwire_workflow_status__", None)
         entry: dict[str, Any] = {
             "id": validator_id,
-            "label": slug.replace("_", " "),
-            "description": _first_paragraph(inspect.getdoc(fn) or ""),
+            "label": validator_label_for(fn),
+            "description": validator_description_for(fn),
             "blocking": True,
         }
-        if isinstance(pair, tuple) and len(pair) == 2:
-            workflow, status = pair
-            entry["workflow"] = workflow
-            entry["status"] = status
         out.append(entry)
     return out
 
@@ -182,7 +182,6 @@ def _build_jit_prompt_registry(
                 prompt=prompt_body,
                 is_pm_role=is_pm_role,
             )
-            pair = getattr(prompt.__class__, "at", ())
             entry: dict[str, Any] = {
                 "id": prompt.id,
                 "label": prompt.id.replace("-", " "),
@@ -192,11 +191,19 @@ def _build_jit_prompt_registry(
                 "prompt_revealed": revealed,
                 "prompt_redacted": redacted or PROMPT_REDACTED_PLACEHOLDER,
             }
-            if isinstance(pair, tuple) and len(pair) == 2:
-                workflow, status = pair
-                entry["workflow"] = workflow
-                entry["status"] = status
             out.append(entry)
+    for prompt_id in sorted(known_jit_prompt_ids(project_dir) - seen):
+        out.append(
+            {
+                "id": prompt_id,
+                "label": prompt_id.replace("-", " "),
+                "description": "",
+                "blocking": True,
+                "fires_on_event": None,
+                "prompt_revealed": None,
+                "prompt_redacted": PROMPT_REDACTED_PLACEHOLDER,
+            }
+        )
     return out
 
 
@@ -214,7 +221,7 @@ def _build_prompt_check_registry(project_dir: Path) -> list[dict[str, Any]]:
             {
                 "id": prompt_check.id,
                 "label": prompt_check.id.replace("-", " "),
-                "status": prompt_check.fires_at,
+                "description": prompt_check.description,
                 "source": str(prompt_check.source),
                 "blocking": True,
             }
@@ -248,17 +255,6 @@ def _runtime_drift_to_dict(finding: Any) -> dict[str, Any]:
         "message": finding.message,
         "severity": finding.severity,
     }
-
-
-def _validator_slug(fn: Any) -> str:
-    """Return a stable workflow id slug for a validator function."""
-    name = getattr(fn, "__name__", "")
-    if name == "check":
-        module_name = getattr(fn, "__module__", "")
-        module_leaf = module_name.rsplit(".", 1)[-1]
-        if module_leaf and module_leaf != module_name:
-            return module_leaf
-    return name.removeprefix("check_")
 
 
 def _first_paragraph(text: str) -> str:

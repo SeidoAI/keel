@@ -22,8 +22,7 @@ from click.testing import CliRunner
 
 
 def _project_dir(tmp_path: Path) -> Path:
-    """Project with a coding-session workflow declaring a prompt-check
-    + a JIT prompt on `executing`."""
+    """Project with target-entry prompt-check and JIT prompt gates."""
     (tmp_path / "project.yaml").write_text(
         "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
         "status_transitions:\n  planned: []\nrepos: {}\nnext_issue_number: 1\n"
@@ -42,9 +41,9 @@ def _project_dir(tmp_path: Path) -> Path:
                     next: queued
                   - id: queued
                     next: executing
-                    prompt_checks: [pm-session-queue]
                   - id: executing
                     next: in_review
+                    prompt_checks: [pm-session-queue]
                     jit_prompts: [self-review]
                   - id: in_review
                     next: verified
@@ -70,7 +69,7 @@ def test_drift_report_empty_on_clean_run(tmp_path: Path) -> None:
 
 
 def test_drift_detects_missing_prompt_check(tmp_path: Path) -> None:
-    """A `transition.completed` from a status that had a declared
+    """A `transition.completed` into a status that had a declared
     prompt-check but no `prompt_check.invoked` event for it produces
     a `drift/prompt_check_missing` finding."""
     from tripwire.core.events.log import emit_event
@@ -100,7 +99,7 @@ def test_drift_clears_when_prompt_check_invoked(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="test-session",
-        status="queued",
+        status="executing",
         event="prompt_check.invoked",
         details={"id": "pm-session-queue"},
     )
@@ -118,21 +117,20 @@ def test_drift_clears_when_prompt_check_invoked(tmp_path: Path) -> None:
 
 
 def test_drift_detects_should_have_fired_jit_prompt(tmp_path: Path) -> None:
-    """A status declares a JIT prompt; the session left that status
-    without a `jit_prompt.fired` event for it → drift."""
+    """A target status declares a JIT prompt but was entered without
+    a `jit_prompt.fired` event for it → drift."""
     from tripwire.core.events.log import emit_event
     from tripwire.core.workflow.drift import detect_drift
 
     pd = _project_dir(tmp_path)
-    # Session left executing (which declares self-review JIT prompt) without
-    # firing it.
+    # Session entered executing (which declares self-review) without firing it.
     emit_event(
         pd,
         workflow="coding-session",
         instance="test-session",
-        status="in_review",
+        status="executing",
         event="transition.completed",
-        details={"from_status": "executing", "to_status": "in_review"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     findings = detect_drift(pd, instance="test-session")
     codes = [f.code for f in findings]
@@ -170,7 +168,7 @@ def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="test-session",
-        status="queued",
+        status="executing",
         event="prompt_check.invoked",
         details={"id": "pm-session-queue"},
     )
@@ -179,16 +177,16 @@ def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
         workflow="coding-session",
         instance="test-session",
         status="executing",
-        event="transition.completed",
-        details={"from_status": "queued", "to_status": "executing"},
+        event="jit_prompt.fired",
+        details={"id": "self-review"},
     )
     emit_event(
         pd,
         workflow="coding-session",
         instance="test-session",
         status="executing",
-        event="jit_prompt.fired",
-        details={"id": "self-review"},
+        event="transition.completed",
+        details={"from_status": "queued", "to_status": "executing"},
     )
     findings = detect_drift(pd, instance="test-session")
     codes = [f.code for f in findings]

@@ -62,7 +62,7 @@ export interface WorkflowRegistry {
 export interface WorkflowDriftFinding {
   source?: "definition" | "runtime" | string;
   code: string;
-  workflow: string;
+  workflow: string | null;
   instance?: string;
   status: string | null;
   severity: "error" | "warning";

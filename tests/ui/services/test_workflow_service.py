@@ -59,7 +59,6 @@ def _write_workflow(project_dir: Path) -> None:
                       - if: review.outcome == approved
                         then: verified
                       - else: executing
-                    jit_prompts: [self-review]
                     artifacts:
                       produces:
                         - id: review-notes
@@ -67,6 +66,7 @@ def _write_workflow(project_dir: Path) -> None:
                   - id: verified
                     next: completed
                   - id: completed
+                    jit_prompts: [self-review]
                     terminal: true
             """
         ),
@@ -156,7 +156,7 @@ def test_build_workflow_joins_registry_metadata(tmp_path: Path) -> None:
 
     prompt_checks = {entry["id"]: entry for entry in registry["prompt_checks"]}
     assert "pm-session-queue" in prompt_checks
-    assert prompt_checks["pm-session-queue"]["status"] == "queued"
+    assert prompt_checks["pm-session-queue"]["blocking"] is True
 
 
 def test_build_workflow_reveals_jit_prompts_when_pm(tmp_path: Path) -> None:
@@ -190,9 +190,13 @@ def test_build_workflow_reports_definition_drift(tmp_path: Path) -> None:
 
     payload = build_workflow(project_dir, project_id="abc", is_pm_role=False)
 
-    assert payload["drift"]["count"] == 1
-    assert payload["drift"]["findings"][0]["source"] == "definition"
-    assert payload["drift"]["findings"][0]["code"] == "workflow/unknown_next_status"
+    assert payload["drift"]["count"] >= 1
+    definition_findings = [
+        finding
+        for finding in payload["drift"]["findings"]
+        if finding["source"] == "definition"
+    ]
+    assert definition_findings[0]["code"] == "workflow/unknown_next_status"
 
 
 def test_build_workflow_workflows_empty_when_yaml_missing(tmp_path: Path) -> None:

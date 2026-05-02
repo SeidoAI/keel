@@ -106,8 +106,6 @@ def test_full_lifecycle_drives_via_transition_only(
     tmp_path: Path, clean_validator
 ) -> None:
     """Drive planned → completed using `tripwire transition` only."""
-    import json
-
     from tripwire.cli.drift import drift_cmd
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
@@ -117,19 +115,6 @@ def test_full_lifecycle_drives_via_transition_only(
 
     statuses = ["queued", "executing", "in_review", "verified", "completed"]
     for target in statuses:
-        # Mirror the agent's real-world drive: before crossing into
-        # `verified`, the self-review tripwire (registered at
-        # `coding-session:verified` via its class-level `at = (...)`)
-        # must be acknowledged. The agent does this by writing
-        # self-review.md and re-running the transition with `--ack`;
-        # here we drop the substantive ack marker directly because
-        # the test isn't exercising the ack-writer CLI.
-        if target == "verified":
-            ack_path = pd / ".tripwire" / "acks" / "self-review-e2e-session.json"
-            ack_path.parent.mkdir(parents=True, exist_ok=True)
-            ack_path.write_text(
-                json.dumps({"declared_no_findings": True}), encoding="utf-8"
-            )
         result = runner.invoke(
             transition_cmd, ["e2e-session", target, "--project-dir", str(pd)]
         )
@@ -181,9 +166,9 @@ def test_unreachable_target_emits_structured_reason(
 
 
 def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
-    """A workflow.yaml with a declared prompt-check on `queued` produces
+    """A workflow.yaml with a declared prompt-check on target `executing` produces
     a `drift/prompt_check_missing` finding once the session leaves
-    `queued` without that prompt-check."""
+    `queued` and enters `executing` without that prompt-check."""
     from tripwire.cli.drift import drift_cmd
     from tripwire.core.events.log import emit_event
 
@@ -202,9 +187,9 @@ def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
                     next: queued
                   - id: queued
                     next: executing
-                    prompt_checks: [pm-session-queue]
                   - id: executing
                     next: in_review
+                    prompt_checks: [pm-session-queue]
                   - id: in_review
                     next: verified
                   - id: verified

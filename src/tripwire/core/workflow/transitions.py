@@ -9,21 +9,18 @@ to a target status. The runtime:
 2. Verifies the target status is reachable from the current status
    (single-id ``next:`` matches, or one of the conditional branches
    resolves to it).
-3. Runs the gate:
+3. Runs the target-status entry gate from ``workflow.yaml``:
 
-   a. **Validators** — call :func:`tripwire.core.validator.validate_project`
-      with ``strict=True``. Any error fails the gate. This is the
-      same code path the KUI-110 edit-time hook drives (no parallel
-      hook surface).
-   b. **JIT prompts** — for every JIT prompt registered at the target
-      status (``at = (workflow, status)``), confirm
-      :meth:`JitPrompt.is_acknowledged` returns True. An unack'd
-      blocking JIT prompt fails the gate.
-   c. **Prompt-checks** — for every prompt-check declared at the
-      *current* status, query the events log to verify it was
-      invoked since the session entered the current status. Missing
-      ones fail the gate. (Verifies the PM ran the required check
-      before the agent transitioned away.)
+   a. **Validators** — run only the validators listed on the target
+      status with ``strict=True``. Any error fails the gate.
+   b. **JIT prompts** — for every JIT prompt listed on the target
+      status, confirm :meth:`JitPrompt.is_acknowledged` returns True.
+      An unack'd blocking JIT prompt fails the gate.
+   c. **Prompt-checks** — for every prompt-check listed on the target
+      status, query the events log to verify it was invoked before
+      entering that status.
+   d. **Artifacts** — required consumed artifacts with concrete paths
+      must exist before entering the target status.
 
 4. On pass: session.status = target, ``current_status_instance``
    bumped, ``transition.completed`` emitted.
@@ -46,11 +43,11 @@ from tripwire.core.events.log import emit_event, read_events
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
 from tripwire.core.workflow.loader import load_workflows
-from tripwire.core.workflow.registry import jit_prompts_for_status
 from tripwire.core.workflow.schema import (
     NextSpec,
     Workflow,
     WorkflowSpec,
+    WorkflowStatus,
 )
 from tripwire.models.enums import SessionStatus
 
@@ -216,7 +213,7 @@ def _run_gate(
     current,
     current_status: str,
     target_status: str,
-    statuses_by_id: dict,
+    statuses_by_id: dict[str, WorkflowStatus],
     when: datetime,
 ) -> TransitionResult:
     """The gate body. Caller holds the per-session transition lock."""
@@ -239,10 +236,20 @@ def _run_gate(
             f"{current_status!r} to {target_status!r} via declared `next:`",
         )
 
-    # 2. Validators — KUI-110's edit-time validate_project surface.
+    target = statuses_by_id[target_status]
+
+    # 2. Validators — target-status entry gate from workflow.yaml.
     from tripwire.cli.transition import validate_project
 
-    report = validate_project(project_dir, strict=True, fix=False)
+    report = validate_project(
+        project_dir,
+        strict=True,
+        fix=False,
+        session_id=session_id,
+        validator_ids=target.validators,
+        workflow=WORKFLOW_ID,
+        status=target_status,
+    )
     if report.errors:
         first = report.errors[0]
         return _reject(
@@ -252,14 +259,11 @@ def _run_gate(
             reason=f"validators_failed: {first.code}: {first.message}",
         )
 
-    # 3. JIT prompts — every prompt registered at the target status
-    # must be acknowledged. Unack'd blocking prompts fail the gate.
-    jit_prompt_ids = jit_prompts_for_status(WORKFLOW_ID, target_status)
+    # 3. JIT prompts — target-status entry gate from workflow.yaml.
+    jit_prompt_ids = list(target.jit_prompts)
     if jit_prompt_ids:
         from tripwire._internal.jit_prompts.loader import load_jit_prompt_registry
 
-        # The registry indexes by `fires_on` event; we want the
-        # subset that registered at this status via class-level `at`.
         registry = load_jit_prompt_registry(project_dir)
         unacked = _unacked_status_jit_prompts(
             project_dir, registry, session_id=session_id, want_ids=set(jit_prompt_ids)
@@ -272,16 +276,11 @@ def _run_gate(
                 reason=f"jit_prompts_not_acknowledged: {sorted(unacked)}",
             )
 
-    # 4. Required prompt-checks declared on the current status in
-    # workflow.yaml must have been invoked since the session entered
-    # the current status. We use the workflow.yaml declaration
-    # (`current.prompt_checks`), NOT the global registry, so a project
-    # can keep prompt-checks defined-but-unrequired without forcing
-    # them on every transition.
-    required_pcs = list(current.prompt_checks)
+    # 4. Prompt-checks — target-status entry gate from workflow.yaml.
+    required_pcs = list(target.prompt_checks)
     if required_pcs:
         invoked = _invoked_prompt_checks_at_status(
-            project_dir, instance=session_id, status=current_status
+            project_dir, instance=session_id, status=target_status
         )
         missing = [pc for pc in required_pcs if pc not in invoked]
         if missing:
@@ -292,7 +291,19 @@ def _run_gate(
                 reason=f"prompt_checks_missing: {missing}",
             )
 
-    # 5. Pass — assign status-instance id, save session, emit completed.
+    # 5. Artifacts — target-status consumed paths must exist.
+    missing_artifacts = _missing_consumed_artifacts(
+        project_dir, session_id=session_id, target=target
+    )
+    if missing_artifacts:
+        return _reject(
+            project_dir,
+            session_id,
+            target_status,
+            reason=f"artifacts_missing: {missing_artifacts}",
+        )
+
+    # 6. Pass — assign status-instance id, save session, emit completed.
     n = _next_status_instance_n(project_dir, WORKFLOW_ID, session_id, target_status)
     status_instance = f"{WORKFLOW_ID}:{session_id}:{target_status}:{n}"
     session.status = SessionStatus(target_status)
@@ -395,6 +406,20 @@ def _invoked_prompt_checks_at_status(
         if isinstance(pc_id, str):
             invoked.add(pc_id)
     return invoked
+
+
+def _missing_consumed_artifacts(
+    project_dir: Path, *, session_id: str, target: WorkflowStatus
+) -> list[str]:
+    """Return workflow-declared consumed artifact paths that do not exist."""
+    missing: list[str] = []
+    for artifact in target.artifacts.consumes:
+        if not artifact.path:
+            continue
+        rel = artifact.path.format(session_id=session_id)
+        if not (project_dir / rel).exists():
+            missing.append(rel)
+    return missing
 
 
 __all__ = [

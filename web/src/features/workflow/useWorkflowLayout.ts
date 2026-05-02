@@ -95,7 +95,7 @@ export function buildWorkflowTerritory(
     const jitPrompts = jitPromptIds.map((id) => ({
       id: `${status.id}:jit:${id}`,
       statusId: status.id,
-      prompt: promptsById.get(id) ?? fallbackEntry(id),
+      prompt: entryForStatus(promptsById, id, status.id),
     }));
     const artifacts = [
       ...(artifactRefs.produces ?? []).map((artifact) => ({
@@ -147,11 +147,11 @@ function buildGateCluster(
   validatorsById: Map<string, WorkflowRegistryEntry>,
   promptChecksById: Map<string, WorkflowRegistryEntry>,
 ): GateCluster | null {
-  const validators = (status.validators ?? []).map(
-    (id) => validatorsById.get(id) ?? fallbackEntry(id),
+  const validators = (status.validators ?? []).map((id) =>
+    entryForStatus(validatorsById, id, status.id),
   );
-  const promptChecks = (status.prompt_checks ?? []).map(
-    (id) => promptChecksById.get(id) ?? fallbackEntry(id),
+  const promptChecks = (status.prompt_checks ?? []).map((id) =>
+    entryForStatus(promptChecksById, id, status.id),
   );
   if (validators.length === 0 && promptChecks.length === 0) return null;
   return {
@@ -216,6 +216,14 @@ function classifyRoute(from: string, to: string, statusIndex: Map<string, number
 
 function byId(entries: WorkflowRegistryEntry[]): Map<string, WorkflowRegistryEntry> {
   return new Map(entries.map((entry) => [entry.id, entry]));
+}
+
+function entryForStatus(
+  entries: Map<string, WorkflowRegistryEntry>,
+  id: string,
+  statusId: string,
+): WorkflowRegistryEntry {
+  return { ...(entries.get(id) ?? fallbackEntry(id)), status: statusId };
 }
 
 function fallbackEntry(id: string): WorkflowRegistryEntry {

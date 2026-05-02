@@ -12,9 +12,9 @@ workflows:
         next: in_review
       - id: in_review
         validators: [v_reference_integrity, v_stale_concept]
-        jit_prompts: [self-review]
         next: verified
       - id: verified
         next: completed
       - id: completed
+        jit_prompts: [self-review]
         terminal: true

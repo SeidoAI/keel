@@ -71,8 +71,8 @@ def _write_workflow(project_dir: Path) -> None:
                 statuses:
                   - id: queued
                     next: executing
-                    prompt_checks: [pm-session-queue]
                   - id: executing
+                    prompt_checks: [pm-session-queue]
                     terminal: true
             """
         ),
