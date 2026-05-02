@@ -1,10 +1,10 @@
-"""JitPrompt station registration (KUI-121).
+"""JitPrompt status registration (KUI-121).
 
-Each JitPrompt subclass declares its workflow + station via a class-level
-``at = ("workflow", "station")`` attribute. The loader registers the
+Each JitPrompt subclass declares its workflow + status via a class-level
+``at = ("workflow", "status")`` attribute. The loader registers the
 mapping with the workflow registry at instantiation time, so the gate
 runner (KUI-159) and drift detector (KUI-124) can ask "what JIT prompts
-should fire at this station?"
+should fire at this status?"
 """
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ from tripwire._internal.jit_prompts.self_review import SelfReviewJitPrompt
 
 
 def test_self_review_jit_prompt_declares_at() -> None:
-    """The first canonical JIT prompt — self-review — declares its station."""
+    """The first canonical JIT prompt — self-review — declares its status."""
     assert hasattr(SelfReviewJitPrompt, "at")
-    workflow, station = SelfReviewJitPrompt.at
+    workflow, status = SelfReviewJitPrompt.at
     assert workflow == "coding-session"
-    assert station == "verified"
+    assert status == "verified"
 
 
-def test_loading_registry_populates_jit_prompt_station(tmp_path: Path) -> None:
+def test_loading_registry_populates_jit_prompt_status(tmp_path: Path) -> None:
     """Loading the manifest must call ``register_jit_prompt_status`` for
     each JitPrompt whose class declares ``at``."""
     from tripwire._internal.jit_prompts.loader import load_jit_prompt_registry
@@ -45,13 +45,13 @@ def test_loading_registry_populates_jit_prompt_station(tmp_path: Path) -> None:
 
 
 def test_jit_prompt_base_class_accepts_at_attribute() -> None:
-    """Subclasses can declare ``at = (workflow, station)`` without
+    """Subclasses can declare ``at = (workflow, status)`` without
     triggering the missing-attr check (id, fires_on still required)."""
 
-    class StationJitPrompt(JitPrompt):
-        id = "station-test"
+    class StatusJitPrompt(JitPrompt):
+        id = "status-test"
         fires_on = "test.event"
-        at = ("test-workflow", "test-station")
+        at = ("test-workflow", "test-status")
 
         def fire(self, ctx):
             return "test"
@@ -59,5 +59,5 @@ def test_jit_prompt_base_class_accepts_at_attribute() -> None:
         def is_acknowledged(self, ctx):
             return True
 
-    instance = StationJitPrompt()
-    assert instance.at == ("test-workflow", "test-station")
+    instance = StatusJitPrompt()
+    assert instance.at == ("test-workflow", "test-status")

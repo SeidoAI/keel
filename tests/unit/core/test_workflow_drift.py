@@ -2,12 +2,12 @@
 
 Drift detection queries the events log for:
 
-- Missing required prompt-checks at a station the session passed
+- Missing required prompt-checks at a status the session passed
   through.
 - Unexpected transitions (gate-bypass writes that flip session.yaml
   status without going through `tripwire transition`).
 - JIT prompts that should-have-fired-but-didn't per workflow.yaml's
-  station declarations.
+  status declarations.
 
 `tripwire drift report` surfaces these as findings. Empty on a clean
 run; correct mismatches surfaced when steps are skipped.
@@ -70,7 +70,7 @@ def test_drift_report_empty_on_clean_run(tmp_path: Path) -> None:
 
 
 def test_drift_detects_missing_prompt_check(tmp_path: Path) -> None:
-    """A `transition.completed` from a station that had a declared
+    """A `transition.completed` from a status that had a declared
     prompt-check but no `prompt_check.invoked` event for it produces
     a `drift/prompt_check_missing` finding."""
     from tripwire.core.events.log import emit_event
@@ -118,7 +118,7 @@ def test_drift_clears_when_prompt_check_invoked(tmp_path: Path) -> None:
 
 
 def test_drift_detects_should_have_fired_jit_prompt(tmp_path: Path) -> None:
-    """A station declares a JIT prompt; the session left that station
+    """A status declares a JIT prompt; the session left that status
     without a `jit_prompt.fired` event for it → drift."""
     from tripwire.core.events.log import emit_event
     from tripwire.core.workflow.drift import detect_drift
@@ -140,7 +140,7 @@ def test_drift_detects_should_have_fired_jit_prompt(tmp_path: Path) -> None:
 
 
 def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
-    """If session.status currently sits at a station that's NOT reachable
+    """If session.status currently sits at a status that's NOT reachable
     from the last `transition.completed` to_status, surface
     `drift/unexpected_transition`. Simulates a gate-bypass write that
     flipped session.yaml without going through `tripwire transition`."""

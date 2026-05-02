@@ -203,6 +203,7 @@ def test_loader_reports_stale_stations_key(tmp_path: Path) -> None:
         known_prompt_checks=set(),
     )
     assert [finding.code for finding in findings] == ["workflow/stale_stations_key"]
+    assert "stale `stations:`" in findings[0].message
 
 
 def test_loader_supports_multiple_workflows(tmp_path: Path) -> None:
@@ -380,8 +381,8 @@ def test_validator_rejects_undeclared_prompt_check_ref(tmp_path: Path) -> None:
 
 
 def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
-    """A station can be terminal OR declare next, never both — cyclic
-    terminal misuse means a station marked terminal that nonetheless
+    """A status can be terminal OR declare next, never both — cyclic
+    terminal misuse means a status marked terminal that nonetheless
     chains forward."""
     from tripwire.core.workflow.loader import load_workflows
     from tripwire.core.workflow.schema import validate_workflow_spec

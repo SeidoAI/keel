@@ -3,7 +3,7 @@
 Parses the raw YAML into the :class:`WorkflowSpec` typed tree. Never
 mutates state — the file is read, normalised into dataclasses, and
 returned. Structural anomalies that can't be expressed in the typed
-tree (e.g. a station with both ``terminal: true`` and ``next:``) are
+tree (e.g. a status with both ``terminal: true`` and ``next:``) are
 recorded as :class:`WorkflowFinding` entries on
 ``WorkflowSpec.load_findings`` and surfaced through
 :func:`validate_workflow_spec`.
@@ -92,7 +92,7 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
                 workflow=wf_id,
                 status=None,
                 message=(
-                    "workflow.yaml uses stale `statuses:`; use `statuses:` "
+                    "workflow.yaml uses stale `stations:`; use `statuses:` "
                     "instead"
                 ),
             )
@@ -141,7 +141,7 @@ def _parse_status(wf_id: str, raw: dict) -> tuple[WorkflowStatus, list[WorkflowF
         # No terminal AND no next — treat as terminal=False but no next;
         # the validator surfaces this through the no-terminal-status
         # check at the workflow level. Carry the empty next as a single
-        # NextSpec pointing at the station itself sentinel… no, keep it
+        # NextSpec pointing at the status itself sentinel… no, keep it
         # honest and emit a load finding.
         findings.append(
             WorkflowFinding(

@@ -124,7 +124,7 @@ def jit_prompts_for_status(workflow: str, status: str) -> list[str]:
 
 
 # ----------------------------------------------------------------------
-# Prompt-check station registry (KUI-122)
+# Prompt-check status registry (KUI-122)
 # ----------------------------------------------------------------------
 
 

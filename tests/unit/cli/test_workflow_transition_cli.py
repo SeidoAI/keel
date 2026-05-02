@@ -1,8 +1,8 @@
 """End-to-end tests for ``tripwire transition`` (KUI-159).
 
 The transition CLI is the gate runner: it loads workflow.yaml, runs
-the station's validators → JIT prompts → prompt-checks, and on pass
-moves the session to the new station and assigns a station-instance
+the status's validators → JIT prompts → prompt-checks, and on pass
+moves the session to the new status and assigns a status-instance
 id. On fail it emits ``transition.rejected`` with a structured
 ``reason`` and the session stays put.
 
@@ -113,7 +113,7 @@ def clean_validator(monkeypatch):
 
 def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) -> None:
     """Happy path: gate passes, session.status flips, transition.completed
-    emitted, station-instance id written."""
+    emitted, status-instance id written."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
@@ -128,7 +128,7 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
     # Session status flipped.
     session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
     assert "status: queued" in session_yaml
-    # Station-instance id present.
+    # Status-instance id present.
     assert "current_status_instance:" in session_yaml
     assert "coding-session:test-session:queued:1" in session_yaml
 
@@ -141,7 +141,7 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
 
 
 def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
-    """Rejecting an unreachable station emits transition.rejected with
+    """Rejecting an unreachable status emits transition.rejected with
     a structured reason naming the gate check that failed."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
@@ -170,7 +170,7 @@ def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
 def test_transition_increments_status_instance_n(
     tmp_path: Path, clean_validator
 ) -> None:
-    """Repeat visits to a station bump the {n} suffix."""
+    """Repeat visits to a status bump the {n} suffix."""
     from tripwire.cli.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
@@ -253,7 +253,7 @@ def test_transition_completed_event_carries_status_instance(
 
 def test_transition_rejected_when_validators_fail(tmp_path: Path) -> None:
     """If `tripwire validate --strict` reports errors at the destination
-    station, the gate rejects with reason=validators_failed."""
+    status, the gate rejects with reason=validators_failed."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
 

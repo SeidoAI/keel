@@ -1,9 +1,9 @@
-"""Prompt-check station mapping (KUI-122).
+"""Prompt-check status mapping (KUI-122).
 
-Each PM-skill slash command file declares ``fires_at: <station-id>``
+Each PM-skill slash command file declares ``fires_at: <status-id>``
 in its YAML frontmatter. The workflow registry indexes commands by
-station so the gate runner (KUI-159) can ask "what prompt-checks fire
-at station X?" and the well-formedness validator can resolve
+status so the gate runner (KUI-159) can ask "what prompt-checks fire
+at status X?" and the well-formedness validator can resolve
 workflow.yaml's ``prompt_checks: [...]`` refs against the registry.
 """
 
@@ -41,12 +41,12 @@ def test_collect_prompt_checks_filters_non_workflow_commands(
 ) -> None:
     """Slash commands without ``fires_at:`` (general PM tools like
     pm-validate, pm-status) are not surfaced through the
-    workflow-station registry."""
+    workflow-status registry."""
     from tripwire.core.workflow.prompt_checks import collect_prompt_checks
 
     pcs = collect_prompt_checks(tmp_path)
     ids = {pc.id for pc in pcs}
-    # These are PM tools, not workflow-station prompt-checks.
+    # These are PM tools, not workflow-status prompt-checks.
     assert "pm-validate" not in ids
     assert "pm-status" not in ids
     assert "pm-edit" not in ids

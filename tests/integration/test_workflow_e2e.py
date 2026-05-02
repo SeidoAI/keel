@@ -162,7 +162,7 @@ def test_full_lifecycle_drives_via_transition_only(
 def test_unreachable_target_emits_structured_reason(
     tmp_path: Path,
 ) -> None:
-    """Trying to skip stations produces `transition_not_reachable`."""
+    """Trying to skip statuses produces `transition_not_reachable`."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
 

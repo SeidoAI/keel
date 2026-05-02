@@ -1,9 +1,9 @@
-"""Prompt-check station mapping (KUI-122).
+"""Prompt-check status mapping (KUI-122).
 
 A prompt-check is a slash command (``pm-session-review``,
 ``pm-session-launch``, etc.) that the project manager runs at a
-specific workflow station. The frontmatter on the slash command file
-declares the station via ``fires_at:``:
+specific workflow status. The frontmatter on the slash command file
+declares the status via ``fires_at:``:
 
 .. code-block:: yaml
 
@@ -34,7 +34,7 @@ import yaml
 
 @dataclass(frozen=True)
 class PromptCheck:
-    """A slash command that declares ``fires_at: <station-id>``."""
+    """A slash command that declares ``fires_at: <status-id>``."""
 
     id: str  # the command name (matches the frontmatter `name:`)
     fires_at: str

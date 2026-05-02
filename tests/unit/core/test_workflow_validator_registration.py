@@ -1,8 +1,8 @@
-"""Validator station registration (KUI-120).
+"""Validator status registration (KUI-120).
 
-Each existing validator check declares its workflow station via the
+Each existing validator check declares its workflow status via the
 ``@registers_at`` decorator. The registry exposes the
-station-to-validator mapping consumed by the gate runner (KUI-159).
+status-to-validator mapping consumed by the gate runner (KUI-159).
 Behaviour during ``tripwire validate`` stays byte-stable: the same
 checks run in the same order; the registry is enrichment metadata.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 
 def test_every_check_in_all_checks_is_registered() -> None:
-    """Every function in ``ALL_CHECKS`` must declare a station via
+    """Every function in ``ALL_CHECKS`` must declare a status via
     ``@registers_at``. The registry attribute is set as a function
     attribute by the decorator; an undecorated check would silently
     fall out of the gate runner's view."""
@@ -24,7 +24,7 @@ def test_every_check_in_all_checks_is_registered() -> None:
     ]
     assert not undecorated, (
         f"checks missing @registers_at: {undecorated}. Each ALL_CHECKS "
-        f"entry must declare its (workflow, station)."
+        f"entry must declare its (workflow, status)."
     )
 
 
@@ -33,7 +33,7 @@ def test_register_at_populates_validator_registry() -> None:
     via :func:`known_validator_ids`. Empty after Step 1 ships, populated
     after Step 2 decorates the existing checks."""
     # Importing checks/__init__.py executes the decorators on every
-    # check function, which flips the registry's _validator_stations
+    # check function, which flips the registry's _validator_statuses
     # to a non-empty mapping.
     import tripwire.core.validator.checks  # noqa: F401
     from tripwire.core.workflow.registry import known_validator_ids

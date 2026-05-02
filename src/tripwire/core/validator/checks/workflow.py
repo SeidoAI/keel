@@ -7,7 +7,7 @@ each :class:`WorkflowFinding` into the validator's standard
 This first cut runs with empty ``known_validators`` /
 ``known_jit_prompts`` / ``known_prompt_checks`` sets — meaning the
 ref-existence checks short-circuit. Subsequent v0.9 sessions tighten
-the contract by populating those sets from the station registries
+the contract by populating those sets from the status registries
 (KUI-120 validators, KUI-121 JIT prompts, KUI-122 prompt-checks). The
 schema-shape checks (unknown_next_status, terminal_with_next, …)
 fire today.
@@ -75,7 +75,7 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
 def _known_validators() -> set[str]:
     """Return the registry-declared validator ids.
 
-    Populated by KUI-120 once each check declares its station via
+    Populated by KUI-120 once each check declares its status via
     ``@registers_at``. Returns an empty set today, which the schema
     treats as "skip the ref-existence check".
     """
@@ -88,7 +88,7 @@ def _known_jit_prompts() -> set[str]:
     """Return the registry-declared JIT prompt ids.
 
     Populated by KUI-121 once each JitPrompt subclass declares its
-    station via ``at = (...)``.
+    status via ``at = (...)``.
 
     KNOWN GAP (codex P2 on PR #73): the registry is populated as a
     side-effect of `_instantiate()` in jit_prompts/loader.py, which only
@@ -98,7 +98,7 @@ def _known_jit_prompts() -> set[str]:
     `workflow/unknown_jit_prompt` finding. Force-loading from this
     callsite would mutate global registry state in a way that leaks
     into the gate runtime in transitions.py (the same registry is
-    used to enforce JIT-prompts-at-stations during `tripwire
+    used to enforce JIT-prompts-at-statuses during `tripwire
     transition`), turning workflow.yaml validation into an
     unintentional precondition for transition behaviour. Filed as
     follow-up: see post-completion-comments.md §Follow-ups
