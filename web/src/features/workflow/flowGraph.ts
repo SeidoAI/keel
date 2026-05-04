@@ -9,7 +9,7 @@ import type {
   WorkflowWorkStep,
 } from "@/lib/api/endpoints/workflow";
 import { BRANCHES, type BranchOutcome } from "./decorations";
-import { ACTOR_COLOR, isKnownActor } from "./tokens";
+import { ACTOR_COLOR, crossLinkHex, isKnownActor } from "./tokens";
 
 const actorStrokeColor = (actor: string): string =>
   isKnownActor(actor) ? ACTOR_COLOR[actor] : "var(--color-ink)";
@@ -980,6 +980,9 @@ export function buildUnifiedFlow(
             otherWorkflowId: link.workflow,
             otherStatusId: link.status,
             label: link.label ?? null,
+            // Both dots wear the SOURCE workflow's colour so the line
+            // and its two endpoints match.
+            color: crossLinkHex(wf.id),
           },
         });
         allNodes.push({
@@ -1004,6 +1007,7 @@ export function buildUnifiedFlow(
             otherWorkflowId: wf.id,
             otherStatusId: status.id,
             label: link.label ?? null,
+            color: crossLinkHex(wf.id),
           },
         });
 
@@ -1026,7 +1030,7 @@ export function buildUnifiedFlow(
           targetHandle: "north",
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: "#0e7c8a",
+            color: crossLinkHex(wf.id),
             width: 14,
             height: 14,
           },

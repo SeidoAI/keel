@@ -784,12 +784,14 @@ export interface CrossLinkEndpointData {
   otherWorkflowId: string;
   otherStatusId: string;
   label: string | null;
+  /** Source-workflow's cross-link colour (see crossLinkHex in tokens). */
+  color: string;
 }
-const CROSSLINK_HEX = "#0e7c8a";
 export function CrossLinkEndpointNode({ data }: NodeProps) {
   const d = data as unknown as CrossLinkEndpointData;
   const [hovered, setHovered] = useState(false);
   const arrow = d.role === "source" ? "→" : "←";
+  const color = d.color ?? "#0e7c8a";
   return (
     <div
       data-testid={`workflow-crosslink-endpoint-${d.role}-${d.otherWorkflowId}-${d.otherStatusId}`}
@@ -801,9 +803,9 @@ export function CrossLinkEndpointNode({ data }: NodeProps) {
         width: 14,
         height: 14,
         borderRadius: "50%",
-        background: CROSSLINK_HEX,
+        background: color,
         border: "2px solid var(--color-paper)",
-        boxShadow: "0 0 0 1px " + CROSSLINK_HEX,
+        boxShadow: "0 0 0 1px " + color,
         cursor: "pointer",
         position: "relative",
       }}
@@ -819,8 +821,8 @@ export function CrossLinkEndpointNode({ data }: NodeProps) {
         <div
           style={{
             background: "var(--color-paper)",
-            border: `1px solid ${CROSSLINK_HEX}`,
-            color: CROSSLINK_HEX,
+            border: `1px solid ${color}`,
+            color: color,
             fontFamily: "var(--font-mono)",
             fontSize: 10,
             padding: "4px 8px",
