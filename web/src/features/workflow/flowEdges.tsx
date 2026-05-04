@@ -102,10 +102,18 @@ export interface CrossLinkEdgeData extends Record<string, unknown> {
   label?: string | null;
 }
 
+// Cross-link colour — picked to stand apart from every actor hue:
+//   pm-agent (var(--color-tripwire) #b8741a ochre)
+//   coding-agent (var(--color-gate) #2d5a3d green)
+//   code (var(--color-info) #2d3a7c indigo)
+// Teal sits diagonally opposite all three on the wheel and reads as
+// "this is metadata, not a route."
+const CROSSLINK_HEX = "#0e7c8a";
+
 export function CrossLinkEdge(props: EdgeProps) {
   const { id, sourceX, sourceY, targetX, targetY, markerEnd, data } = props;
   const d = (data ?? {}) as CrossLinkEdgeData;
-  const stroke = "var(--color-info)";
+  const stroke = CROSSLINK_HEX;
   const dash = "4 4";
   const r = 14;
   // Lane that floats above the target band (and above its input chips).
@@ -154,7 +162,7 @@ export function CrossLinkEdge(props: EdgeProps) {
             borderRadius: 2,
             fontFamily: "var(--font-mono)",
             fontSize: 10,
-            color: "var(--color-info)",
+            color: stroke,
             letterSpacing: "0.06em",
             pointerEvents: "all",
             whiteSpace: "nowrap",

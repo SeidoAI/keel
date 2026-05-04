@@ -883,6 +883,12 @@ export function buildUnifiedFlow(
           target: targetId,
           sourceHandle: "south",
           targetHandle: "north",
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: "#0e7c8a",
+            width: 14,
+            height: 14,
+          },
           data: {
             sourceWorkflow: wf.id,
             label: link.label ?? null,

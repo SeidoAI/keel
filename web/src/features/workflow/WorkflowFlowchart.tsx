@@ -141,14 +141,16 @@ function FlowInner({
   const nodesInitialized = useNodesInitialized();
   const lastInitForFocus = useRef<string | null>(null);
 
-  // Restore viewport from sessionStorage on first mount per project. Use
-  // the project_id as the key so switching projects starts fresh.
+  // Initial viewport restore: only on the very first mount for this
+  // project. Subsequent focusId changes always re-centre on the new band.
   const storageKey = `${VIEWPORT_STORAGE_PREFIX}${graph.project_id}`;
+  const initialRestoreDone = useRef(false);
   useEffect(() => {
-    if (!nodesInitialized) return;
+    if (!nodesInitialized || initialRestoreDone.current) return;
+    initialRestoreDone.current = true;
     const raw =
       typeof window !== "undefined" ? sessionStorage.getItem(storageKey) : null;
-    if (raw && lastInitForFocus.current === null) {
+    if (raw) {
       try {
         const v = JSON.parse(raw) as Viewport;
         rf.setViewport(v, { duration: 0 });
@@ -158,20 +160,19 @@ function FlowInner({
         /* fall through to fitView */
       }
     }
-    // Either no saved viewport, or the focus changed — fit to the focused
-    // band (default: first band).
-    const targetBandId = focusId
-      ? `band:${focusId}`
-      : (flow.bands[0]?.parentNodeId ?? null);
-    if (targetBandId && lastInitForFocus.current !== focusId) {
-      rf.fitView({
-        nodes: [{ id: targetBandId }],
-        padding: 0.12,
-        duration: lastInitForFocus.current ? 600 : 200,
-      });
-      lastInitForFocus.current = focusId ?? "__initial__";
-    }
+    centreOnBand(rf, flow.bands, focusId ?? null, 200);
+    lastInitForFocus.current = focusId ?? "__initial__";
   }, [nodesInitialized, focusId, storageKey, rf, flow.bands]);
+
+  // On every subsequent focusId change, re-centre on the target band.
+  // Decoupled from the initial-restore effect so the saved viewport
+  // doesn't fight the focus update.
+  useEffect(() => {
+    if (!nodesInitialized || !initialRestoreDone.current) return;
+    if (lastInitForFocus.current === focusId) return;
+    centreOnBand(rf, flow.bands, focusId ?? null, 600);
+    lastInitForFocus.current = focusId ?? "__initial__";
+  }, [focusId, nodesInitialized, rf, flow.bands]);
 
   // Persist viewport on every settle.
   useOnViewportChange({
@@ -353,8 +354,14 @@ function FlowInner({
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable
+        // Trackpad two-finger drag pans the canvas (the unified canvas
+        // is the page now — there's no per-tab page scroll to compete
+        // with). Pinch (which Macs deliver as ctrl+wheel) zooms.
+        // zoomOnScroll left off so a non-pinch gesture never zooms.
+        panOnScroll
+        panOnScrollSpeed={0.7}
         zoomOnPinch
-        zoomOnScroll
+        zoomOnScroll={false}
         zoomOnDoubleClick={false}
         proOptions={{ hideAttribution: true }}
         onNodeClick={handleNodeClick}
@@ -381,6 +388,42 @@ function FlowInner({
       )}
     </div>
   );
+}
+
+// Centre the viewport on a named band. We compute the centre + zoom from
+// the band's known bounds (BandInfo) instead of fitView({nodes:[id]})
+// because parent group nodes don't always report measured bounds in
+// React Flow until they have visible children measured — which can race
+// with the navigator click.
+function centreOnBand(
+  rf: ReturnType<typeof useReactFlow>,
+  bands: Array<{
+    workflowId: string;
+    bandTop: number;
+    width: number;
+    height: number;
+  }>,
+  focusId: string | null,
+  duration: number,
+): void {
+  const band = focusId
+    ? bands.find((b) => b.workflowId === focusId)
+    : bands[0];
+  if (!band) return;
+  // Aim for ~88% horizontal fit so the band has a little air. Pick the
+  // smaller of width/height ratios so nothing clips.
+  const PADDING = 0.12;
+  const vw = window.innerWidth || 1280;
+  const vh = (window.innerHeight || 800) - 200; // header + chrome estimate
+  const zoom = Math.min(
+    (vw * (1 - PADDING)) / Math.max(band.width, 1),
+    (vh * (1 - PADDING)) / Math.max(band.height, 1),
+    1.0,
+  );
+  rf.setCenter(band.width / 2, band.bandTop + band.height / 2, {
+    zoom: Math.max(0.3, zoom),
+    duration,
+  });
 }
 
 // MiniMap renders nodes via SVG `fill` / `stroke` attributes — and CSS
