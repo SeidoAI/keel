@@ -20,7 +20,8 @@ const fixture: WorkflowDefinition = {
     {
       id: "planned",
       next: { kind: "single", single: "queued" },
-      validators: [],
+      tripwires: [],
+      heuristics: [],
       jit_prompts: [],
       prompt_checks: [],
       artifacts: { produces: [], consumes: [] },
@@ -29,7 +30,8 @@ const fixture: WorkflowDefinition = {
     {
       id: "queued",
       next: { kind: "single", single: "executing" },
-      validators: [],
+      tripwires: [],
+      heuristics: [],
       jit_prompts: [],
       prompt_checks: [],
       artifacts: { produces: [{ id: "plan", label: "plan.md" }], consumes: [] },
@@ -38,7 +40,8 @@ const fixture: WorkflowDefinition = {
     {
       id: "executing",
       next: { kind: "single", single: "in_review" },
-      validators: [],
+      tripwires: [],
+      heuristics: [],
       jit_prompts: ["self-review", "cost-ceiling"],
       prompt_checks: [],
       artifacts: { produces: [{ id: "diff", label: "diff" }], consumes: [] },
@@ -49,7 +52,8 @@ const fixture: WorkflowDefinition = {
     {
       id: "in_review",
       next: { kind: "single", single: "verified" },
-      validators: [],
+      tripwires: [],
+      heuristics: [],
       jit_prompts: [],
       prompt_checks: [],
       artifacts: { produces: [], consumes: [] },
@@ -58,7 +62,8 @@ const fixture: WorkflowDefinition = {
     {
       id: "verified",
       next: { kind: "terminal" },
-      validators: [],
+      tripwires: [],
+      heuristics: [],
       jit_prompts: [],
       prompt_checks: [],
       artifacts: { produces: [], consumes: [] },
@@ -74,7 +79,13 @@ const fixture: WorkflowDefinition = {
       to: "planned",
       kind: "forward",
       label: "create session",
-      controls: { validators: [], jit_prompts: [], prompt_checks: [] },
+      controls: {
+        tripwires: [],
+        heuristics: [],
+        jit_prompts: [],
+        prompt_checks: [],
+      },
+      signals: [],
       skills: [],
       emits: { artifacts: [], events: [], comments: [], status_changes: [] },
     },
@@ -86,7 +97,13 @@ const fixture: WorkflowDefinition = {
       to: "executing",
       kind: "forward",
       label: "spawn coding agent",
-      controls: { validators: ["v_uuid_present"], jit_prompts: [], prompt_checks: [] },
+      controls: {
+        tripwires: ["v_uuid_present"],
+        heuristics: [],
+        jit_prompts: [],
+        prompt_checks: [],
+      },
+      signals: [],
       skills: [],
       emits: { artifacts: [], events: [], comments: [], status_changes: [] },
     },
@@ -98,7 +115,13 @@ const fixture: WorkflowDefinition = {
       to: "verified",
       kind: "forward",
       label: "approve review",
-      controls: { validators: [], jit_prompts: [], prompt_checks: [] },
+      controls: {
+        tripwires: [],
+        heuristics: [],
+        jit_prompts: [],
+        prompt_checks: [],
+      },
+      signals: [],
       skills: [],
       emits: { artifacts: [], events: [], comments: [], status_changes: [] },
     },
@@ -110,7 +133,13 @@ const fixture: WorkflowDefinition = {
       to: "executing",
       kind: "return",
       label: "request changes",
-      controls: { validators: [], jit_prompts: [], prompt_checks: [] },
+      controls: {
+        tripwires: [],
+        heuristics: [],
+        jit_prompts: [],
+        prompt_checks: [],
+      },
+      signals: [],
       skills: [],
       emits: { artifacts: [], events: [], comments: [], status_changes: [] },
     },
@@ -122,7 +151,13 @@ const fixture: WorkflowDefinition = {
       to: "sink:main",
       kind: "terminal",
       label: "merge to main",
-      controls: { validators: [], jit_prompts: [], prompt_checks: [] },
+      controls: {
+        tripwires: [],
+        heuristics: [],
+        jit_prompts: [],
+        prompt_checks: [],
+      },
+      signals: [],
       skills: [],
       emits: { artifacts: [], events: [], comments: [], status_changes: [] },
     },
@@ -212,6 +247,30 @@ describe("buildFlow", () => {
     expect(flares).toHaveLength(2);
     expect(flares.every((n) => n.parentId === "status:executing")).toBe(true);
   });
+
+  it("includes tripwires + heuristics + prompt_checks in a transition's gate count", () => {
+    const withHeuristics: WorkflowDefinition = {
+      ...fixture,
+      routes: fixture.routes.map((r) =>
+        r.id === "queued-to-executing"
+          ? {
+              ...r,
+              controls: {
+                tripwires: ["v_uuid_present"],
+                heuristics: ["h_artifact_freshness"],
+                jit_prompts: [],
+                prompt_checks: ["pmt_review_checklist"],
+              },
+            }
+          : r,
+      ),
+    };
+    const flow = buildFlow(withHeuristics);
+    const tx = flow.nodes.find((n) => n.id === "tx:queued-to-executing");
+    expect(tx).toBeDefined();
+    const gateCount = (tx?.data as { gateCount: number } | undefined)?.gateCount;
+    expect(gateCount).toBe(3);
+  });
 });
 
 // ── unified flow ────────────────────────────────────────────────────
@@ -225,7 +284,8 @@ const triageFixture: WorkflowDefinition = {
     {
       id: "intake",
       next: { kind: "single", single: "act" },
-      validators: [],
+      tripwires: [],
+      heuristics: [],
       jit_prompts: [],
       prompt_checks: [],
       artifacts: { produces: [], consumes: [] },
@@ -234,7 +294,8 @@ const triageFixture: WorkflowDefinition = {
     {
       id: "act",
       next: { kind: "terminal" },
-      validators: [],
+      tripwires: [],
+      heuristics: [],
       jit_prompts: [],
       prompt_checks: [],
       artifacts: { produces: [], consumes: [] },
@@ -258,7 +319,8 @@ const unifiedFixture: WorkflowGraph = {
   project_id: "test",
   workflows: [fixture, triageFixture],
   registry: {
-    validators: [],
+    tripwires: [],
+    heuristics: [],
     jit_prompts: [],
     prompt_checks: [],
     commands: [],

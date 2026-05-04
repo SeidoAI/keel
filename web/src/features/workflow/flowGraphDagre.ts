@@ -204,7 +204,8 @@ export function buildFlowDagre(wf: WorkflowDefinition): FlowGraph {
       if (!r) return;
       const isForwardLike = r.kind === "forward" || r.kind === "terminal";
       const gateCount =
-        (r.controls?.validators?.length ?? 0) +
+        (r.controls?.tripwires?.length ?? 0) +
+        (r.controls?.heuristics?.length ?? 0) +
         (r.controls?.prompt_checks?.length ?? 0);
       nodes.push({
         id,

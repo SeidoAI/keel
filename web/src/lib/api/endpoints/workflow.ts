@@ -34,6 +34,7 @@ export interface WorkflowCrossLink {
   status: string;
   label?: string | null;
   kind: "triggers" | "triggered_by";
+  pm_subagent_dispatch?: boolean;
 }
 
 export interface WorkflowStatus {
@@ -41,7 +42,8 @@ export interface WorkflowStatus {
   label?: string;
   description?: string;
   next: WorkflowNext;
-  validators: string[];
+  tripwires: string[];
+  heuristics: string[];
   jit_prompts: string[];
   prompt_checks: string[];
   artifacts: WorkflowStatusArtifacts;
@@ -50,7 +52,8 @@ export interface WorkflowStatus {
 }
 
 export interface WorkflowRouteControls {
-  validators: string[];
+  tripwires: string[];
+  heuristics: string[];
   jit_prompts: string[];
   prompt_checks: string[];
 }
@@ -73,6 +76,7 @@ export interface WorkflowRoute {
   trigger?: string | null;
   command?: string | null;
   controls: WorkflowRouteControls;
+  signals: string[];
   skills: string[];
   emits: WorkflowRouteEmits;
 }
@@ -101,7 +105,8 @@ export interface WorkflowRegistryEntry {
 }
 
 export interface WorkflowRegistry {
-  validators: WorkflowRegistryEntry[];
+  tripwires: WorkflowRegistryEntry[];
+  heuristics: WorkflowRegistryEntry[];
   jit_prompts: WorkflowRegistryEntry[];
   prompt_checks: WorkflowRegistryEntry[];
   commands: WorkflowRegistryEntry[];

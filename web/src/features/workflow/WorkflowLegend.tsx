@@ -57,6 +57,34 @@ export function WorkflowLegend() {
         </svg>
         gate cluster
       </span>
+      <span
+        data-testid="workflow-legend-heuristic"
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+      >
+        <svg width={14} height={14} aria-hidden>
+          <rect
+            x={2}
+            y={2}
+            width={10}
+            height={10}
+            rx={3}
+            stroke="var(--color-warn)"
+            strokeWidth={1.4}
+            fill="none"
+          />
+          <text
+            x={7}
+            y={10}
+            textAnchor="middle"
+            fontSize={9}
+            fontWeight={700}
+            fill="var(--color-warn)"
+          >
+            ~
+          </text>
+        </svg>
+        heuristic
+      </span>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         <svg width={14} height={14} aria-hidden>
           <rect

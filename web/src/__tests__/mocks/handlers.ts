@@ -96,7 +96,14 @@ export const defaultHandlers = [
     HttpResponse.json({
       project_id: "p1",
       workflows: [],
-      registry: { validators: [], jit_prompts: [], prompt_checks: [] },
+      registry: {
+        tripwires: [],
+        heuristics: [],
+        jit_prompts: [],
+        prompt_checks: [],
+        commands: [],
+        skills: [],
+      },
       drift: { count: 0, findings: [] },
     }),
   ),

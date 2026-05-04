@@ -24,7 +24,8 @@ function status(
   return {
     id,
     next: { kind: "single", single: "next" },
-    validators: [],
+    tripwires: [],
+    heuristics: [],
     jit_prompts: [],
     prompt_checks: [],
     artifacts: { produces: [], consumes: [] },
@@ -42,7 +43,13 @@ function route(overrides: Partial<WorkflowRoute>): WorkflowRoute {
     to: "queued",
     kind: "forward",
     label: "go",
-    controls: { validators: [], jit_prompts: [], prompt_checks: [] },
+    controls: {
+      tripwires: [],
+      heuristics: [],
+      jit_prompts: [],
+      prompt_checks: [],
+    },
+    signals: [],
     skills: [],
     emits: { artifacts: [], events: [], comments: [], status_changes: [] },
     ...overrides,
@@ -84,7 +91,8 @@ function makeGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
             to: "executing",
             label: "spawn coding agent",
             controls: {
-              validators: ["v_uuid_present"],
+              tripwires: ["v_uuid_present"],
+              heuristics: [],
               jit_prompts: [],
               prompt_checks: ["pm-session-spawn"],
             },
@@ -134,13 +142,14 @@ function makeGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
       },
     ],
     registry: {
-      validators: [
+      tripwires: [
         {
           id: "v_uuid_present",
           label: "v_uuid_present",
           description: "all entities have UUIDs",
         },
       ],
+      heuristics: [],
       prompt_checks: [
         {
           id: "pm-session-spawn",

@@ -9,7 +9,7 @@ import type {
 import { SourceViewer } from "./SourceViewer";
 
 export interface GateRow {
-  kind: "validator" | "prompt-check";
+  kind: "tripwire" | "heuristic" | "prompt-check";
   id: string;
   label: string;
   blurb: string;
@@ -24,14 +24,29 @@ export function describeGateContents(
   registry?: WorkflowRegistry,
 ): GateRow[] {
   const rows: GateRow[] = [];
-  const valBy = new Map((registry?.validators ?? []).map((v) => [v.id, v]));
+  const tripwireBy = new Map(
+    (registry?.tripwires ?? []).map((v) => [v.id, v]),
+  );
+  const heuristicBy = new Map(
+    (registry?.heuristics ?? []).map((h) => [h.id, h]),
+  );
   const pmtBy = new Map((registry?.prompt_checks ?? []).map((p) => [p.id, p]));
-  for (const id of route.controls.validators ?? []) {
-    const entry = valBy.get(id);
+  for (const id of route.controls.tripwires ?? []) {
+    const entry = tripwireBy.get(id);
     rows.push({
-      kind: "validator",
+      kind: "tripwire",
       id,
       label: id.replace(/^v_/, ""),
+      blurb: entry?.description ?? entry?.label ?? "",
+      source: sourceOf(entry),
+    });
+  }
+  for (const id of route.controls.heuristics ?? []) {
+    const entry = heuristicBy.get(id);
+    rows.push({
+      kind: "heuristic",
+      id,
+      label: id,
       blurb: entry?.description ?? entry?.label ?? "",
       source: sourceOf(entry),
     });
@@ -170,16 +185,22 @@ export function GatePanel({
                 fontFamily: "var(--font-mono)",
                 fontSize: 9,
                 color:
-                  row.kind === "validator"
+                  row.kind === "tripwire"
                     ? "var(--color-gate)"
-                    : "var(--color-info)",
+                    : row.kind === "heuristic"
+                      ? "var(--color-warn)"
+                      : "var(--color-info)",
                 letterSpacing: "0.04em",
                 flexShrink: 0,
                 width: 28,
                 textTransform: "uppercase",
               }}
             >
-              {row.kind === "validator" ? "val" : "pmt"}
+              {row.kind === "tripwire"
+                ? "trp"
+                : row.kind === "heuristic"
+                  ? "hrs"
+                  : "pmt"}
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div

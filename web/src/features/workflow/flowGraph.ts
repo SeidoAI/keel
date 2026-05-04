@@ -574,7 +574,8 @@ export function buildFlow(
         data: {
           route: r,
           gateCount:
-            (r.controls?.validators?.length ?? 0) +
+            (r.controls?.tripwires?.length ?? 0) +
+            (r.controls?.heuristics?.length ?? 0) +
             (r.controls?.prompt_checks?.length ?? 0),
         } satisfies BoundaryNodeData,
       });
@@ -600,7 +601,8 @@ export function buildFlow(
       data: {
         route: r,
         gateCount:
-          (r.controls?.validators?.length ?? 0) +
+          (r.controls?.tripwires?.length ?? 0) +
+          (r.controls?.heuristics?.length ?? 0) +
           (r.controls?.prompt_checks?.length ?? 0),
       } satisfies DetourNodeData,
     });
@@ -1127,7 +1129,13 @@ function defaultRoute(actor: string): WorkflowRoute {
     to: "default",
     kind: "forward",
     label: "",
-    controls: { validators: [], jit_prompts: [], prompt_checks: [] },
+    controls: {
+      tripwires: [],
+      heuristics: [],
+      jit_prompts: [],
+      prompt_checks: [],
+    },
+    signals: [],
     skills: [],
     emits: { artifacts: [], events: [], comments: [], status_changes: [] },
   };
