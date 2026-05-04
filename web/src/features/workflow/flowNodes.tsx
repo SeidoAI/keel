@@ -770,6 +770,51 @@ function ToolbarButton({
   );
 }
 
+// ── cross-link endpoint dot ───────────────────────────────────────
+// Small clickable circle on a status region's south (source) or north
+// (target) edge. Clicking jumps the viewport to the OTHER endpoint's
+// band — a one-click teleport across workflows.
+export interface CrossLinkEndpointData {
+  role: "source" | "target";
+  otherWorkflowId: string;
+  otherStatusId: string;
+  label: string | null;
+}
+const CROSSLINK_HEX = "#0e7c8a";
+export function CrossLinkEndpointNode({ data }: NodeProps) {
+  const d = data as unknown as CrossLinkEndpointData;
+  const tooltip = d.label
+    ? `${d.label} → ${d.otherWorkflowId}.${d.otherStatusId}`
+    : `→ ${d.otherWorkflowId}.${d.otherStatusId}`;
+  return (
+    <div
+      data-testid={`workflow-crosslink-endpoint-${d.role}-${d.otherWorkflowId}-${d.otherStatusId}`}
+      data-crosslink-target-workflow={d.otherWorkflowId}
+      data-crosslink-target-status={d.otherStatusId}
+      title={tooltip}
+      style={{
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        background: CROSSLINK_HEX,
+        border: "2px solid var(--color-paper)",
+        boxShadow: "0 0 0 1px " + CROSSLINK_HEX,
+        cursor: "pointer",
+        position: "relative",
+      }}
+    >
+      {/* Hidden ReactFlow handle so the edge can attach. South side
+          for source dots, north side for target dots. */}
+      <Handle
+        id={d.role === "source" ? "south" : "north"}
+        type={d.role === "source" ? "source" : "target"}
+        position={d.role === "source" ? Position.Bottom : Position.Top}
+        style={{ ...hiddenHandle, left: 7 }}
+      />
+    </div>
+  );
+}
+
 // ── band parent group (one per workflow in the unified canvas) ────
 // Renders the band header ribbon (workflow id + brief description)
 // floating above the band's top edge. The group itself is invisible —

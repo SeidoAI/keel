@@ -43,6 +43,7 @@ import {
   DetourTransitionNode,
   JitPromptNode,
   BandHeaderNode,
+  CrossLinkEndpointNode,
   PortNode,
   StatusDividerNode,
   StatusRegionNode,
@@ -65,6 +66,7 @@ const NODE_TYPES = {
   anchor: AnchorNode,
   divider: StatusDividerNode,
   band: BandHeaderNode,
+  crosslinkEndpoint: CrossLinkEndpointNode,
 };
 
 const EDGE_TYPES = {
@@ -211,6 +213,9 @@ function FlowInner({
       if (y + h > maxY) maxY = y + h;
     }
     const MARGIN = 240;
+    // Ensure the cross-link bus (at CROSSLINK_BUS_X = -120) is reachable
+    // by panning. Bands sit at x ≥ 0; the bus lives in negative x.
+    minX = Math.min(minX, -240);
     return [
       [minX - MARGIN, minY - MARGIN],
       [maxX + MARGIN, maxY + MARGIN],
@@ -247,6 +252,16 @@ function FlowInner({
         setOpenedBoundaryNodeId((prev) =>
           prev === namespacedId ? null : namespacedId,
         );
+      }
+      return;
+    }
+    // Cross-link endpoint dot: jump to the OTHER endpoint's band.
+    if (node.type === "crosslinkEndpoint") {
+      const d = node.data as {
+        otherWorkflowId?: string;
+      };
+      if (d.otherWorkflowId) {
+        centreOnBand(rf, flow.bands, d.otherWorkflowId, 600);
       }
       return;
     }

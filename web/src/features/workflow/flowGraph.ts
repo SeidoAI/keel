@@ -27,7 +27,11 @@ export const WORK_W = 220;
 export const WORK_H = 72;
 
 export const TX_W = 200;
-export const TX_H = 60;
+// Same height as WORK_H so the gate/transition boxes' tops align with
+// the work-step boxes' tops. Both centre at Y_WORK so handles align too;
+// matching heights makes that alignment *look* clean (the eye reads box
+// tops, not centres — a 12px height diff reads as a 6px sunken row).
+export const TX_H = 72;
 
 export const CHIP_H = 26;
 export const CHIP_GAP = 14;
@@ -758,6 +762,17 @@ export const BAND_GUTTER = 140;
  *  below the region's top stripe). */
 export const CROSSLINK_LANE_OFFSET = 36;
 
+/** Distance from the canvas's left edge to the cross-link "bus" — a
+ *  vertical lane shared by every cross-workflow link. Routing every
+ *  cross-link through this single lane keeps them out of the bands they
+ *  don't terminate at. The lane sits in the negative-x margin so it
+ *  doesn't push the bands themselves rightwards. */
+export const CROSSLINK_BUS_X = -120;
+
+/** Pixel size of the small endpoint circle rendered on a status's
+ *  south/north edge where a cross-link starts/ends. */
+export const CROSSLINK_DOT_SIZE = 14;
+
 export interface BandInfo {
   workflowId: string;
   bandTop: number;
@@ -865,8 +880,9 @@ export function buildUnifiedFlow(
     cursorY += sub.height + BAND_GUTTER;
   }
 
-  // Cross-workflow edges. Read from each status's `cross_links` (always
-  // canonical on the source side per the schema convention).
+  // Cross-workflow edges + clickable endpoint dots. Read from each
+  // status's `cross_links` (always canonical on the source side per the
+  // schema convention).
   for (const wf of graph.workflows) {
     for (const status of wf.statuses) {
       const links = status.cross_links ?? [];
@@ -874,13 +890,73 @@ export function buildUnifiedFlow(
         const link = links[i];
         if (!link || link.kind === "triggered_by") continue;
         const sourceId = statusNodeIdByLink.get(`${wf.id}|${status.id}`);
-        const targetId = statusNodeIdByLink.get(`${link.workflow}|${link.status}`);
+        const targetId = statusNodeIdByLink.get(
+          `${link.workflow}|${link.status}`,
+        );
         if (!sourceId || !targetId) continue;
+
+        // Emit source + target endpoint dots, parented to their
+        // respective status regions. Click handler on each dot jumps
+        // to the OTHER endpoint's band (wired in WorkflowFlowchart).
+        const srcDotId = `xdot:src:${wf.id}:${status.id}:${i}`;
+        const tgtDotId = `xdot:tgt:${wf.id}:${status.id}:${i}`;
+        const srcRegion = allNodes.find((n) => n.id === sourceId);
+        const tgtRegion = allNodes.find((n) => n.id === targetId);
+        const srcW = (srcRegion?.style as { width?: number } | undefined)
+          ?.width ?? MIN_REGION_W;
+        const srcH = (srcRegion?.style as { height?: number } | undefined)
+          ?.height ?? REGION_H;
+        const tgtW = (tgtRegion?.style as { width?: number } | undefined)
+          ?.width ?? MIN_REGION_W;
+        // South dot on source region: bottom-centre, half outside.
+        allNodes.push({
+          id: srcDotId,
+          type: "crosslinkEndpoint",
+          parentId: sourceId,
+          position: {
+            x: srcW / 2 - CROSSLINK_DOT_SIZE / 2,
+            y: srcH - CROSSLINK_DOT_SIZE / 2,
+          },
+          draggable: false,
+          selectable: false,
+          focusable: false,
+          zIndex: 20,
+          data: {
+            role: "source",
+            otherWorkflowId: link.workflow,
+            otherStatusId: link.status,
+            label: link.label ?? null,
+          },
+        });
+        // North dot on target region: top-centre, half outside.
+        allNodes.push({
+          id: tgtDotId,
+          type: "crosslinkEndpoint",
+          parentId: targetId,
+          position: {
+            x: tgtW / 2 - CROSSLINK_DOT_SIZE / 2,
+            y: -CROSSLINK_DOT_SIZE / 2,
+          },
+          draggable: false,
+          selectable: false,
+          focusable: false,
+          zIndex: 20,
+          data: {
+            role: "target",
+            otherWorkflowId: wf.id,
+            otherStatusId: status.id,
+            label: link.label ?? null,
+          },
+        });
+
+        // Edge connects the dots. Path is drawn by CrossLinkEdge, which
+        // routes through the left bus (CROSSLINK_BUS_X) so the line
+        // never crosses a status region it doesn't terminate at.
         allEdges.push({
           id: `xlink:${wf.id}:${status.id}:${i}`,
           type: "crosslink",
-          source: sourceId,
-          target: targetId,
+          source: srcDotId,
+          target: tgtDotId,
           sourceHandle: "south",
           targetHandle: "north",
           markerEnd: {

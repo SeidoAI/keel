@@ -5,7 +5,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 
-import { CROSSLINK_LANE_OFFSET, Y_DEEP_RETURN } from "./flowGraph";
+import { CROSSLINK_BUS_X, Y_DEEP_RETURN } from "./flowGraph";
 import { ACTOR_COLOR, isKnownActor } from "./tokens";
 
 export interface ActorEdgeData extends Record<string, unknown> {
@@ -115,27 +115,41 @@ export function CrossLinkEdge(props: EdgeProps) {
   const d = (data ?? {}) as CrossLinkEdgeData;
   const stroke = CROSSLINK_HEX;
   const dash = "4 4";
-  const r = 14;
-  // Lane that floats above the target band (and above its input chips).
-  const targetLaneY = targetY - CROSSLINK_LANE_OFFSET;
-  // Halfway through the gutter between source and target bands. We pick
-  // the midpoint between the source's exit Y and the target lane Y,
-  // clamped so it stays in the gutter visually.
-  const gutterY = sourceY + (targetLaneY - sourceY) / 2;
+  const r = 12;
 
-  // Step path:
-  //   source ↓ to gutterY → across to targetX → ↓ to targetLaneY → ↓ to target
+  // Route every cross-link through a shared vertical bus on the far
+  // left of the canvas (CROSSLINK_BUS_X). Path:
+  //   source dot ↓
+  //     ↓ short drop into the gutter just below source band
+  //     ← west across the gutter to the bus
+  //     ↓/↑ along the bus to the gutter just above target band
+  //     → east across that gutter to under target dot
+  //     ↓ into target dot
+  // Horizontal segments live in inter-band gutters; vertical segment
+  // lives in the bus. Nothing crosses an unrelated status region.
+  const busX = CROSSLINK_BUS_X;
+  // Drop just below the source dot (it sits at the south edge of a
+  // status region, with the gutter immediately below it).
+  const sourceTurnY = sourceY + 32;
+  // Rise to just above the target dot (target dot is at north edge).
+  const targetTurnY = targetY - 32;
+
   const path = [
     `M ${sourceX} ${sourceY}`,
-    `L ${sourceX} ${gutterY - r}`,
-    `Q ${sourceX} ${gutterY}, ${sourceX + (targetX > sourceX ? r : -r)} ${gutterY}`,
-    `L ${targetX - (targetX > sourceX ? r : -r)} ${gutterY}`,
-    `Q ${targetX} ${gutterY}, ${targetX} ${gutterY + r}`,
+    `L ${sourceX} ${sourceTurnY - r}`,
+    `Q ${sourceX} ${sourceTurnY}, ${sourceX - r} ${sourceTurnY}`,
+    `L ${busX + r} ${sourceTurnY}`,
+    `Q ${busX} ${sourceTurnY}, ${busX} ${sourceTurnY + (targetTurnY > sourceTurnY ? r : -r)}`,
+    `L ${busX} ${targetTurnY - (targetTurnY > sourceTurnY ? r : -r)}`,
+    `Q ${busX} ${targetTurnY}, ${busX + r} ${targetTurnY}`,
+    `L ${targetX - r} ${targetTurnY}`,
+    `Q ${targetX} ${targetTurnY}, ${targetX} ${targetTurnY + r}`,
     `L ${targetX} ${targetY}`,
   ].join(" ");
 
-  const labelX = (sourceX + targetX) / 2;
-  const labelY = gutterY;
+  // Label sits at the bus, vertically centred between the two turns.
+  const labelX = busX;
+  const labelY = (sourceTurnY + targetTurnY) / 2;
 
   return (
     <>

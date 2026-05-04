@@ -312,12 +312,21 @@ describe("buildUnifiedFlow", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("emits a crosslink edge for each `triggers` cross_link", () => {
+  it("emits a crosslink edge + endpoint dots for each `triggers` cross_link", () => {
     const flow = buildUnifiedFlow(unifiedFixture);
     const xlinks = flow.edges.filter((e) => e.type === "crosslink");
     expect(xlinks).toHaveLength(1);
-    expect(xlinks[0]?.source).toBe("band:pm-triage:status:act");
-    expect(xlinks[0]?.target).toBe("band:coding-session:status:planned");
+    // Edge connects the endpoint dots, not the regions directly. Source
+    // dot is parented to the source status; target dot to the target.
+    expect(xlinks[0]?.source).toBe("xdot:src:pm-triage:act:0");
+    expect(xlinks[0]?.target).toBe("xdot:tgt:pm-triage:act:0");
+
+    const dots = flow.nodes.filter((n) => n.type === "crosslinkEndpoint");
+    expect(dots).toHaveLength(2);
+    const src = dots.find((n) => n.id === "xdot:src:pm-triage:act:0");
+    const tgt = dots.find((n) => n.id === "xdot:tgt:pm-triage:act:0");
+    expect(src?.parentId).toBe("band:pm-triage:status:act");
+    expect(tgt?.parentId).toBe("band:coding-session:status:planned");
   });
 
   it("returns a bands array with positions for navigator fitView", () => {
