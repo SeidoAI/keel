@@ -909,6 +909,9 @@ export function buildUnifiedFlow(
         const tgtW = (tgtRegion?.style as { width?: number } | undefined)
           ?.width ?? MIN_REGION_W;
         // South dot on source region: bottom-centre, half outside.
+        // Explicit width/height so ReactFlow can position before measure;
+        // pointerEvents: auto overrides the band parent's "none" so the
+        // dot stays clickable.
         allNodes.push({
           id: srcDotId,
           type: "crosslinkEndpoint",
@@ -920,7 +923,12 @@ export function buildUnifiedFlow(
           draggable: false,
           selectable: false,
           focusable: false,
-          zIndex: 20,
+          zIndex: 100,
+          style: {
+            width: CROSSLINK_DOT_SIZE,
+            height: CROSSLINK_DOT_SIZE,
+            pointerEvents: "auto",
+          },
           data: {
             role: "source",
             otherWorkflowId: link.workflow,
@@ -940,7 +948,12 @@ export function buildUnifiedFlow(
           draggable: false,
           selectable: false,
           focusable: false,
-          zIndex: 20,
+          zIndex: 100,
+          style: {
+            width: CROSSLINK_DOT_SIZE,
+            height: CROSSLINK_DOT_SIZE,
+            pointerEvents: "auto",
+          },
           data: {
             role: "target",
             otherWorkflowId: wf.id,
