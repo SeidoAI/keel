@@ -305,9 +305,7 @@ def check_coverage_heuristics(ctx: ValidationContext) -> list[CheckResult]:
                 # `coverage/unreferenced_node` was designed to warn when
                 # a code-anchored node has no implementing issue — a
                 # `principle-pm-curates-attention` legitimately has none.
-                node_type = str(
-                    node_entity.raw_frontmatter.get("type", "") or ""
-                )
+                node_type = str(node_entity.raw_frontmatter.get("type", "") or "")
                 if node_type in DEFINITIONAL_NODE_TYPES:
                     continue
                 results.append(
