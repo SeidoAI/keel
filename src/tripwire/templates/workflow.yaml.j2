@@ -309,15 +309,40 @@ workflows:
     statuses:
       - id: intake
         next: draft
+        work_steps:
+          - id: capture
+            actor: pm-agent
+            label: capture intent
+            skills: [project-manager]
       - id: draft
         next: validate
+        work_steps:
+          - id: draft
+            actor: pm-agent
+            label: draft scoped issues
+            skills: [project-manager]
       - id: validate
         next:
           - if: gaps.present == true
             then: draft
           - else: publish
+        work_steps:
+          - id: validate
+            actor: code
+            label: validate scope
+            skills: [project-manager]
       - id: publish
         terminal: true
+        cross_links:
+          - workflow: pm-triage
+            status: intake
+            label: scoped issues enter triage
+            kind: triggers
+        work_steps:
+          - id: publish
+            actor: pm-agent
+            label: publish scoped issues
+            skills: [project-manager]
     routes:
       - id: scope-intake
         actor: pm-agent
@@ -375,8 +400,18 @@ workflows:
     statuses:
       - id: intake
         next: classify
+        work_steps:
+          - id: receive
+            actor: pm-agent
+            label: receive inbox item
+            skills: [project-manager, agent-messaging]
       - id: classify
         next: act
+        work_steps:
+          - id: classify
+            actor: pm-agent
+            label: classify item
+            skills: [project-manager]
       - id: act
         next: close
         cross_links:
@@ -384,8 +419,18 @@ workflows:
             status: planned
             label: triages into session
             kind: triggers
+        work_steps:
+          - id: act
+            actor: pm-agent
+            label: act on classification
+            skills: [project-manager]
       - id: close
         terminal: true
+        work_steps:
+          - id: close
+            actor: pm-agent
+            label: close triage record
+            skills: [project-manager]
     routes:
       - id: triage-intake
         actor: pm-agent
@@ -430,15 +475,40 @@ workflows:
     statuses:
       - id: inspect
         next: edit
+        work_steps:
+          - id: inspect
+            actor: pm-agent
+            label: inspect change request
+            skills: [project-manager]
       - id: edit
         next: validate
+        work_steps:
+          - id: edit
+            actor: pm-agent
+            label: apply edits
+            skills: [project-manager]
       - id: validate
         next:
           - if: validation.clean == true
             then: publish
           - else: edit
+        work_steps:
+          - id: validate
+            actor: code
+            label: validate edits
+            skills: [project-manager]
       - id: publish
         terminal: true
+        cross_links:
+          - workflow: coding-session
+            status: planned
+            label: incremental update spawns session
+            kind: triggers
+        work_steps:
+          - id: publish
+            actor: pm-agent
+            label: publish update
+            skills: [project-manager]
     routes:
       - id: inspect-update
         actor: pm-agent
@@ -492,8 +562,23 @@ workflows:
     statuses:
       - id: inspect
         next: report
+        work_steps:
+          - id: inspect
+            actor: pm-agent
+            label: inspect project state
+            skills: [project-manager]
       - id: report
         terminal: true
+        cross_links:
+          - workflow: pm-triage
+            status: intake
+            label: maintenance findings enter triage
+            kind: triggers
+        work_steps:
+          - id: report
+            actor: pm-agent
+            label: emit findings
+            skills: [project-manager]
     routes:
       - id: status-report
         actor: pm-agent
