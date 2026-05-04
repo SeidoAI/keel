@@ -323,6 +323,15 @@ workflows:
             skills: [project-manager]
       - id: draft
         next: validate
+        # Heuristics fire-once on draft outputs: mega-issue (split too
+        # large), prose-without-node (concept names mentioned without a
+        # structured ref), semantic-coverage (AC under-references
+        # nodes), quality-consistency (drift from calibrated baseline).
+        heuristics:
+          - v_mega_issue
+          - v_concept_name_prose
+          - v_semantic_coverage
+          - v_quality_consistency
         work_steps:
           - id: draft
             actor: pm-agent
@@ -333,6 +342,18 @@ workflows:
           - if: gaps.present == true
             then: draft
           - else: publish
+        # Hard gates on the scoped artifacts before the loop can exit;
+        # the slash-command invocation is itself recorded as a
+        # prompt_check so the gate can audit "was pm-validate run."
+        # (v_workflow_well_formed is auto-prepended by the registry.)
+        tripwires:
+          - v_uuid_present
+          - v_id_format
+          - v_id_collisions
+          - v_reference_integrity
+        heuristics:
+          - v_sequence_drift
+        prompt_checks: [pm-validate]
         work_steps:
           - id: validate
             actor: code
@@ -340,6 +361,14 @@ workflows:
             skills: [project-manager]
       - id: publish
         terminal: true
+        # Phase requirements (gap-analysis.md + compliance.md present
+        # AND complete) is the scoping → scoped phase boundary tripwire.
+        # The done-implies-completed gate keeps publish from advancing
+        # an issue whose dependent session is not yet finished.
+        tripwires:
+          - v_phase_requirements
+          - v_done_implies_session_completed
+        prompt_checks: [pm-scope]
         cross_links:
           - workflow: pm-triage
             status: intake
@@ -414,6 +443,10 @@ workflows:
             skills: [project-manager, agent-messaging]
       - id: classify
         next: act
+        # Mega-item flag at classify-time so the PM can split before
+        # acting on a too-large incoming inbox row.
+        heuristics:
+          - v_mega_issue
         work_steps:
           - id: classify
             actor: pm-agent
@@ -421,6 +454,11 @@ workflows:
             skills: [project-manager]
       - id: act
         next: close
+        # Action references must resolve before the triage hops out to
+        # a coding-session; pm-edit is the recorded slash command.
+        tripwires:
+          - v_reference_integrity
+        prompt_checks: [pm-edit]
         cross_links:
           - workflow: coding-session
             status: planned
@@ -433,6 +471,8 @@ workflows:
             skills: [project-manager]
       - id: close
         terminal: true
+        tripwires:
+          - v_done_implies_session_completed
         work_steps:
           - id: close
             actor: pm-agent
@@ -489,6 +529,10 @@ workflows:
             skills: [project-manager]
       - id: edit
         next: validate
+        # Edit-time heuristics: prose-without-node, quality-drift.
+        heuristics:
+          - v_concept_name_prose
+          - v_quality_consistency
         work_steps:
           - id: edit
             actor: pm-agent
@@ -499,6 +543,11 @@ workflows:
           - if: validation.clean == true
             then: publish
           - else: edit
+        tripwires:
+          - v_uuid_present
+          - v_id_format
+          - v_reference_integrity
+        prompt_checks: [pm-validate]
         work_steps:
           - id: validate
             actor: code
@@ -506,6 +555,10 @@ workflows:
             skills: [project-manager]
       - id: publish
         terminal: true
+        tripwires:
+          - v_phase_requirements
+          - v_done_implies_session_completed
+        prompt_checks: [pm-issue-close]
         cross_links:
           - workflow: coding-session
             status: planned
@@ -569,6 +622,13 @@ workflows:
     statuses:
       - id: inspect
         next: report
+        # Sweep heuristics: stale concepts, off-band node ratio, drift
+        # from calibrated quality. Markers keep the sweep idempotent
+        # across runs; condition_hash drift re-fires.
+        heuristics:
+          - v_stale_concept
+          - v_node_ratio
+          - v_quality_consistency
         work_steps:
           - id: inspect
             actor: pm-agent
@@ -576,6 +636,7 @@ workflows:
             skills: [project-manager]
       - id: report
         terminal: true
+        prompt_checks: [pm-agenda]
         cross_links:
           - workflow: pm-triage
             status: intake
