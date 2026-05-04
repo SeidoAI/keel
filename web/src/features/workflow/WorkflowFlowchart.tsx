@@ -23,7 +23,7 @@ import type {
   WorkflowRoute,
   WorkflowStatus,
 } from "@/lib/api/endpoints/workflow";
-import { ActorEdge, ReturnEdge } from "./flowEdges";
+import { ActorEdge, CrossLinkEdge, ReturnEdge } from "./flowEdges";
 import {
   buildFlow,
   type BoundaryNodeData,
@@ -72,6 +72,7 @@ const NODE_TYPES = {
 const EDGE_TYPES = {
   actor: ActorEdge,
   return: ReturnEdge,
+  crosslink: CrossLinkEdge,
 };
 
 const DEFAULT_EDGE_OPTIONS = {

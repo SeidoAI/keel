@@ -137,6 +137,21 @@ export function StatusRegionNode({ data }: NodeProps) {
       {/* hidden handles for the region anchor edge target */}
       <Handle id="left" type="target" position={Position.Left} style={{ ...hiddenHandle, top: Y_WORK }} />
       <Handle id="right" type="source" position={Position.Right} style={{ ...hiddenHandle, top: Y_WORK }} />
+      {/* north/south handles for cross-workflow links — sit at the
+          band's vertical edges (top centre / bottom centre). Hidden but
+          functional; the CrossLinkEdge renders the visible chrome. */}
+      <Handle
+        id="north"
+        type="target"
+        position={Position.Top}
+        style={{ ...hiddenHandle, left: d.width / 2 }}
+      />
+      <Handle
+        id="south"
+        type="source"
+        position={Position.Bottom}
+        style={{ ...hiddenHandle, left: d.width / 2 }}
+      />
     </div>
   );
 }

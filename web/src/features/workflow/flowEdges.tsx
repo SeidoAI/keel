@@ -5,7 +5,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 
-import { Y_DEEP_RETURN } from "./flowGraph";
+import { CROSSLINK_LANE_OFFSET, Y_DEEP_RETURN } from "./flowGraph";
 import { ACTOR_COLOR, isKnownActor } from "./tokens";
 
 export interface ActorEdgeData extends Record<string, unknown> {
@@ -86,6 +86,85 @@ export function ActorEdge(props: EdgeProps) {
           </div>
         </EdgeLabelRenderer>
       )}
+    </>
+  );
+}
+
+// ── CrossLinkEdge: connects a status in one workflow band to a status
+// in another. Routes south out of the source region's bottom, traverses
+// the inter-band gutter, then drops into the target band on a dedicated
+// lane *above* the inputs band — so the cross-link never crosses any
+// material-input chip docking on the same north edge. Distinct visual
+// (dashed indigo) marks it as a cross-workflow link, not an intra-workflow
+// transition.
+export interface CrossLinkEdgeData extends Record<string, unknown> {
+  sourceWorkflow: string;
+  label?: string | null;
+}
+
+export function CrossLinkEdge(props: EdgeProps) {
+  const { id, sourceX, sourceY, targetX, targetY, markerEnd, data } = props;
+  const d = (data ?? {}) as CrossLinkEdgeData;
+  const stroke = "var(--color-info)";
+  const dash = "4 4";
+  const r = 14;
+  // Lane that floats above the target band (and above its input chips).
+  const targetLaneY = targetY - CROSSLINK_LANE_OFFSET;
+  // Halfway through the gutter between source and target bands. We pick
+  // the midpoint between the source's exit Y and the target lane Y,
+  // clamped so it stays in the gutter visually.
+  const gutterY = sourceY + (targetLaneY - sourceY) / 2;
+
+  // Step path:
+  //   source ↓ to gutterY → across to targetX → ↓ to targetLaneY → ↓ to target
+  const path = [
+    `M ${sourceX} ${sourceY}`,
+    `L ${sourceX} ${gutterY - r}`,
+    `Q ${sourceX} ${gutterY}, ${sourceX + (targetX > sourceX ? r : -r)} ${gutterY}`,
+    `L ${targetX - (targetX > sourceX ? r : -r)} ${gutterY}`,
+    `Q ${targetX} ${gutterY}, ${targetX} ${gutterY + r}`,
+    `L ${targetX} ${targetY}`,
+  ].join(" ");
+
+  const labelX = (sourceX + targetX) / 2;
+  const labelY = gutterY;
+
+  return (
+    <>
+      <BaseEdge
+        path={path}
+        markerEnd={markerEnd}
+        style={{
+          stroke,
+          strokeWidth: 1.5,
+          strokeDasharray: dash,
+          fill: "none",
+        }}
+      />
+      <EdgeLabelRenderer>
+        <div
+          data-testid={`workflow-crosslink-label-${id}`}
+          className="nodrag nopan"
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            padding: "2px 10px",
+            background: "var(--color-paper)",
+            border: `1px dashed ${stroke}`,
+            borderRadius: 2,
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            color: "var(--color-info)",
+            letterSpacing: "0.06em",
+            pointerEvents: "all",
+            whiteSpace: "nowrap",
+            zIndex: 50,
+            boxShadow: "0 0 0 4px var(--color-paper)",
+          }}
+        >
+          ↗ {d.label ?? d.sourceWorkflow}
+        </div>
+      </EdgeLabelRenderer>
     </>
   );
 }
