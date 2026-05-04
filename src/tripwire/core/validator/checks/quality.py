@@ -8,6 +8,7 @@ from tripwire.core import paths
 from tripwire.core.graph.refs import extract_references
 from tripwire.core.id_generator import parse_key
 from tripwire.core.validator._types import CheckResult, LoadedEntity, ValidationContext
+from tripwire.models.enums import DEFINITIONAL_NODE_TYPES
 from tripwire.models.issue import Issue
 from tripwire.models.session import AgentSession
 
@@ -298,6 +299,17 @@ def check_coverage_heuristics(ctx: ValidationContext) -> list[CheckResult]:
                 None,
             )
             if node_entity:
+                # Definitional types (principle / glossary / persona /
+                # invariant / anti_pattern / practice / metric / skill)
+                # are reference surfaces, not implementation targets.
+                # `coverage/unreferenced_node` was designed to warn when
+                # a code-anchored node has no implementing issue — a
+                # `principle-pm-curates-attention` legitimately has none.
+                node_type = str(
+                    node_entity.raw_frontmatter.get("type", "") or ""
+                )
+                if node_type in DEFINITIONAL_NODE_TYPES:
+                    continue
                 results.append(
                     CheckResult(
                         code="coverage/unreferenced_node",

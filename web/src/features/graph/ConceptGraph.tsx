@@ -245,9 +245,23 @@ export function ConceptGraph() {
     );
   }
   if (!data || data.nodes.length === 0) {
+    // Drift header still renders on the empty page — workflow drift
+    // findings, unresolved refs, and stale pins are not gated on the
+    // existence of any concept nodes, so the operator gets the
+    // signal even on a fresh project.
     return (
-      <div className="flex h-full items-center justify-center p-6 font-serif text-[14px] italic text-(--color-ink-3)">
-        No concept nodes yet. Add one under <code className="font-mono">nodes/</code>.
+      <div className="flex min-h-full flex-col bg-(--color-paper) text-(--color-ink)">
+        <div className="border-(--color-edge) border-b px-7 py-3">
+          <DriftHeader
+            projectId={projectId}
+            staleCount={0}
+            staleOnly={false}
+            onToggleStaleOnly={() => {}}
+          />
+        </div>
+        <div className="flex flex-1 items-center justify-center p-6 font-serif text-[14px] italic text-(--color-ink-3)">
+          No concept nodes yet. Add one under <code className="font-mono">nodes/</code>.
+        </div>
       </div>
     );
   }
