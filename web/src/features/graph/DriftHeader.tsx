@@ -53,24 +53,30 @@ export function DriftHeader({
         tone === "loading" && "border-(--color-edge) bg-(--color-paper-2)",
       )}
     >
-      <ScoreBlock tone={tone} score={score} pending={query.isPending} />
-
-      <div className="flex flex-1 flex-wrap items-center gap-x-5 gap-y-1">
+      <div
+        className="flex flex-1 flex-wrap items-baseline gap-x-3 gap-y-1"
+        data-testid="drift-stats-row"
+      >
+        <ScoreBlock tone={tone} score={score} pending={query.isPending} />
+        <Separator />
         <BreakdownStat
           label="stale concepts"
           value={breakdown?.stale_concepts}
           testId="drift-stale-concepts"
         />
+        <Separator />
         <BreakdownStat
           label="stale pins"
           value={breakdown?.stale_pins}
           testId="drift-stale-pins"
         />
+        <Separator />
         <BreakdownStat
           label="unresolved refs"
           value={breakdown?.unresolved_refs}
           testId="drift-unresolved-refs"
         />
+        <Separator />
         <BreakdownStat
           label="workflow drift"
           value={breakdown?.workflow_drift_findings}
@@ -127,9 +133,6 @@ function ScoreBlock({
       <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
         coherence
       </span>
-      <span aria-hidden className="text-(--color-ink-3)">
-        ·
-      </span>
       <span
         className={cn(
           "font-sans font-semibold text-[15px] tabular-nums",
@@ -160,9 +163,6 @@ function BreakdownStat({
       <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
         {label}
       </span>
-      <span aria-hidden className="text-(--color-ink-3)">
-        ·
-      </span>
       <span
         className={cn(
           "font-sans font-semibold text-[15px] tabular-nums",
@@ -172,6 +172,14 @@ function BreakdownStat({
         {v}
       </span>
     </div>
+  );
+}
+
+function Separator() {
+  return (
+    <span aria-hidden className="font-mono text-[14px] text-(--color-ink-3) leading-none">
+      ·
+    </span>
   );
 }
 
