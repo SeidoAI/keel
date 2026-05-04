@@ -210,14 +210,30 @@ export function WorkStepNode({ data, selected }: NodeProps) {
       style={{
         width: WORK_W,
         height: WORK_H,
-        background: "var(--color-paper-2)",
-        border: `1.8px solid ${c}`,
-        borderRadius: 4,
         position: "relative",
         cursor: "pointer",
         boxShadow: selected ? `0 0 0 2px ${c}33` : undefined,
       }}
     >
+      {/* Background + border on an inner inset:0 div with
+          box-sizing: border-box, matching TransitionBox. This keeps the
+          rendered visible bounds equal to (WORK_W × WORK_H), so the
+          visible vertical centre lands at exactly WORK_H/2 — same Y
+          where ReactFlow anchors the side handles. Without this, an
+          outer-wrapper border (content-box default) inflates the
+          visible size by 2×border-width and shifts the visual centre
+          ~1.8px below the handle, producing a faint kink at every
+          gate↔work_step join. */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "var(--color-paper-2)",
+          border: `1.8px solid ${c}`,
+          borderRadius: 4,
+          boxSizing: "border-box",
+        }}
+      />
       <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
         <ToolbarShell>
           <ToolbarLabel>WORK · {w.id}</ToolbarLabel>
