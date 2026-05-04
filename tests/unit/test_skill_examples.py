@@ -254,7 +254,10 @@ def test_all_reference_docs_present() -> None:
         "WORKFLOWS_INITIAL_SCOPING.md",
         "WORKFLOWS_INCREMENTAL_UPDATE.md",
         "WORKFLOWS_TRIAGE.md",
-        "WORKFLOWS_REVIEW.md",
+        # WORKFLOWS_REVIEW.md split into two docs in v0.9.6:
+        "WORKFLOWS_CODE_REVIEW.md",
+        "WORKFLOWS_NODE_RECONCILIATION.md",
+        "MONITOR_CRITERIA.md",
         "SCHEMA_PROJECT.md",
         "SCHEMA_ISSUES.md",
         "SCHEMA_NODES.md",

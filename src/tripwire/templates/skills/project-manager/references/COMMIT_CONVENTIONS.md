@@ -99,5 +99,6 @@ Don't mix feature work and unrelated housekeeping in one PR.
 
 ## See also
 
-- `WORKFLOWS_REVIEW.md` — the PM review side of PRs
+- `WORKFLOWS_CODE_REVIEW.md` — the PM review side of PRs
+- `WORKFLOWS_NODE_RECONCILIATION.md` — `reconcile:` commit convention for node updates
 - `ANTI_PATTERNS.md` — anti-patterns around commits and PRs

@@ -20,7 +20,7 @@ selects the workflow to execute:
 | `/pm-scope` | `references/WORKFLOWS_INITIAL_SCOPING.md` | Starting a new project from raw planning docs |
 | `/pm-edit` | `references/WORKFLOWS_INCREMENTAL_UPDATE.md` | Making a surgical change to existing entities |
 | `/pm-triage` | `references/WORKFLOWS_TRIAGE.md` | Processing inbound suggestions (comments, agent messages, bug reports) |
-| `/pm-review` | `references/WORKFLOWS_REVIEW.md` | Reviewing a PR to the project repo |
+| `/pm-review` | `references/WORKFLOWS_CODE_REVIEW.md` | Reviewing a coding-session's PR pair (tripwire-pr + project-pr) |
 | `/pm-status` | read-only wrapper | Summarizing project health, concerning items, next action |
 | `/pm-agenda` | read-only wrapper | Listing in-flight work and the next actionable item |
 | `/pm-graph` | read-only wrapper | Analysing the dependency graph for critical path, parallelizable work, cycles |
