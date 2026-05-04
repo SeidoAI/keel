@@ -34,6 +34,7 @@ export function WorkflowLegend() {
       <Eyebrow>route</Eyebrow>
       <RouteSwatch dash={null} label="forward" />
       <RouteSwatch dash="7 5" label="return" />
+      <RouteSwatch dash="10 4 2 4" label="side" />
       <CrossLinkSwatch />
       <Eyebrow>markers</Eyebrow>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
