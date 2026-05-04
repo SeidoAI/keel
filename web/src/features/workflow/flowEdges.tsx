@@ -5,7 +5,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 
-import { CROSSLINK_BUS_X, Y_DEEP_RETURN } from "./flowGraph";
+import { CROSSLINK_BUS_X, Y_DEEP_RETURN, Y_WORK } from "./flowGraph";
 import { ACTOR_COLOR, isKnownActor } from "./tokens";
 
 export interface ActorEdgeData extends Record<string, unknown> {
@@ -147,9 +147,31 @@ export function CrossLinkEdge(props: EdgeProps) {
     `L ${targetX} ${targetY}`,
   ].join(" ");
 
-  // Label sits at the bus, vertically centred between the two turns.
-  const labelX = busX;
-  const labelY = (sourceTurnY + targetTurnY) / 2;
+  // Two labels per edge — one near each end — so the user reads the
+  // link's purpose while looking AT the source dot OR the target dot,
+  // not from the middle of the bus where it'd be off-screen.
+  // Labels sit on the horizontal segment in each gutter, ~140px in from
+  // the dot column (so they're visible without obscuring the dot).
+  const sourceLabelOffset = 140;
+  const targetLabelOffset = 140;
+  const sourceLabelX = sourceX - sourceLabelOffset;
+  const targetLabelX = targetX - targetLabelOffset;
+  const labelText = d.label ?? d.sourceWorkflow;
+  const labelStyle: React.CSSProperties = {
+    position: "absolute",
+    padding: "2px 10px",
+    background: "var(--color-paper)",
+    border: `1px dashed ${stroke}`,
+    borderRadius: 2,
+    fontFamily: "var(--font-mono)",
+    fontSize: 10,
+    color: stroke,
+    letterSpacing: "0.06em",
+    pointerEvents: "all",
+    whiteSpace: "nowrap",
+    zIndex: 50,
+    boxShadow: "0 0 0 4px var(--color-paper)",
+  };
 
   return (
     <>
@@ -165,26 +187,24 @@ export function CrossLinkEdge(props: EdgeProps) {
       />
       <EdgeLabelRenderer>
         <div
-          data-testid={`workflow-crosslink-label-${id}`}
+          data-testid={`workflow-crosslink-label-${id}-source`}
           className="nodrag nopan"
           style={{
-            position: "absolute",
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            padding: "2px 10px",
-            background: "var(--color-paper)",
-            border: `1px dashed ${stroke}`,
-            borderRadius: 2,
-            fontFamily: "var(--font-mono)",
-            fontSize: 10,
-            color: stroke,
-            letterSpacing: "0.06em",
-            pointerEvents: "all",
-            whiteSpace: "nowrap",
-            zIndex: 50,
-            boxShadow: "0 0 0 4px var(--color-paper)",
+            ...labelStyle,
+            transform: `translate(-50%, -50%) translate(${sourceLabelX}px, ${sourceTurnY}px)`,
           }}
         >
-          ↗ {d.label ?? d.sourceWorkflow}
+          ↗ {labelText}
+        </div>
+        <div
+          data-testid={`workflow-crosslink-label-${id}-target`}
+          className="nodrag nopan"
+          style={{
+            ...labelStyle,
+            transform: `translate(-50%, -50%) translate(${targetLabelX}px, ${targetTurnY}px)`,
+          }}
+        >
+          ↘ {labelText}
         </div>
       </EdgeLabelRenderer>
     </>
@@ -201,7 +221,13 @@ export function ReturnEdge(props: EdgeProps) {
   const d = (data ?? {}) as ActorEdgeData;
   const stroke = actorStroke(d.actor);
   const dash = "7 5";
-  const deep = Y_DEEP_RETURN;
+  // Y_DEEP_RETURN is a band-RELATIVE constant. In the unified canvas,
+  // sourceY is absolute (band offset baked in), so deriving `deep` from
+  // the constant directly puts the U-turn at band 0's depth — making
+  // returns in lower bands shoot up to the top of the canvas. Compute
+  // deep from sourceY's offset within its band so the U-turn lands in
+  // the same per-band lane regardless of which band we're in.
+  const deep = sourceY + (Y_DEEP_RETURN - Y_WORK);
 
   // step path with rounded corners
   const r = 18;

@@ -255,13 +255,24 @@ function FlowInner({
       }
       return;
     }
-    // Cross-link endpoint dot: jump to the OTHER endpoint's band.
+    // Cross-link endpoint dot: jump to the OTHER endpoint's specific
+    // status region (tight close-up — fits the *region* not the whole
+    // band, so the user lands looking AT the target node, not from
+    // 30,000 ft up).
     if (node.type === "crosslinkEndpoint") {
       const d = node.data as {
         otherWorkflowId?: string;
+        otherStatusId?: string;
       };
-      if (d.otherWorkflowId) {
-        centreOnBand(rf, flow.bands, d.otherWorkflowId, 600);
+      if (d.otherWorkflowId && d.otherStatusId) {
+        const targetRegionId = `band:${d.otherWorkflowId}:status:${d.otherStatusId}`;
+        rf.fitView({
+          nodes: [{ id: targetRegionId }],
+          padding: 0.25,
+          duration: 600,
+          maxZoom: 1.0,
+          minZoom: 0.6,
+        });
       }
       return;
     }

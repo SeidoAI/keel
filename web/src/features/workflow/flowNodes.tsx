@@ -1,4 +1,5 @@
 import { Handle, NodeToolbar, Position, type NodeProps } from "@xyflow/react";
+import { useState } from "react";
 
 import { ACTOR_COLOR, ACTOR_LABEL, isKnownActor, statusHex, statusTint } from "./tokens";
 import {
@@ -464,25 +465,29 @@ function TransitionBox({ d, flavor, selected }: TransitionBoxProps) {
           background: c,
         }}
       />
+      {/* Eyebrow (command name) — aligned to work_step's eyebrow at
+          top:10 so the two node types' visual rhythms match. */}
       {r.command && (
         <div
           style={{
             position: "absolute",
-            top: 8,
+            top: 10,
             left: 12,
             fontFamily: "var(--font-mono)",
-            fontSize: 10,
+            fontSize: 9.5,
             color: "var(--color-ink-3)",
-            letterSpacing: "0.04em",
+            letterSpacing: "0.14em",
           }}
         >
           ▷ {r.command}
         </div>
       )}
+      {/* Main label — aligned to work_step's label at top:28 so the
+          eye reads the two side-by-side without a vertical jog. */}
       <div
         style={{
           position: "absolute",
-          top: r.command ? 24 : 16,
+          top: 28,
           left: 12,
           right: 12,
           fontFamily: "var(--font-sans)",
@@ -783,15 +788,15 @@ export interface CrossLinkEndpointData {
 const CROSSLINK_HEX = "#0e7c8a";
 export function CrossLinkEndpointNode({ data }: NodeProps) {
   const d = data as unknown as CrossLinkEndpointData;
-  const tooltip = d.label
-    ? `${d.label} → ${d.otherWorkflowId}.${d.otherStatusId}`
-    : `→ ${d.otherWorkflowId}.${d.otherStatusId}`;
+  const [hovered, setHovered] = useState(false);
+  const arrow = d.role === "source" ? "→" : "←";
   return (
     <div
       data-testid={`workflow-crosslink-endpoint-${d.role}-${d.otherWorkflowId}-${d.otherStatusId}`}
       data-crosslink-target-workflow={d.otherWorkflowId}
       data-crosslink-target-status={d.otherStatusId}
-      title={tooltip}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         width: 14,
         height: 14,
@@ -803,13 +808,51 @@ export function CrossLinkEndpointNode({ data }: NodeProps) {
         position: "relative",
       }}
     >
+      {/* Hover popover — uses ReactFlow's NodeToolbar so it positions
+          correctly relative to the node and survives the canvas
+          transform. */}
+      <NodeToolbar
+        isVisible={hovered}
+        position={d.role === "source" ? Position.Right : Position.Left}
+        offset={6}
+      >
+        <div
+          style={{
+            background: "var(--color-paper)",
+            border: `1px solid ${CROSSLINK_HEX}`,
+            color: CROSSLINK_HEX,
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            padding: "4px 8px",
+            letterSpacing: "0.04em",
+            whiteSpace: "nowrap",
+            boxShadow: "0 4px 12px rgba(26,24,21,0.10)",
+            borderRadius: 2,
+          }}
+        >
+          {d.label ? `${d.label} ` : ""}
+          {arrow} {d.otherWorkflowId}.{d.otherStatusId}
+          <span
+            style={{
+              color: "var(--color-ink-3)",
+              marginLeft: 6,
+              fontSize: 9,
+            }}
+          >
+            click to jump
+          </span>
+        </div>
+      </NodeToolbar>
       {/* Hidden ReactFlow handle so the edge can attach. South side
-          for source dots, north side for target dots. */}
+          for source dots, north side for target dots. Don't override
+          left/top — let ReactFlow's default Position.Bottom/Top
+          (left:50%; translate(-50%,-50%)) centre the handle exactly on
+          the dot's geometric midpoint. */}
       <Handle
         id={d.role === "source" ? "south" : "north"}
         type={d.role === "source" ? "source" : "target"}
         position={d.role === "source" ? Position.Bottom : Position.Top}
-        style={{ ...hiddenHandle, left: 7 }}
+        style={hiddenHandle}
       />
     </div>
   );
