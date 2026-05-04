@@ -229,7 +229,9 @@ export function WorkStepNode({ data, selected }: NodeProps) {
           position: "absolute",
           inset: 0,
           background: "var(--color-paper-2)",
-          border: `1.8px solid ${c}`,
+          // Match the gate's 2px border weight + same borderRadius so
+          // the two node types read as one chrome family.
+          border: `2px solid ${c}`,
           borderRadius: 4,
           boxSizing: "border-box",
         }}
@@ -245,43 +247,62 @@ export function WorkStepNode({ data, selected }: NodeProps) {
           <ToolbarButton action="zoom-to-node">Zoom</ToolbarButton>
         </ToolbarShell>
       </NodeToolbar>
+      {/* Left actor stripe (matches gate's 4px stripe). */}
       <div
         style={{
           position: "absolute",
           top: 0,
           bottom: 0,
           left: 0,
-          width: 6,
+          width: 4,
           background: c,
         }}
       />
+      {/* Eyebrow — labels the row. Aligned to gate's eyebrow at top:10/left:12. */}
       <div
         style={{
           position: "absolute",
           top: 10,
-          left: 16,
+          left: 12,
           fontFamily: "var(--font-mono)",
           fontSize: 9.5,
           color: "var(--color-ink-3)",
           letterSpacing: "0.14em",
         }}
       >
-        WORK · {actorLabel(w.actor)}
+        WORK · {w.id}
       </div>
+      {/* Main label — aligned to gate's main label at top:28/left:12. */}
       <div
         style={{
           position: "absolute",
           top: 28,
-          left: 16,
-          right: 14,
+          left: 12,
+          right: 12,
           fontFamily: "var(--font-sans)",
           fontWeight: 600,
-          fontSize: 18,
+          fontSize: 14,
           color: "var(--color-ink)",
+          letterSpacing: "-0.005em",
           lineHeight: 1.1,
         }}
       >
         {w.label}
+      </div>
+      {/* Bottom-right actor stamp (matches gate's). */}
+      <div
+        style={{
+          position: "absolute",
+          right: 8,
+          bottom: 6,
+          fontFamily: "var(--font-mono)",
+          fontSize: 9.5,
+          fontWeight: 600,
+          color: c,
+          letterSpacing: "0.06em",
+        }}
+      >
+        {actorLabel(w.actor)}
       </div>
       <Handle id="left" type="target" position={Position.Left} style={sideHandle(WORK_H / 2)} />
       <Handle id="right" type="source" position={Position.Right} style={sideHandle(WORK_H / 2)} />
@@ -482,17 +503,22 @@ function TransitionBox({ d, flavor, selected }: TransitionBoxProps) {
         }}
       />
       {/* Eyebrow (command name) — aligned to work_step's eyebrow at
-          top:10 so the two node types' visual rhythms match. */}
+          top:10 so the two node types' visual rhythms match. The
+          right:64 keeps it clear of the gate badge in the top-right. */}
       {r.command && (
         <div
           style={{
             position: "absolute",
             top: 10,
             left: 12,
+            right: 64,
             fontFamily: "var(--font-mono)",
             fontSize: 9.5,
             color: "var(--color-ink-3)",
             letterSpacing: "0.14em",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           ▷ {r.command}

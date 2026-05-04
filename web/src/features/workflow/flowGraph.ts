@@ -23,10 +23,14 @@ export const INPUTS_BAND_H = 64;
 export const OUTPUTS_BAND_H = 64;
 export const REGION_PAD_BOTTOM = 24;
 
-export const WORK_W = 220;
+// Work-step and gate share the same outer footprint so visually the
+// two node types read as one rhythm along Y_WORK. Width was bumped from
+// 220/200 → 240 so the gate's eyebrow (▷ pm-session-…) stops colliding
+// with the gate badge in the top-right.
+export const WORK_W = 240;
 export const WORK_H = 72;
 
-export const TX_W = 200;
+export const TX_W = 240;
 // Same height as WORK_H so the gate/transition boxes' tops align with
 // the work-step boxes' tops. Both centre at Y_WORK so handles align too;
 // matching heights makes that alignment *look* clean (the eye reads box
