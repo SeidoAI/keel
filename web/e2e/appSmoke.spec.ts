@@ -40,6 +40,8 @@ test("workflow page renders against real API payload without console regressions
   await expect(page.getByTestId("workflow-navigator")).toBeVisible();
   await expect(page.getByTestId("workflow-flowchart")).toBeVisible();
   await expect(page.getByTestId("workflow-nav-tile-coding-session")).toBeVisible();
+  // Unified canvas: every workflow is wrapped in a band parent group.
+  await expect(page.getByTestId("workflow-band-coding-session")).toBeVisible();
   await expect(page.getByTestId("workflow-region-executing")).toBeVisible();
   await expect(page.getByTestId("workflow-jit-completed-self-review")).toBeVisible();
   await expect(page.getByTestId("workflow-workstep-executing-implement")).toBeVisible();
