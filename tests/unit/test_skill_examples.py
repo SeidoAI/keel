@@ -264,6 +264,7 @@ def test_all_reference_docs_present() -> None:
         "SCHEMA_SESSIONS.md",
         "SCHEMA_COMMENTS.md",
         "SCHEMA_ARTIFACTS.md",
+        "SCHEMA_WORKFLOW.md",
         "CONCEPT_GRAPH.md",
         "ID_ALLOCATION.md",
         "VALIDATION.md",

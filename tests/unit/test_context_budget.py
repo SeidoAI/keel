@@ -59,12 +59,17 @@ def test_pm_skill_total_size_under_budget() -> None:
     v0.9.6 (continued) bumps to 166KB for WORKFLOWS_CODE_REVIEW.md —
     the multi-reviewer cycle (self/superpowers/codex) split out of
     WORKFLOWS_REVIEW.md as part of the four-primitive codification.
+    v0.9.6 (final, C15) bumps to 170KB for SCHEMA_WORKFLOW.md (NEW;
+    user-facing workflow.yaml schema reference) plus the
+    SUBAGENT_DELEGATION.md rewrite (2.6KB → 3.8KB; "NOT YET ENABLED"
+    stub replaced with the pm_subagent_dispatch contract from plan
+    §9). Net of WORKFLOWS_REVIEW.md deletion.
     """
     pm_dir = TEMPLATES_DIR / "skills" / "project-manager"
     total = _total_chars(pm_dir)
-    assert total < 166_000, (
+    assert total < 170_000, (
         f"PM skill is {total:,} chars ({total / 1024:.0f} KB). "
-        f"Budget is 166KB. Consolidate or trim reference docs."
+        f"Budget is 170KB. Consolidate or trim reference docs."
     )
 
 
