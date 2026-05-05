@@ -40,7 +40,6 @@ test("workflow page renders against real API payload without console regressions
   await expect(page.getByTestId("workflow-navigator")).toBeVisible();
   await expect(page.getByTestId("workflow-flowchart")).toBeVisible();
   await expect(page.getByTestId("workflow-nav-tile-coding-session")).toBeVisible();
-  // Unified canvas: every workflow is wrapped in a band parent group.
   await expect(page.getByTestId("workflow-band-coding-session")).toBeVisible();
   await expect(page.getByTestId("workflow-region-executing")).toBeVisible();
   await expect(page.getByTestId("workflow-jit-completed-self-review")).toBeVisible();
@@ -55,16 +54,18 @@ test("workflow page renders against real API payload without console regressions
   await guard.assertClean();
 });
 
-test("drift page renders without console or network errors", async ({
+test("concept graph drift header renders without console or network errors", async ({
   page,
   request,
 }, testInfo) => {
+  // The standalone /drift page was retired in v0.9.7; the same signal
+  // now lives as a header card on the Concept Graph page.
   const guard = installConsoleGuard(page, testInfo);
   const projectId = await fixtureProjectId(request);
 
-  await page.goto(`/p/${projectId}/drift`);
+  await page.goto(`/p/${projectId}/graph`);
 
-  await expect(page.getByRole("heading", { name: /Drift report/i })).toBeVisible();
+  await expect(page.getByTestId("drift-header")).toBeVisible();
   await expect(page.getByTestId("drift-score")).toBeVisible();
   await guard.assertClean();
 });

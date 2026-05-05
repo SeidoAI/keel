@@ -1,4 +1,4 @@
-import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { LayoutGrid, PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectShell } from "@/app/ProjectShell";
@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ReactFlowNode } from "@/lib/api/endpoints/graph";
 import { type InboxItem, useInbox } from "@/lib/api/endpoints/inbox";
 import { cn } from "@/lib/utils";
+import { DriftHeader } from "./DriftHeader";
 import { GraphLegend } from "./GraphLegend";
 import { GraphRail } from "./GraphRail";
 import { colorForKind, GraphSidebar } from "./GraphSidebar";
@@ -17,6 +18,41 @@ import { useLayoutPersistence } from "./useLayoutPersistence";
 const DEFAULT_CANVAS = { width: 1000, height: 600 };
 const NODE_RADIUS = 22;
 const NODE_RADIUS_SMALL = 16;
+
+/**
+ * Type-driven size multipliers. Encodes the architectural hierarchy
+ * subtly (1.4× / 1.0× / 0.85×) — load-bearing types whisper
+ * "important" without claiming a ranking *within* type. PM #25
+ * round 5: ref-count sizing was considered and rejected — it would
+ * inflate well-cited terms (glossary-tripwire) over architecturally
+ * important principles (principle-comparative-advantage) that are
+ * usually invoked, not cited.
+ */
+const TYPE_SIZE_SCALE: Record<string, number> = {
+  principle: 1.4,
+  invariant: 1.4,
+  decision: 1.0,
+  contract: 1.0,
+  requirement: 1.0,
+  endpoint: 1.0,
+  service: 1.0,
+  schema: 1.0,
+  config: 1.0,
+  model: 1.0,
+  glossary: 0.85,
+  practice: 0.85,
+  persona: 0.85,
+  metric: 0.85,
+  anti_pattern: 0.85,
+  skill: 0.85,
+  tf_output: 0.85,
+  custom: 0.85,
+};
+
+function radiusForType(nodeType: string): number {
+  const scale = TYPE_SIZE_SCALE[nodeType] ?? 1.0;
+  return Math.round(NODE_RADIUS * scale);
+}
 
 /** Cap on canvas-rendered node labels — the rail shows the full
  *  string. PM #25 round 2 P1: at ~200 nodes, untruncated titles
@@ -108,6 +144,18 @@ export function ConceptGraph() {
   const [railOpen, setRailOpen] = useState(true);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState(DEFAULT_CANVAS);
+  // Bumped by the Auto-arrange button to force `useGraphLayout` to
+  // re-seed (smart placement + a fresh d3-force pass).
+  const [reseedNonce, setReseedNonce] = useState(0);
+  // "unsaved" — only re-place nodes without a saved layout.
+  // "all" — un-pin every node and re-distribute. Used when the user
+  // clicks Auto-arrange with zero unsaved nodes (the saved positions
+  // came from automatic seeding, not user drags, so re-arranging is
+  // the user's intent).
+  const [reseedMode, setReseedMode] = useState<"unsaved" | "all">("unsaved");
+  // Drift filter — when on, non-stale nodes dim and the sidebar
+  // narrows to stale nodes only. Toggled from the DriftHeader card.
+  const [staleOnly, setStaleOnly] = useState(false);
 
   // Track canvas size so the d3-force seeding centres in the
   // visible area instead of the default 1000×600 viewBox.
@@ -130,6 +178,10 @@ export function ConceptGraph() {
     () => (data?.nodes ?? []).filter((n) => n.type === "concept"),
     [data?.nodes],
   );
+  const staleCount = useMemo(
+    () => concepts.filter((n) => n.data?.status === "stale").length,
+    [concepts],
+  );
 
   // Restrict edges to concept↔concept before handing them to
   // d3-force: the simulation only sees concept nodes, and any link
@@ -148,7 +200,20 @@ export function ConceptGraph() {
     edges: conceptEdges,
     width: size.width,
     height: size.height,
+    reseedNonce,
+    reseedMode,
+    // P0 from PR review: "all" mode is one-shot. Without this reset
+    // the next refetch (default `staleTime` 30s, WS invalidation, ...)
+    // would re-enter the seed effect with mode still "all" and
+    // re-run the simulation across the just-persisted positions,
+    // thrashing node YAMLs whenever the user lands on the page.
+    onReseedComplete: () => setReseedMode("unsaved"),
   });
+
+  const unsavedCount = useMemo(
+    () => concepts.filter((n) => !n.data?.has_saved_layout).length,
+    [concepts],
+  );
 
   // Persist any newly-seeded positions back to YAML so the next
   // reload reads them and skips d3-force entirely.
@@ -180,9 +245,23 @@ export function ConceptGraph() {
     );
   }
   if (!data || data.nodes.length === 0) {
+    // Drift header still renders on the empty page — workflow drift
+    // findings, unresolved refs, and stale pins are not gated on the
+    // existence of any concept nodes, so the operator gets the
+    // signal even on a fresh project.
     return (
-      <div className="flex h-full items-center justify-center p-6 font-serif text-[14px] italic text-(--color-ink-3)">
-        No concept nodes yet. Add one under <code className="font-mono">nodes/</code>.
+      <div className="flex min-h-full flex-col bg-(--color-paper) text-(--color-ink)">
+        <div className="border-(--color-edge) border-b px-7 py-3">
+          <DriftHeader
+            projectId={projectId}
+            staleCount={0}
+            staleOnly={false}
+            onToggleStaleOnly={() => {}}
+          />
+        </div>
+        <div className="flex flex-1 items-center justify-center p-6 font-serif text-[14px] italic text-(--color-ink-3)">
+          No concept nodes yet. Add one under <code className="font-mono">nodes/</code>.
+        </div>
       </div>
     );
   }
@@ -198,16 +277,54 @@ export function ConceptGraph() {
   return (
     <div className="flex min-h-full flex-col bg-(--color-paper) text-(--color-ink)">
       <header className="border-(--color-edge) border-b px-7 py-4">
-        <div className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
-          chapter 05 · concept graph
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
+              chapter 05 · concept graph
+            </div>
+            <h1 className="mt-1 font-sans font-semibold text-[30px] text-(--color-ink) leading-[1.1] tracking-[-0.02em]">
+              What this project is made of.
+            </h1>
+            <p className="mt-1 font-serif text-[14.5px] italic text-(--color-ink-2)">
+              Every concept the team has named, who cites it, and how fresh it is.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // When there are unsaved nodes, just place those.
+              // When everything is saved, the user is asking for a
+              // full re-layout — un-pin all nodes for this pass.
+              setReseedMode(unsavedCount === 0 ? "all" : "unsaved");
+              setReseedNonce((n) => n + 1);
+            }}
+            title={
+              unsavedCount === 0
+                ? "Re-distribute every node — saved positions become starting points"
+                : "Re-place unsaved nodes near related neighbours"
+            }
+            aria-label={
+              unsavedCount === 0
+                ? "Re-layout every concept node"
+                : "Auto-arrange unsaved nodes"
+            }
+          >
+            <LayoutGrid className="mr-1.5 h-3.5 w-3.5" />
+            {unsavedCount === 0
+              ? "Re-layout all"
+              : `Auto-arrange (${unsavedCount} unsaved)`}
+          </Button>
         </div>
-        <h1 className="mt-1 font-sans font-semibold text-[30px] text-(--color-ink) leading-[1.1] tracking-[-0.02em]">
-          What this project is made of.
-        </h1>
-        <p className="mt-1 font-serif text-[14.5px] italic text-(--color-ink-2)">
-          Every concept the team has named, who cites it, and how fresh it is.
-        </p>
       </header>
+      <div className="border-(--color-edge) border-b px-7 py-3">
+        <DriftHeader
+          projectId={projectId}
+          staleCount={staleCount}
+          staleOnly={staleOnly}
+          onToggleStaleOnly={() => setStaleOnly((on) => !on)}
+        />
+      </div>
       <div className="border-(--color-edge) border-b px-7 py-3">
         <GraphLegend />
       </div>
@@ -305,11 +422,13 @@ export function ConceptGraph() {
               if (!pos) return null;
               const isFocus = node.id === focus;
               const isNeighbour = neighbours.has(node.id);
-              const dim = focus !== null && !isFocus && !isNeighbour;
               const stale = node.data?.status === "stale";
+              const dimByFocus = focus !== null && !isFocus && !isNeighbour;
+              const dimByStaleOnly = staleOnly && !stale;
+              const dim = dimByFocus || dimByStaleOnly;
               const nodeType = String(node.data?.type ?? "concept");
               const typeColor = colorForKind(nodeType);
-              const r = NODE_RADIUS;
+              const r = radiusForType(nodeType);
               const inboxCount = inboxByNode.get(node.id)?.length ?? 0;
               return (
                 // biome-ignore lint/a11y/useSemanticElements: HTML <button> isn't a valid SVG child; role="button" on a <g> is the standard pattern for interactive SVG groups

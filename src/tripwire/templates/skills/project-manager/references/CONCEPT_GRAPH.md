@@ -33,13 +33,19 @@ endpoint), general enough to be meaningfully referenced. If you'd link
 to it in a design doc, it's a node. Whole-repo nodes are too broad —
 split into the concepts within the repo that other things reference.
 
-Good: API endpoints, data schemas (collections, config schemas, event
-types), inter-system contracts (SSE event model, approval flow),
-constraint decisions, shared libraries (subdivide: SDK + the client
+Good (code-anchored): API endpoints, data schemas (collections, config
+schemas, event types), inter-system contracts (SSE event model, approval
+flow), constraint decisions, shared libraries (subdivide: SDK + the client
 class others import), infra resources consumed by app code.
 
-Bad (keep as prose): single helper functions, local variables, things
-internal to one file that nothing else references.
+Good (conceptual): principles guiding many decisions, practices codifying
+recurring work (kebab-case slugs, every session writes verified.md),
+glossary terms with project-specific meaning, metrics driving process
+review, personas (PM agent, coding agent, reviewer), invariants the
+system must preserve, anti-patterns the team has ruled out.
+
+Bad (keep as prose): single helper functions, local variables, page-specific
+UX details, things internal to one file that nothing else references.
 
 ## Granularity benchmarks
 
