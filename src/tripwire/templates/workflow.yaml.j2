@@ -91,7 +91,7 @@ workflows:
           - id: deliver
             actor: coding-agent
             label: open PRs + self-review
-            skills: [verification, agent-messaging]
+            skills: [verification]
       - id: in_review
         next: verified
         cross_links:
@@ -125,7 +125,7 @@ workflows:
           - id: review
             actor: pm-agent
             label: review session
-            skills: [project-manager, verification]
+            skills: []
       - id: verified
         next: completed
         artifacts:
@@ -308,7 +308,7 @@ workflows:
             - followups-not-filed
             - stopped-to-ask
             - write-count
-            - cost-ceiling  # impl in src/tripwire/_internal/jit_prompts/; reclassified to tripwires in stage 2
+            - cost-ceiling  # reclassified to tripwires in stage 2
         skills: [project-manager, verification]
         emits:
           artifacts:
@@ -728,15 +728,15 @@ workflows:
           - id: gather-pr-state
             actor: pm-agent
             label: gather PR state
-            skills: [project-manager]
+            skills: []
           - id: gather-inbox-state
             actor: pm-agent
             label: gather inbox state
-            skills: [project-manager, agent-messaging]
+            skills: [agent-messaging]
           - id: gather-message-queue
             actor: pm-agent
             label: gather message queue
-            skills: [project-manager, agent-messaging]
+            skills: []
       - id: classify
         next: dispatch
         heuristics:
@@ -794,6 +794,12 @@ workflows:
             actor: pm-agent
             label: wait for next tick
             skills: [project-manager]
+      - id: stopped
+        terminal: true
+        # Sink for shutdown / kill. Reached only when the operator
+        # halts the monitor — not via any normal route. Required by the
+        # well-formedness check; pm-monitor's working loop is
+        # `scan → classify → dispatch → idle → scan`.
     routes:
       - id: monitor-tick
         actor: pm-agent
@@ -901,11 +907,11 @@ workflows:
           - id: walk-verification-checklist
             actor: pm-agent
             label: walk verification checklist
-            skills: [verification]
+            skills: []
           - id: write-verified-md
             actor: pm-agent
             label: write verified.md
-            skills: [project-manager, verification]
+            skills: []
       - id: independent-reviews
         next: synthesis
         work_steps:
@@ -916,15 +922,15 @@ workflows:
           - id: launch-superpowers-subagent
             actor: pm-agent
             label: launch superpowers code-review subagent
-            skills: [project-manager]
+            skills: []
           - id: comment-codex-trigger
             actor: pm-agent
             label: comment @codex on project-pr
-            skills: [project-manager]
+            skills: []
           - id: collect-review-outputs
             actor: pm-agent
             label: collect three review outputs
-            skills: [project-manager]
+            skills: []
       - id: synthesis
         next:
           - if: review.verdict == merge
@@ -940,7 +946,7 @@ workflows:
           - id: decide-verdict
             actor: pm-agent
             label: decide merge or relaunch
-            skills: [project-manager]
+            skills: []
       - id: node-reconcile
         next: merge
         cross_links:
@@ -956,15 +962,15 @@ workflows:
           - id: identify-missing-nodes
             actor: pm-agent
             label: identify missing nodes
-            skills: [project-manager]
+            skills: []
           - id: update-or-create-nodes
             actor: pm-agent
             label: update or create nodes
-            skills: [project-manager]
+            skills: []
           - id: rehash-source-nodes
             actor: pm-agent
             label: rehash source nodes
-            skills: [project-manager]
+            skills: []
       - id: merge
         terminal: true
         tripwires:
@@ -977,11 +983,11 @@ workflows:
           - id: merge-project-pr
             actor: pm-agent
             label: merge project-pr
-            skills: [project-manager]
+            skills: []
           - id: emit-merge-event
             actor: pm-agent
             label: emit merge event
-            skills: [project-manager]
+            skills: []
       - id: relaunch
         terminal: true
         cross_links:
@@ -998,7 +1004,7 @@ workflows:
           - id: session-reopen-and-resume
             actor: pm-agent
             label: reopen session and resume coding agent
-            skills: [project-manager]
+            skills: []
     routes:
       - id: pr-pair-received
         actor: pm-agent
@@ -1367,11 +1373,11 @@ workflows:
           - id: decide-outcome
             actor: pm-agent
             label: decide refresh / accept-divergence / delete
-            skills: [project-manager]
+            skills: []
           - id: apply-outcome
             actor: pm-agent
             label: apply outcome (rehash, edit body, or delete)
-            skills: [project-manager]
+            skills: []
       - id: reconciled
         terminal: true
         tripwires:
@@ -1418,7 +1424,7 @@ workflows:
           - id: enumerate-stale-nodes
             actor: pm-agent
             label: enumerate stale nodes
-            skills: [project-manager]
+            skills: []
       - id: reviewing
         next: reconciled
         tripwires:
@@ -1427,15 +1433,15 @@ workflows:
           - id: read-source-and-node
             actor: pm-agent
             label: read live source against node body
-            skills: [project-manager]
+            skills: []
           - id: decide-outcome
             actor: pm-agent
             label: decide refresh / accept-divergence / delete
-            skills: [project-manager]
+            skills: []
           - id: apply-outcome
             actor: pm-agent
             label: apply outcome (rehash, edit body, or delete)
-            skills: [project-manager]
+            skills: []
       - id: reconciled
         terminal: true
         tripwires:
@@ -1444,7 +1450,7 @@ workflows:
           - id: emit-reconcile-event
             actor: pm-agent
             label: emit reconcile event
-            skills: [project-manager]
+            skills: []
     routes:
       - id: freshness-detected
         actor: pm-agent

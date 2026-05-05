@@ -40,6 +40,9 @@ ALLOWED_NAMES = {
     "pm-status",
     "pm-agenda",
     "pm-graph",
+    # v0.9.6 — pm-monitor and phase-advancement workflows
+    "pm-monitor",
+    "pm-phase",
 }
 
 # Commands that take arguments must have an argument-hint.

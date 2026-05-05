@@ -310,6 +310,9 @@ class TestInitBasics:
             "pm-session-review.md",
             # v0.7b session complete:
             "pm-session-complete.md",
+            # v0.9.6 pm-monitor and phase-advancement workflows:
+            "pm-monitor.md",
+            "pm-phase.md",
         }
         actual = {p.name for p in commands_dir.glob("*.md")}
         assert expected == actual, (

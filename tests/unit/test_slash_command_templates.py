@@ -53,6 +53,9 @@ EXPECTED_COMMANDS: tuple[str, ...] = (
     "pm-session-review",
     # v0.7b session complete:
     "pm-session-complete",
+    # v0.9.6 pm-monitor and phase-advancement workflows:
+    "pm-monitor",
+    "pm-phase",
 )
 
 REQUIRED_FRONTMATTER_FIELDS: tuple[str, ...] = ("name", "description", "argument-hint")
