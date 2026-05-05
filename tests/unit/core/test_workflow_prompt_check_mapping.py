@@ -91,3 +91,38 @@ def test_no_prompt_check_fires_at_frontmatter_remains() -> None:
         if "fires_at:" in path.read_text(encoding="utf-8")
     ]
     assert offenders == []
+
+
+def test_default_workflow_declares_lifecycle_prompt_checks() -> None:
+    import yaml
+
+    from tripwire.core.workflow.prompt_checks import LIFECYCLE_PROMPT_CHECK_IDS
+
+    template = Path("src/tripwire/templates/workflow.yaml.j2").read_text(
+        encoding="utf-8"
+    )
+    parsed = yaml.safe_load(template)
+    declared = set()
+    for workflow in parsed["workflows"].values():
+        for status in workflow["statuses"]:
+            declared.update(status.get("prompt_checks", []))
+        for route in workflow.get("routes", []):
+            declared.update((route.get("controls") or {}).get("prompt_checks", []))
+    assert LIFECYCLE_PROMPT_CHECK_IDS - declared == set()
+
+
+def test_lifecycle_prompt_check_templates_record_invocations() -> None:
+    root = Path("src/tripwire/templates/commands")
+    missing: list[str] = []
+    for prompt_check_id in (
+        "pm-session-create",
+        "pm-session-queue",
+        "pm-session-spawn",
+        "pm-session-review",
+        "pm-session-complete",
+    ):
+        text = (root / f"{prompt_check_id}.md").read_text(encoding="utf-8")
+        expected = f"tripwire prompt-check invoke {prompt_check_id}"
+        if expected not in text:
+            missing.append(prompt_check_id)
+    assert missing == []

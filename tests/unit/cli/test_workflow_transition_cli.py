@@ -160,10 +160,10 @@ def test_transition_uses_target_status_validators(
                 statuses:
                   - id: planned
                     next: queued
-                    validators: [v_id_format]
+                    tripwires: [v_id_format]
                   - id: queued
                     next: executing
-                    validators: [v_uuid_present]
+                    tripwires: [v_uuid_present]
                   - id: executing
                     terminal: true
             """
@@ -181,6 +181,101 @@ def test_transition_uses_target_status_validators(
     assert call["kwargs"]["validator_ids"] == ["v_uuid_present"]
     assert call["kwargs"]["workflow"] == "coding-session"
     assert call["kwargs"]["status"] == "queued"
+
+
+def test_transition_uses_route_controls_when_routes_declared(
+    tmp_path: Path, clean_validator
+) -> None:
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    terminal: true
+                    tripwires: [v_status_only]
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    controls:
+                      tripwires: [v_route_only]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+
+    assert result.exit_code == 0, result.output
+    call = clean_validator.calls[-1]
+    assert call["kwargs"]["validator_ids"] == ["v_route_only"]
+
+
+def test_transition_prompt_check_gate_accepts_recorded_invocation(
+    tmp_path: Path, clean_validator
+) -> None:
+    from tripwire.cli.prompt_check import prompt_check_cmd
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    next: executing
+                    prompt_checks: [pm-session-queue]
+                  - id: executing
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+
+    rejected = runner.invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+    assert rejected.exit_code != 0
+    assert "prompt_checks_missing" in rejected.output
+
+    invoked = runner.invoke(
+        prompt_check_cmd,
+        [
+            "invoke",
+            "pm-session-queue",
+            "test-session",
+            "--project-dir",
+            str(pd),
+        ],
+    )
+    assert invoked.exit_code == 0, invoked.output
+
+    accepted = runner.invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+    assert accepted.exit_code == 0, accepted.output
 
 
 def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
@@ -294,9 +389,9 @@ def test_transition_completed_event_carries_status_instance(
     )
 
 
-def test_transition_rejected_when_validators_fail(tmp_path: Path) -> None:
-    """If `tripwire validate --strict` reports errors at the destination
-    status, the gate rejects with reason=validators_failed."""
+def test_transition_rejected_when_tripwires_fail(tmp_path: Path) -> None:
+    """If `tripwire validate` reports errors at the destination status,
+    the gate rejects with reason=tripwires_failed."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
@@ -315,7 +410,7 @@ def test_transition_rejected_when_validators_fail(tmp_path: Path) -> None:
     assert result.exit_code != 0
     rows = list(read_events(pd, instance="test-session", event="transition.rejected"))
     assert any(
-        r["details"].get("reason", "").startswith("validators_failed") for r in rows
+        r["details"].get("reason", "").startswith("tripwires_failed") for r in rows
     )
     # Session did NOT advance.
     session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
@@ -416,3 +511,146 @@ def test_transition_reloads_session_inside_lock(
     assert completed
     assert completed[-1]["details"]["from_status"] == "queued"
     assert completed[-1]["details"]["to_status"] == "executing"
+
+
+# ============================================================================
+# Codex P2 — _missing_consumed_artifacts must not crash on unresolved
+# template placeholders mid-transition.
+# ============================================================================
+
+
+def test_missing_consumed_artifacts_resolves_issue_key_from_session(
+    tmp_path: Path,
+) -> None:
+    """When a consumed-artifact path uses ``{issue_key}``, the helper
+    resolves it from ``session.issues[0]`` rather than crashing on
+    KeyError.
+    """
+    from datetime import datetime, timezone
+
+    from tripwire.core.workflow.schema import (
+        NextSpec,
+        WorkflowArtifactRef,
+        WorkflowStatus,
+        WorkflowStatusArtifacts,
+    )
+    from tripwire.core.workflow.transitions import _missing_consumed_artifacts
+    from tripwire.models.session import AgentSession
+
+    target = WorkflowStatus(
+        id="executing",
+        next=NextSpec(kind="terminal"),
+        artifacts=WorkflowStatusArtifacts(
+            consumes=[
+                WorkflowArtifactRef(
+                    id="developer-doc",
+                    label="developer.md",
+                    path="issues/{issue_key}/developer.md",
+                )
+            ]
+        ),
+    )
+    session = AgentSession(
+        id="test-session",
+        name="Test",
+        agent="backend-coder",
+        issues=["SEI-42"],
+        repos=[],
+        status="planned",
+        created_at=datetime.now(tz=timezone.utc),
+        updated_at=datetime.now(tz=timezone.utc),
+    )
+
+    # No file on disk — helper should report the resolved path as
+    # missing, not crash.
+    missing = _missing_consumed_artifacts(
+        tmp_path, session_id="test-session", target=target, session=session
+    )
+    assert missing == ["issues/SEI-42/developer.md"]
+
+
+def test_missing_consumed_artifacts_skips_unresolved_placeholders(
+    tmp_path: Path,
+) -> None:
+    """Placeholders that only settle at write-time (``{nnn}``,
+    ``{yyyy-mm-dd}``) cannot be answered at gate-check; the helper
+    must skip such paths rather than raise.
+    """
+    from tripwire.core.workflow.schema import (
+        NextSpec,
+        WorkflowArtifactRef,
+        WorkflowStatus,
+        WorkflowStatusArtifacts,
+    )
+    from tripwire.core.workflow.transitions import _missing_consumed_artifacts
+
+    target = WorkflowStatus(
+        id="verified",
+        next=NextSpec(kind="terminal"),
+        artifacts=WorkflowStatusArtifacts(
+            consumes=[
+                WorkflowArtifactRef(
+                    id="completion-comment",
+                    label="completion comment",
+                    path=(
+                        "issues/{issue_key}/comments/{nnn}-completion-{yyyy-mm-dd}.yaml"
+                    ),
+                )
+            ]
+        ),
+    )
+
+    # No session bound; even with one, `{nnn}`/`{yyyy-mm-dd}` remain
+    # unresolved. Helper returns empty list rather than KeyError.
+    missing = _missing_consumed_artifacts(
+        tmp_path, session_id="test-session", target=target, session=None
+    )
+    assert missing == []
+
+
+def test_missing_consumed_artifacts_handles_session_without_issues(
+    tmp_path: Path,
+) -> None:
+    """A session with no bound issues + a path requiring ``{issue_key}``
+    leaves the placeholder unresolved, which means the helper skips
+    the path (cannot answer existence) instead of crashing.
+    """
+    from datetime import datetime, timezone
+
+    from tripwire.core.workflow.schema import (
+        NextSpec,
+        WorkflowArtifactRef,
+        WorkflowStatus,
+        WorkflowStatusArtifacts,
+    )
+    from tripwire.core.workflow.transitions import _missing_consumed_artifacts
+    from tripwire.models.session import AgentSession
+
+    target = WorkflowStatus(
+        id="executing",
+        next=NextSpec(kind="terminal"),
+        artifacts=WorkflowStatusArtifacts(
+            consumes=[
+                WorkflowArtifactRef(
+                    id="developer-doc",
+                    label="developer.md",
+                    path="issues/{issue_key}/developer.md",
+                )
+            ]
+        ),
+    )
+    session = AgentSession(
+        id="test-session",
+        name="Test",
+        agent="backend-coder",
+        issues=[],
+        repos=[],
+        status="planned",
+        created_at=datetime.now(tz=timezone.utc),
+        updated_at=datetime.now(tz=timezone.utc),
+    )
+
+    missing = _missing_consumed_artifacts(
+        tmp_path, session_id="test-session", target=target, session=session
+    )
+    assert missing == []

@@ -37,15 +37,20 @@ test("workflow page renders against real API payload without console regressions
 
   await page.goto(`/p/${projectId}/workflow`);
 
-  await expect(page.getByRole("heading", { name: /^Workflow$/i })).toBeVisible();
-  await expect(page.getByRole("region", { name: /Workflow territory map/i })).toBeVisible();
-  await expect(page.getByRole("region", { name: /Status executing/i })).toBeVisible();
-  await expect(page.getByRole("region", { name: /Status in_review/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Gate into executing/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /JIT prompt self review/i })).toBeVisible();
+  await expect(page.getByTestId("workflow-navigator")).toBeVisible();
+  await expect(page.getByTestId("workflow-flowchart")).toBeVisible();
+  await expect(page.getByTestId("workflow-nav-tile-coding-session")).toBeVisible();
+  await expect(page.getByTestId("workflow-band-coding-session")).toBeVisible();
+  await expect(page.getByTestId("workflow-region-executing")).toBeVisible();
+  await expect(page.getByTestId("workflow-jit-completed-self-review")).toBeVisible();
+  await expect(page.getByTestId("workflow-workstep-executing-implement")).toBeVisible();
 
-  await page.getByRole("button", { name: /Gate into executing/i }).click();
-  await expect(page.getByRole("dialog")).toContainText("v_uuid_present");
+  const gateBadge = page.getByTestId("workflow-gate-badge-queued-to-executing");
+  await expect(gateBadge).toBeVisible();
+  await gateBadge.click();
+  await expect(
+    page.getByTestId("workflow-gate-panel-queued-to-executing"),
+  ).toContainText("uuid_present");
   await guard.assertClean();
 });
 
@@ -53,10 +58,8 @@ test("concept graph drift header renders without console or network errors", asy
   page,
   request,
 }, testInfo) => {
-  // The standalone /drift page was retired in v0.9.7; the same
-  // signal now lives as a header card on the Concept Graph page
-  // (see [[principle-concept-graph-as-definition]]'s "drift as a
-  // metric, not a view" section). E2E moved with it.
+  // The standalone /drift page was retired in v0.9.7; the same signal
+  // now lives as a header card on the Concept Graph page.
   const guard = installConsoleGuard(page, testInfo);
   const projectId = await fixtureProjectId(request);
 

@@ -423,11 +423,6 @@ export function ConceptGraph() {
               const isFocus = node.id === focus;
               const isNeighbour = neighbours.has(node.id);
               const stale = node.data?.status === "stale";
-              // Two independent dim sources: focus mode (highlight a
-              // selected node + its neighbours) and stale-only mode
-              // (highlight stale nodes regardless of focus). Either
-              // engages dim; stale nodes always read clearly when
-              // stale-only is on.
               const dimByFocus = focus !== null && !isFocus && !isNeighbour;
               const dimByStaleOnly = staleOnly && !stale;
               const dim = dimByFocus || dimByStaleOnly;

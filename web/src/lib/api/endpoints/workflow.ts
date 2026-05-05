@@ -22,22 +22,72 @@ export interface WorkflowStatusArtifacts {
   consumes: WorkflowArtifactRef[];
 }
 
+export interface WorkflowWorkStep {
+  id: string;
+  actor: string;
+  label: string;
+  skills: string[];
+}
+
+export interface WorkflowCrossLink {
+  workflow: string;
+  status: string;
+  label?: string | null;
+  kind: "triggers" | "triggered_by";
+  pm_subagent_dispatch?: boolean;
+}
+
 export interface WorkflowStatus {
   id: string;
   label?: string;
   description?: string;
   next: WorkflowNext;
-  validators: string[];
+  tripwires: string[];
+  heuristics: string[];
   jit_prompts: string[];
   prompt_checks: string[];
   artifacts: WorkflowStatusArtifacts;
+  work_steps: WorkflowWorkStep[];
+  cross_links?: WorkflowCrossLink[];
+}
+
+export interface WorkflowRouteControls {
+  tripwires: string[];
+  heuristics: string[];
+  jit_prompts: string[];
+  prompt_checks: string[];
+}
+
+export interface WorkflowRouteEmits {
+  artifacts: WorkflowArtifactRef[];
+  events: string[];
+  comments: string[];
+  status_changes: string[];
+}
+
+export interface WorkflowRoute {
+  id: string;
+  workflow_id: string;
+  actor: "pm-agent" | "coding-agent" | "code" | string;
+  from: string;
+  to: string;
+  kind: "forward" | "return" | "loop" | "side" | "terminal" | string;
+  label: string;
+  trigger?: string | null;
+  command?: string | null;
+  controls: WorkflowRouteControls;
+  signals: string[];
+  skills: string[];
+  emits: WorkflowRouteEmits;
 }
 
 export interface WorkflowDefinition {
   id: string;
   actor: string;
   trigger: string;
+  brief_description?: string | null;
   statuses: WorkflowStatus[];
+  routes: WorkflowRoute[];
 }
 
 export interface WorkflowRegistryEntry {
@@ -47,6 +97,7 @@ export interface WorkflowRegistryEntry {
   blocking?: boolean;
   workflow?: string;
   status?: string;
+  route?: string;
   source?: string;
   fires_on_event?: string;
   prompt_revealed?: string | null;
@@ -54,9 +105,12 @@ export interface WorkflowRegistryEntry {
 }
 
 export interface WorkflowRegistry {
-  validators: WorkflowRegistryEntry[];
+  tripwires: WorkflowRegistryEntry[];
+  heuristics: WorkflowRegistryEntry[];
   jit_prompts: WorkflowRegistryEntry[];
   prompt_checks: WorkflowRegistryEntry[];
+  commands: WorkflowRegistryEntry[];
+  skills: WorkflowRegistryEntry[];
 }
 
 export interface WorkflowDriftFinding {

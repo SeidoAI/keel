@@ -273,9 +273,6 @@ def discover_projects(config: UserConfig) -> list[ProjectSummary]:
         for name in _FALLBACK_ROOTS:
             _add(_find_projects_in_root(home / name, max_depth=2))
 
-    # Build summaries (the variable is also used in the pinned
-    # branch above; mypy reads both branches, hence the bare
-    # assignment here to avoid a `[no-redef]` collision).
     summaries = []
     for project_dir in candidates:
         summary = _try_load_summary(project_dir)

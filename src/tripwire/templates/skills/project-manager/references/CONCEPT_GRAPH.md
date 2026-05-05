@@ -1,174 +1,117 @@
 # Concept Graph
 
-The concept graph is the mechanism that keeps issues, code, contracts,
-and decisions coherent as a project evolves. It's the single most
-important design element in this system — more important than the issue
-schema or the validation gate.
+Keeps issues, code, contracts, and decisions coherent as the project
+evolves. The most important design element in this system — more so
+than the issue schema or the validation gate.
 
-## The problem it solves
+## What it solves
 
-Without a concept graph, three things drift independently:
+Without it, three things drift independently: issue text (written once,
+stale forever), code (changes via PRs), and the doc or contract the
+issue referenced. Downstream agents pick up a later issue and build
+against stale info. **Drift is a tax on every future agent invocation.**
 
-1. The issue text (written once, stale forever)
-2. The actual code (changes via PRs)
-3. The doc or contract the issue referenced (changes separately)
-
-Nobody notices until a downstream agent picks up a later issue and
-builds against stale information. Agents compound the damage because
-they can't tell which source is authoritative. **Drift is a tax on
-every future agent invocation.**
-
-## The solution
-
-A **concept node** is a named, versioned pointer to a concrete artifact
-in the codebase. Instead of prose like "the auth endpoint in the
-backend", issues reference `[[auth-token-endpoint]]` — a stable
-identifier that resolves to a specific file, line range, and content
-hash.
+A **concept node** is a named, versioned pointer to a concrete
+artifact. Issues reference `[[auth-token-endpoint]]` — a stable id
+resolving to a file, optional line range, and content hash — instead
+of prose like "the auth endpoint in the backend".
 
 ## When to create a node
 
-**When in doubt, create the node.** The cost of a node is 30 seconds
-of writing a YAML file. The cost of a missing node is undetected
-drift across every issue that mentions the concept in prose.
+**When in doubt, create it.** Node = 30s of YAML; missing node =
+undetected drift everywhere the concept appears in prose.
 
-Create a node when ANY of these are true:
-- The concept appears in 2+ issues
-- The concept crosses a repo boundary
-- The concept is a contract or interface between components
-- The concept is a decision that constrains downstream work
-- The concept is a schema, data model, or API endpoint that other
-  things validate against
+Create when ANY apply:
+- Appears in 2+ issues
+- Crosses a repo boundary
+- Is a contract or interface between components
+- Is a decision that constrains downstream work
+- Is a schema, model, or endpoint that other things validate against
 
-**Granularity:** A node should be specific enough to have a single
-owner (one file, one schema, one endpoint) but general enough to be
-meaningfully referenced. If you'd link to it in a design doc, it
-should be a node. If a node covers an entire repo, it's too broad —
-break it into the concepts within the repo that other things
-actually reference.
+**Granularity:** specific enough to have one owner (file, schema,
+endpoint), general enough to be meaningfully referenced. If you'd link
+to it in a design doc, it's a node. Whole-repo nodes are too broad —
+split into the concepts within the repo that other things reference.
 
-Good candidates (code-anchored):
-- API endpoints (one node per endpoint or endpoint group)
-- Data schemas (Firestore collections, config schemas, event types)
-- Contracts between systems (SSE event model, approval flow)
-- Decisions that constrain work (storage choice, auth approach)
-- Shared libraries or SDKs (but subdivide: the SDK is one node, the
-  client class within it that others import is another)
-- Infrastructure resources consumed by application code
+Good (code-anchored): API endpoints, data schemas (collections, config
+schemas, event types), inter-system contracts (SSE event model, approval
+flow), constraint decisions, shared libraries (subdivide: SDK + the client
+class others import), infra resources consumed by app code.
 
-Good candidates (conceptual):
-- Principles guiding many decisions (e.g. "agents do mechanical work,
-  humans do taste") — load-bearing lenses worth naming once and
-  citing many times
-- Practices that codify how recurring work gets done (kebab-case slugs,
-  every session writes verified.md)
-- Glossary terms with project-specific meaning (tripwire, station,
-  engagement) — first-class definitions other nodes can link to
-- Metrics that drive process review (validator pass-rate, tripwire
-  fires per session)
-- Personas (PM agent, coding agent, human reviewer) — actors with
-  defined skill profiles and write scope
-- Invariants the system must preserve (UUIDs are immutable, cache is
-  rebuildable from source) — anchor points for validator rules
-- Anti-patterns the team has explicitly ruled out — pair with the
-  principle they violate
+Good (conceptual): principles guiding many decisions, practices codifying
+recurring work (kebab-case slugs, every session writes verified.md),
+glossary terms with project-specific meaning, metrics driving process
+review, personas (PM agent, coding agent, reviewer), invariants the
+system must preserve, anti-patterns the team has ruled out.
 
-Bad candidates (keep as prose):
-- A single helper function only one issue mentions
-- Local variables or implementation details
-- Things internal to a single file that nothing else references
-- Page-specific UX details ("the side drawer is 520px wide") — those
-  go in the relevant component's body, not as their own node
+Bad (keep as prose): single helper functions, local variables, page-specific
+UX details, things internal to one file that nothing else references.
 
 ## Granularity benchmarks
 
-**Target ratio:** ~0.7-0.9x the number of concrete issues. An
-8,000-line planning corpus with 60 concrete issues should produce
-40-55 nodes. If your node count is below 0.6x your concrete issue
-count, you are likely grouping concepts that should be separate
-nodes.
+Target node count: ~0.7-0.9x concrete issues. 60 issues → 40-55 nodes.
+Below 0.6x → likely grouping concepts that should be separate.
 
-**Splitting signals:**
-- A node whose description uses "and" to join two distinct concepts
-  should be split (e.g., "auth endpoint and rate limiter" → two
-  nodes).
-- A node referenced by issues that don't otherwise overlap — those
-  issues reference different aspects of the grouped concept.
+Splitting signals: descriptions using "and" to join distinct concepts
+("auth endpoint and rate limiter" → two), or a node referenced by
+non-overlapping issues (different aspects of the grouped concept).
 
-**Merging signals:**
-- A node referenced by only 1 issue after the second-pass check is
-  a candidate for merging, unless it's genuinely unique (e.g., a
-  single Terraform resource).
+Merging signal: only 1 referrer after the second-pass check, unless
+it's genuinely unique (a single Terraform resource).
 
 ## Reference syntax
 
-`[[node-id]]` in any Markdown body (issue, node description, comment)
-parses as a reference. The reference parser:
+`[[node-id]]` in any Markdown body. Parser matches lowercase,
+letter-first, hyphenated slugs, skips fenced code blocks (` ``` ` and
+`~~~`), and deduplicates within a file while preserving order.
 
-- Matches lowercase, letter-first, hyphenated slugs
-- Skips fenced code blocks (`` ``` `` and `~~~`)
-- Deduplicates within a file but preserves document order
+- ✓ `[[user-model]]`, `[[dec-003-session-tokens]]`
+- ✗ `[[UserModel]]` (uppercase), `[[user_model]]` (underscore)
 
-Examples:
-- ✓ `Uses the [[user-model]] for lookups.`
-- ✓ `See [[dec-003-session-tokens]] for the rationale.`
-- ✗ `[[UserModel]]` — uppercase not allowed
-- ✗ `[[user_model]]` — underscores not allowed
-- ✗ `Inside a ``` code block ``` [[ref]]` — skipped by the parser
+## Graph cache
 
-## The graph cache
-
-`graph/index.yaml` is a committed cache of the concept graph built from
-scanning every issue and node file. Its purpose is to make graph reads
-O(1) without rescanning everything.
-
-The validator rebuilds the cache as a side effect. You never edit it
-by hand — delete it and run `validate` if you think it's corrupt.
+`graph/index.yaml` is a committed cache for O(1) reads. Validator
+rebuilds it as a side effect. Don't hand-edit — delete and re-validate
+if corrupt.
 
 ## Freshness
 
-Every active node with a `source` has a `content_hash`. During
-validation, the freshness checker fetches the current content at the
-node's source path and compares hashes. Different hash → stale node.
+Every active node with a `source` has a `content_hash`. Validate
+fetches the current content and compares. Mismatch → stale.
 
-When you update code that a node points at, you must rehash the node:
-
-1. Read the current content (respecting `source.lines` if set)
-2. Compute `sha256:<hex>`
-3. Update `source.content_hash` and `updated_at` in the node file
-
-Leave `content_hash: null` if you don't know — the validator will flag
-it as stale and the next agent working there can rehash.
+When you change code at a node's source: read the content (respecting
+`source.lines` if set), compute `sha256:<hex>`, update
+`source.content_hash` and `updated_at`. If you don't know, leave
+`content_hash: null` — validator flags it stale and the next agent
+rehashes.
 
 ## Edge types
 
-Edges are derived from the data, never stored as separate files:
+Derived from data, never stored as separate files:
 
 | Edge | Source | How |
 |---|---|---|
-| Issue → Node | issue body | `[[node-id]]` in the Markdown |
-| Issue → Issue | issue frontmatter | `blocked_by: [OTHER-1]` |
-| Issue → Requirement | issue frontmatter | `implements: [REQ-001]` |
-| Node → Node | node frontmatter | `related: [other-node]` (bi-directional) |
-| Node → Source | node frontmatter | `source: {repo, path, lines, content_hash}` |
+| Issue → Node | issue body | `[[node-id]]` |
+| Issue → Issue | frontmatter | `blocked_by: [OTHER-1]` |
+| Issue → Requirement | frontmatter | `implements: [REQ-001]` |
+| Node → Node | frontmatter | `related: [other-node]` (bi-directional) |
+| Node → Source | frontmatter | `source: {repo, path, lines, content_hash}` |
 
-## Bi-directional `related`
-
-If `node-a.related` contains `node-b`, then `node-b.related` must
-contain `node-a`. The validator warns on one-sided refs and `--fix`
-auto-adds the missing side. Write both sides yourself — it's clearer.
+`related` is bi-directional: if `a.related ⊇ {b}` then
+`b.related ⊇ {a}`. Validator warns on one-sided refs; `--fix`
+auto-adds the missing side. Write both yourself — it's clearer.
 
 ## Commands
 
-- `tripwire refs list <issue-key>` — see an issue's references
-- `tripwire refs reverse <node-id>` — see what references a node
-- `tripwire refs check` — full scan for dangling/orphan/stale refs
+- `tripwire refs list <issue-key>` — issue's references
+- `tripwire refs reverse <node-id>` — what references a node
+- `tripwire refs check` — full dangling/orphan/stale scan
 - `tripwire node check [node-id]` — freshness check
-- `tripwire graph --type concept` — render the full graph
+- `tripwire graph --type concept` — render the graph
 
 ## See also
 
 - `examples/node-*.yaml` — one example per node type
-- `SCHEMA_NODES.md` — the node file schema
-- `REFERENCES.md` — `[[node-id]]` syntax and bi-directional rules
-- `VALIDATION.md` — the reference integrity checks
+- `SCHEMA_NODES.md` — node schema
+- `REFERENCES.md` — syntax and bi-directional rules
+- `VALIDATION.md` — reference-integrity checks

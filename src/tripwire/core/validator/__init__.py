@@ -81,7 +81,9 @@ from tripwire.core.validator.checks.coherence import (
     _COHERENCE_MATRIX,
     _SESSION_STATUS_TO_PHASE,
     check_comment_provenance,
+    check_done_implies_session_completed,
     check_freshness,
+    check_issue_session_status_compatibility,
     check_pm_response_covers_self_review,
     check_pm_response_followups_resolve,
     check_session_issue_coherence,
@@ -910,6 +912,147 @@ def _checks_for_validate(
     return checks
 
 
+_VALID_HEURISTIC_MODES = {"surface", "quiet", "none", "as_tripwires"}
+
+
+def _entity_uuid_for_finding(
+    finding: CheckResult, ctx: ValidationContext, entity_kind: str
+) -> str:
+    """Resolve the entity uuid a heuristic finding scopes against.
+
+    For ``project``-scoped heuristics (no per-entity locus), the
+    singleton sentinel is used so all such markers cluster together.
+    For per-entity heuristics, the finding's ``file`` is matched
+    against the loaded entity buckets; missing matches fall back to a
+    file-path digest so suppression still keys uniquely.
+    """
+    from tripwire._internal.heuristics._acks import (
+        PROJECT_SINGLETON_UUID,
+        condition_hash,
+    )
+
+    if entity_kind == "project":
+        return PROJECT_SINGLETON_UUID
+
+    file_str = finding.file or ""
+    if not file_str:
+        return PROJECT_SINGLETON_UUID
+
+    bucket: list[LoadedEntity]
+    if entity_kind == "issue":
+        bucket = ctx.issues
+    elif entity_kind == "node":
+        bucket = ctx.nodes
+    elif entity_kind == "session":
+        bucket = ctx.sessions
+    else:
+        bucket = []
+
+    for entity in bucket:
+        if entity.rel_path == file_str:
+            uuid_value = entity.raw_frontmatter.get("uuid")
+            if isinstance(uuid_value, str) and uuid_value:
+                return uuid_value
+            break
+
+    # Fallback: hash the file path. Keeps suppression deterministic
+    # when uuid resolution fails (e.g. parse error in the entity).
+    return f"path:{condition_hash(file_str)}"
+
+
+def _apply_heuristic_mode(
+    findings: list[CheckResult],
+    *,
+    project_dir: Path,
+    ctx: ValidationContext,
+    mode: str,
+) -> list[CheckResult]:
+    """Filter / promote heuristic-class findings per the requested mode.
+
+    ``mode`` is one of:
+
+    * ``"surface"`` — emit every heuristic finding; markers are
+      written/refreshed as a side effect so subsequent ``"quiet"`` runs
+      can suppress them.
+    * ``"quiet"`` — drop heuristic findings whose marker exists for the
+      current ``(heuristic_id, entity_uuid, condition_hash)``; refresh
+      the marker for surviving findings.
+    * ``"none"`` — drop every heuristic finding without writing markers.
+    * ``"as_tripwires"`` — promote every heuristic finding to
+      ``severity="error"``; markers are neither read nor written in
+      this mode (CI gating must not pollute the local suppression
+      state, otherwise a follow-up ``--quiet-heuristics`` dev run
+      would silently drop the very findings that just failed CI).
+    """
+    if mode not in _VALID_HEURISTIC_MODES:
+        raise ValueError(
+            f"unknown heuristic_mode {mode!r} (expected one of "
+            f"{sorted(_VALID_HEURISTIC_MODES)})"
+        )
+
+    from tripwire._internal.heuristics import (
+        heuristic_for_check_code,
+        write_marker,
+    )
+    from tripwire._internal.heuristics._acks import (
+        MarkerKey,
+        condition_hash,
+        has_marker,
+    )
+
+    out: list[CheckResult] = []
+    for finding in findings:
+        spec = heuristic_for_check_code(finding.code)
+        if spec is None:
+            out.append(finding)
+            continue
+
+        if mode == "none":
+            continue
+
+        entity_uuid = _entity_uuid_for_finding(finding, ctx, spec.entity)
+        chash = condition_hash(
+            finding.code,
+            finding.message,
+            finding.file or "",
+            finding.field or "",
+        )
+        key = MarkerKey(spec.id, entity_uuid, chash)
+
+        if mode == "quiet" and has_marker(project_dir, key):
+            continue
+
+        if mode == "as_tripwires" and finding.severity == "warning":
+            finding = CheckResult(
+                code=finding.code,
+                severity="error",
+                message=finding.message,
+                file=finding.file,
+                line=finding.line,
+                field=finding.field,
+                fix_hint=finding.fix_hint,
+                before=finding.before,
+                after=finding.after,
+            )
+
+        if mode in ("surface", "quiet"):
+            try:
+                write_marker(
+                    project_dir,
+                    key,
+                    evidence_summary=finding.message[:160],
+                )
+            except OSError:
+                logger.warning(
+                    "heuristic marker write failed for %s/%s",
+                    spec.id,
+                    entity_uuid,
+                )
+
+        out.append(finding)
+    return out
+
+
 def validate_project(
     project_dir: Path,
     *,
@@ -920,6 +1063,7 @@ def validate_project(
     validator_ids: Iterable[str] | None = None,
     workflow: str | None = None,
     status: str | None = None,
+    heuristic_mode: str = "surface",
 ) -> ValidationReport:
     """Run the full validation gate against a project.
 
@@ -948,10 +1092,11 @@ def validate_project(
 
     started = time.monotonic()
     logger.info(
-        "validate_project: starting (project=%s, strict=%s, fix=%s)",
+        "validate_project: starting (project=%s, strict=%s, fix=%s, heuristic_mode=%s)",
         project_dir,
         strict,
         fix,
+        heuristic_mode,
     )
 
     ctx = load_context(project_dir)
@@ -1022,6 +1167,10 @@ def validate_project(
                 )
             )
 
+    findings = _apply_heuristic_mode(
+        findings, project_dir=project_dir, ctx=ctx, mode=heuristic_mode
+    )
+
     errors = [f for f in findings if f.severity == "error"]
     warnings = [f for f in findings if f.severity == "warning"]
 
@@ -1075,6 +1224,7 @@ __all__ = [
     "check_bidirectional_related",
     "check_comment_provenance",
     "check_coverage_heuristics",
+    "check_done_implies_session_completed",
     "check_enum_values",
     "check_freshness",
     "check_handoff_artifact",
@@ -1082,6 +1232,7 @@ __all__ = [
     "check_id_format",
     "check_issue_artifact_presence",
     "check_issue_body_structure",
+    "check_issue_session_status_compatibility",
     "check_manifest_phase_ownership_consistent",
     "check_manifest_schema",
     "check_phase_requirements",

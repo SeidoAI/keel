@@ -22,6 +22,8 @@ All emission goes via :func:`emit_event`. Three callers:
 - :mod:`tripwire.core.workflow.transitions` (KUI-159) — emits
   ``transition.requested`` / ``transition.completed`` /
   ``transition.rejected`` for each gate run.
+- :mod:`tripwire.cli.prompt_check` — emits ``prompt_check.invoked``
+  when a PM slash-command check has been run for a workflow status.
 
 The drift detector (KUI-124) consumes via :func:`read_events`.
 """

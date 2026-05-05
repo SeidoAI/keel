@@ -46,10 +46,13 @@ from tripwire.core.workflow.loader import load_workflows
 from tripwire.core.workflow.schema import (
     NextSpec,
     Workflow,
+    WorkflowRoute,
+    WorkflowRouteControls,
     WorkflowSpec,
     WorkflowStatus,
 )
 from tripwire.models.enums import SessionStatus
+from tripwire.models.session import AgentSession
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +184,7 @@ def request_transition(
             return _run_gate(
                 project_dir,
                 session=session,
+                workflow=workflow,
                 current=current,
                 current_status=current_status,
                 target_status=target_status,
@@ -210,6 +214,7 @@ def _run_gate(
     project_dir: Path,
     *,
     session,
+    workflow: Workflow,
     current,
     current_status: str,
     target_status: str,
@@ -227,18 +232,24 @@ def _run_gate(
             reason=f"transition_not_reachable: current status "
             f"{current_status!r} is not declared in workflow.yaml",
         )
-    if not _is_reachable(current_status, target_status, current.next):
+    route = _route_between(workflow, current_status, target_status)
+    if workflow.routes:
+        reachable = route is not None
+    else:
+        reachable = _is_reachable(current_status, target_status, current.next)
+    if not reachable:
         return _reject(
             project_dir,
             session_id,
             target_status,
             reason=f"transition_not_reachable: cannot move from "
-            f"{current_status!r} to {target_status!r} via declared `next:`",
+            f"{current_status!r} to {target_status!r} via declared workflow route",
         )
 
     target = statuses_by_id[target_status]
+    controls = _controls_for_transition(route, target)
 
-    # 2. Validators — target-status entry gate from workflow.yaml.
+    # 2. Tripwires — target-status entry gate from workflow.yaml.
     from tripwire.cli.transition import validate_project
 
     report = validate_project(
@@ -246,7 +257,7 @@ def _run_gate(
         strict=True,
         fix=False,
         session_id=session_id,
-        validator_ids=target.validators,
+        validator_ids=controls.tripwires,
         workflow=WORKFLOW_ID,
         status=target_status,
     )
@@ -256,11 +267,11 @@ def _run_gate(
             project_dir,
             session_id,
             target_status,
-            reason=f"validators_failed: {first.code}: {first.message}",
+            reason=f"tripwires_failed: {first.code}: {first.message}",
         )
 
     # 3. JIT prompts — target-status entry gate from workflow.yaml.
-    jit_prompt_ids = list(target.jit_prompts)
+    jit_prompt_ids = list(controls.jit_prompts)
     if jit_prompt_ids:
         from tripwire._internal.jit_prompts.loader import load_jit_prompt_registry
 
@@ -277,7 +288,7 @@ def _run_gate(
             )
 
     # 4. Prompt-checks — target-status entry gate from workflow.yaml.
-    required_pcs = list(target.prompt_checks)
+    required_pcs = list(controls.prompt_checks)
     if required_pcs:
         invoked = _invoked_prompt_checks_at_status(
             project_dir, instance=session_id, status=target_status
@@ -293,7 +304,10 @@ def _run_gate(
 
     # 5. Artifacts — target-status consumed paths must exist.
     missing_artifacts = _missing_consumed_artifacts(
-        project_dir, session_id=session_id, target=target
+        project_dir,
+        session_id=session_id,
+        target=target,
+        session=session,
     )
     if missing_artifacts:
         return _reject(
@@ -355,6 +369,28 @@ def _reject(
     )
 
 
+def _route_between(
+    workflow: Workflow, current_status: str, target_status: str
+) -> WorkflowRoute | None:
+    for route in workflow.routes:
+        if route.from_ref == current_status and route.to_ref == target_status:
+            return route
+    return None
+
+
+def _controls_for_transition(
+    route: WorkflowRoute | None, target: WorkflowStatus
+) -> WorkflowRouteControls:
+    if route is None:
+        return WorkflowRouteControls(
+            tripwires=list(target.tripwires),
+            heuristics=list(target.heuristics),
+            jit_prompts=list(target.jit_prompts),
+            prompt_checks=list(target.prompt_checks),
+        )
+    return route.controls
+
+
 def _unacked_status_jit_prompts(
     project_dir: Path,
     registry: dict,
@@ -408,15 +444,53 @@ def _invoked_prompt_checks_at_status(
     return invoked
 
 
+class _SafeFormatDict(dict):
+    """``str.format_map`` companion that leaves unknown ``{name}``
+    placeholders intact instead of raising ``KeyError``.
+    """
+
+    def __missing__(self, key: str) -> str:
+        return "{" + key + "}"
+
+
 def _missing_consumed_artifacts(
-    project_dir: Path, *, session_id: str, target: WorkflowStatus
+    project_dir: Path,
+    *,
+    session_id: str,
+    target: WorkflowStatus,
+    session: AgentSession | None = None,
 ) -> list[str]:
-    """Return workflow-declared consumed artifact paths that do not exist."""
+    """Return workflow-declared consumed artifact paths that do not exist.
+
+    Path templates can carry placeholders beyond ``{session_id}`` (e.g.
+    ``{issue_key}``, ``{nnn}``, ``{yyyy-mm-dd}``). The first is
+    resolvable from the session's bound issue; the latter two only
+    settle at write-time. Use a name-blind safe formatter that leaves
+    unknowns in place, then skip any path still carrying ``{...}``
+    after the substitution — there's no way to know whether such a
+    file exists, and the gate must not crash mid-transition for a
+    template the runtime can't fully resolve yet.
+    """
+    context: dict[str, str] = {"session_id": session_id}
+    if session is not None and session.issues:
+        # The session's first issue key is the canonical binding for
+        # `{issue_key}` template paths. If the session is bound to
+        # multiple issues, additional issue artifacts surface through
+        # the per-issue paths declared elsewhere.
+        context["issue_key"] = session.issues[0]
+    safe = _SafeFormatDict(context)
+
     missing: list[str] = []
     for artifact in target.artifacts.consumes:
         if not artifact.path:
             continue
-        rel = artifact.path.format(session_id=session_id)
+        rel = artifact.path.format_map(safe)
+        if "{" in rel:
+            # An unresolved placeholder remains (e.g. `{nnn}` or
+            # `{yyyy-mm-dd}` — settled at write-time). Cannot answer
+            # "does the file exist" for such a template at gate-check;
+            # skip rather than crash.
+            continue
         if not (project_dir / rel).exists():
             missing.append(rel)
     return missing

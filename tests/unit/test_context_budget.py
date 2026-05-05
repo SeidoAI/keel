@@ -53,19 +53,17 @@ def test_pm_skill_total_size_under_budget() -> None:
     v0.8x bumps to 153KB for the new SCHEMA_INBOX.md reference doc + the
     "Inbox — escalating to the human" section in SKILL.md (PM-as-curator
     of the dashboard's left-column attention queue).
-    v0.9.7 bumps to 165KB for the node-type expansion (7 new types:
-    principle, practice, glossary, metric, persona, invariant,
-    anti_pattern) — adds 7 example node files + the Naming the node
-    section + adjacent-types decision table in SCHEMA_NODES.md.
-    v0.9.7 round 2 bumps to 168KB for the `skill` node type (8th
-    new type) — adds node-skill.yaml example + skill rows in the
-    type list and adjacent-types table.
+    v0.9.6 (final, C15) bumps to 170KB for SCHEMA_WORKFLOW.md plus the
+    SUBAGENT_DELEGATION.md rewrite, net of WORKFLOWS_REVIEW.md deletion.
+    v0.9.7 merge bumps to 185KB to absorb the 8 new node-type example
+    files (principle, practice, glossary, metric, persona, invariant,
+    anti_pattern, skill) plus SCHEMA_NODES expansion.
     """
     pm_dir = TEMPLATES_DIR / "skills" / "project-manager"
     total = _total_chars(pm_dir)
-    assert total < 168_000, (
+    assert total < 185_000, (
         f"PM skill is {total:,} chars ({total / 1024:.0f} KB). "
-        f"Budget is 153KB. Consolidate or trim reference docs."
+        f"Budget is 170KB. Consolidate or trim reference docs."
     )
 
 
@@ -88,7 +86,7 @@ def test_pm_skill_md_under_budget() -> None:
 
 
 def test_total_templates_under_budget() -> None:
-    """Everything `tripwire init` copies must stay under 332KB total.
+    """Everything `tripwire init` copies must stay under the total budget.
 
     v0.2 was ~217KB. v0.6a bumped to 275KB. v0.7b bumped to 285KB for
     spawn/defaults.yaml + issue_artifacts + /pm-issue-artifact. v0.7.2
@@ -100,13 +98,14 @@ def test_total_templates_under_budget() -> None:
     monitor invocation fields. v0.7.10 §D (KUI-95) bumps to 325KB for
     the codex-review workflow + codex-reviewer agent + protocol doc.
     v0.8x bumps to 332KB for the inbox primitive (SCHEMA_INBOX.md
-    reference doc + the SKILL.md inbox-authoring section).
-    v0.9.7 bumps to 350KB for the node-type expansion (PM skill +12KB
-    via 7 new example files + SCHEMA_NODES expansion).
+    reference doc + the SKILL.md inbox-authoring section). v0.9.6 ran a
+    conciseness pass across all four skills and the workflow.yaml.j2
+    template, then bumped to 360KB to absorb the PM-expansion content.
+    v0.9.7 merge bumps to 380KB to cover the node-type expansion on top.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 350_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 332KB."
+    assert total < 380_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 380KB."
     )
 
 

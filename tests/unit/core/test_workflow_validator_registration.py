@@ -6,6 +6,31 @@ from pathlib import Path
 from textwrap import dedent
 
 
+def test_every_source_check_function_is_in_catalog() -> None:
+    import ast
+
+    from tripwire.core.validator import ALL_CHECKS
+    from tripwire.core.workflow.registry import validator_id_for
+
+    root = Path("src/tripwire/core/validator/checks")
+    source_ids: set[str] = set()
+    for path in sorted(root.glob("*.py")):
+        if path.name == "__init__.py":
+            continue
+        module = ast.parse(path.read_text(encoding="utf-8"))
+        for node in module.body:
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("check"):
+                ident = (
+                    f"v_{path.stem}"
+                    if node.name == "check"
+                    else f"v_{node.name.removeprefix('check_')}"
+                )
+                source_ids.add(ident)
+
+    catalog_ids = {validator_id_for(fn) for fn in ALL_CHECKS}
+    assert sorted(source_ids - catalog_ids) == []
+
+
 def test_every_check_has_unique_workflow_catalog_id() -> None:
     from tripwire.core.validator import ALL_CHECKS
     from tripwire.core.workflow.registry import validator_id_for
@@ -30,10 +55,10 @@ def test_declared_validator_ids_come_from_workflow_yaml(tmp_path: Path) -> None:
                 statuses:
                   - id: queued
                     next: executing
-                    validators: [v_uuid_present]
+                    tripwires: [v_uuid_present]
                   - id: executing
                     terminal: true
-                    validators: [v_reference_integrity, v_uuid_present]
+                    tripwires: [v_reference_integrity, v_uuid_present]
             """
         ),
         encoding="utf-8",
@@ -43,6 +68,41 @@ def test_declared_validator_ids_come_from_workflow_yaml(tmp_path: Path) -> None:
         "v_workflow_well_formed",
         "v_uuid_present",
         "v_reference_integrity",
+    ]
+
+
+def test_declared_validator_ids_prefer_route_controls(tmp_path: Path) -> None:
+    from tripwire.core.workflow.registry import declared_validator_ids
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: queued
+                    next: executing
+                    tripwires: [v_status_only]
+                  - id: executing
+                    terminal: true
+                routes:
+                  - id: queued-to-executing
+                    actor: pm-agent
+                    from: queued
+                    to: executing
+                    controls:
+                      tripwires: [v_route_only, v_status_only]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    assert declared_validator_ids(tmp_path) == [
+        "v_workflow_well_formed",
+        "v_route_only",
+        "v_status_only",
     ]
 
 
@@ -75,7 +135,7 @@ def test_all_declared_validators_resolve_to_implementations(tmp_path: Path) -> N
                 statuses:
                   - id: completed
                     terminal: true
-                    validators: [v_uuid_present, v_enum_values]
+                    tripwires: [v_uuid_present, v_enum_values]
             """
         ),
         encoding="utf-8",
@@ -109,7 +169,7 @@ def test_validate_project_runs_only_workflow_declared_validators(
                 statuses:
                   - id: completed
                     terminal: true
-                    validators: [v_selected]
+                    tripwires: [v_selected]
             """
         ),
         encoding="utf-8",

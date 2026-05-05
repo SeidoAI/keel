@@ -26,6 +26,16 @@ from pathlib import Path
 
 import yaml
 
+LIFECYCLE_PROMPT_CHECK_IDS = frozenset(
+    {
+        "pm-session-create",
+        "pm-session-queue",
+        "pm-session-spawn",
+        "pm-session-review",
+        "pm-session-complete",
+    }
+)
+
 
 @dataclass(frozen=True)
 class PromptCheck:
@@ -97,4 +107,4 @@ def _parse_command_file(path: Path) -> PromptCheck | None:
     )
 
 
-__all__ = ["PromptCheck", "collect_prompt_checks"]
+__all__ = ["LIFECYCLE_PROMPT_CHECK_IDS", "PromptCheck", "collect_prompt_checks"]

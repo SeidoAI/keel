@@ -75,8 +75,12 @@ def declared_validator_ids(project_dir: Path) -> list[str]:
     if not spec.workflows:
         return list(validator_catalog())
     for workflow in spec.workflows.values():
+        for route in workflow.routes:
+            for validator_id in route.controls.tripwires:
+                if validator_id not in ids:
+                    ids.append(validator_id)
         for status in workflow.statuses:
-            for validator_id in status.validators:
+            for validator_id in status.tripwires:
                 if validator_id not in ids:
                     ids.append(validator_id)
     return ids
@@ -119,6 +123,9 @@ def jit_prompt_status_refs(
     refs: list[tuple[str, str]] = []
     spec = load_workflows(project_dir)
     for workflow in spec.workflows.values():
+        for route in workflow.routes:
+            if jit_prompt_id in route.controls.jit_prompts:
+                refs.append((workflow.id, route.to_ref))
         for status in workflow.statuses:
             if jit_prompt_id in status.jit_prompts:
                 refs.append((workflow.id, status.id))
@@ -132,34 +139,94 @@ def known_prompt_check_ids(project_dir: Path) -> set[str]:
     return {pc.id for pc in collect_prompt_checks(project_dir)}
 
 
+def known_command_ids(project_dir: Path) -> set[str]:
+    """Return all packaged or project-local slash command ids."""
+    return known_prompt_check_ids(project_dir)
+
+
+def known_skill_ids(project_dir: Path | None = None) -> set[str]:
+    """Return packaged and project-local skill ids."""
+    ids: set[str] = set()
+    for root in _skill_roots(project_dir):
+        if not root.is_dir():
+            continue
+        for skill_md in root.glob("*/SKILL.md"):
+            ids.add(skill_md.parent.name)
+    return ids
+
+
+def _skill_roots(project_dir: Path | None) -> list[Path]:
+    import tripwire
+
+    roots = [Path(tripwire.__file__).parent / "templates" / "skills"]
+    if project_dir is not None:
+        roots.append(project_dir / ".tripwire" / "skills")
+    return roots
+
+
 def workflow_catalog_drift(project_dir: Path) -> list[dict[str, Any]]:
     """Return catalog/config mismatch findings for workflow-adjacent UIs.
 
     Referenced-missing controls are reported by ``validate_workflow_spec``.
-    This helper reports validator implementations that are present but
-    not referenced by any workflow status. JIT prompts and prompt checks
-    may be dormant implementation options, so they are not catalog drift
-    unless a workflow references a missing id.
+    This helper reports implemented workflow controls that must be
+    placed by ``workflow.yaml`` but are not referenced by any status.
     """
     spec = load_workflows(project_dir)
     if not spec.workflows:
         return []
 
     used_validators: set[str] = set()
+    used_jit_prompts: set[str] = set()
+    used_prompt_checks: set[str] = set()
     for workflow in spec.workflows.values():
+        for route in workflow.routes:
+            used_validators.update(route.controls.tripwires)
+            used_jit_prompts.update(route.controls.jit_prompts)
+            used_prompt_checks.update(route.controls.prompt_checks)
         for status in workflow.statuses:
-            used_validators.update(status.validators)
+            used_validators.update(status.tripwires)
+            used_jit_prompts.update(status.jit_prompts)
+            used_prompt_checks.update(status.prompt_checks)
 
     findings: list[dict[str, Any]] = []
     for ident in sorted(known_validator_ids() - used_validators):
         findings.append(
             {
                 "source": "catalog",
-                "code": "workflow/unreferenced_validator",
+                "code": "workflow/unreferenced_tripwire",
                 "workflow": None,
                 "status": None,
                 "message": (
-                    f"validator {ident!r} is implemented but not referenced in workflow.yaml"
+                    f"tripwire {ident!r} is implemented but not referenced in workflow.yaml"
+                ),
+                "severity": "warning",
+            }
+        )
+    for ident in sorted(known_jit_prompt_ids(project_dir) - used_jit_prompts):
+        findings.append(
+            {
+                "source": "catalog",
+                "code": "workflow/unreferenced_jit_prompt",
+                "workflow": None,
+                "status": None,
+                "message": (
+                    f"JIT prompt {ident!r} is implemented but not referenced in workflow.yaml"
+                ),
+                "severity": "warning",
+            }
+        )
+
+    from tripwire.core.workflow.prompt_checks import LIFECYCLE_PROMPT_CHECK_IDS
+
+    for ident in sorted(LIFECYCLE_PROMPT_CHECK_IDS - used_prompt_checks):
+        findings.append(
+            {
+                "source": "catalog",
+                "code": "workflow/unreferenced_prompt_check",
+                "workflow": None,
+                "status": None,
+                "message": (
+                    f"prompt-check {ident!r} is implemented but not referenced in workflow.yaml"
                 ),
                 "severity": "warning",
             }
@@ -170,8 +237,10 @@ def workflow_catalog_drift(project_dir: Path) -> list[dict[str, Any]]:
 __all__ = [
     "declared_validator_ids",
     "jit_prompt_status_refs",
+    "known_command_ids",
     "known_jit_prompt_ids",
     "known_prompt_check_ids",
+    "known_skill_ids",
     "known_validator_ids",
     "validator_catalog",
     "validator_checks_for_ids",

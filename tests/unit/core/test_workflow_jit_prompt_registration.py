@@ -35,9 +35,17 @@ def test_jit_prompt_status_refs_come_from_workflow_yaml(tmp_path: Path) -> None:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
+                  - id: executing
+                    next: completed
                   - id: completed
                     terminal: true
-                    jit_prompts: [self-review]
+                routes:
+                  - id: executing-to-completed
+                    actor: pm-agent
+                    from: executing
+                    to: completed
+                    controls:
+                      jit_prompts: [self-review]
             """
         ),
         encoding="utf-8",
@@ -84,3 +92,35 @@ def test_no_jit_prompt_at_metadata_remains() -> None:
         if " at =" in text or "\nat:" in text:
             offenders.append(str(path))
     assert offenders == []
+
+
+def test_default_workflow_declares_all_builtin_jit_prompts() -> None:
+    """Every implemented JIT prompt class must be referenced in
+    ``workflow.yaml.j2``. Some are referenced under ``tripwires:`` rather
+    than ``jit_prompts:`` — the four-primitive split classifies an impl
+    by the kind of *control* it represents (hard pass/fail vs hidden +
+    ack), not by the Python directory it ships in. ``cost-ceiling`` is
+    the canonical example: lives under ``_internal/jit_prompts/`` for
+    historical reasons but is referenced as a tripwire because it's a
+    hard cap. Until the stage-2 module rename relocates it, the test
+    accepts a reference under any control slot.
+    """
+
+    import yaml
+
+    from tripwire.core.workflow.registry import known_jit_prompt_ids
+
+    template = Path("src/tripwire/templates/workflow.yaml.j2").read_text(
+        encoding="utf-8"
+    )
+    parsed = yaml.safe_load(template)
+    declared = set()
+    for workflow in parsed["workflows"].values():
+        for status in workflow["statuses"]:
+            for slot in ("jit_prompts", "tripwires", "heuristics", "prompt_checks"):
+                declared.update(status.get(slot, []))
+        for route in workflow.get("routes", []):
+            controls = route.get("controls") or {}
+            for slot in ("jit_prompts", "tripwires", "heuristics", "prompt_checks"):
+                declared.update(controls.get(slot, []))
+    assert known_jit_prompt_ids() - declared == set()

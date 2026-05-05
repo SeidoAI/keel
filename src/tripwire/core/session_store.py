@@ -23,6 +23,8 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from tripwire.core import paths
 from tripwire.core.event_emitter import EventEmitter, NullEmitter
 from tripwire.core.parser import (
@@ -33,6 +35,17 @@ from tripwire.core.parser import (
 from tripwire.models.session import AgentSession
 
 logger = logging.getLogger(__name__)
+
+
+class SessionLoadError(ValueError):
+    """Raised when a session.yaml file fails to deserialise.
+
+    Wraps pydantic's ``ValidationError`` so callers see a stable
+    exception type and a single migration instruction. Name-blind:
+    the offending key(s) are extracted from the pydantic error
+    rather than checked by name, so the wrapper does not encode any
+    knowledge of legacy session shapes.
+    """
 
 
 def session_dir(project_dir: Path, session_id: str) -> Path:
@@ -46,7 +59,15 @@ def session_yaml_path(project_dir: Path, session_id: str) -> Path:
 
 
 def load_session(project_dir: Path, session_id: str) -> AgentSession:
-    """Load `sessions/<session_id>/session.yaml` into an AgentSession."""
+    """Load `sessions/<session_id>/session.yaml` into an AgentSession.
+
+    Raises :class:`SessionLoadError` if pydantic's
+    :class:`ValidationError` fires on the parsed frontmatter — most
+    commonly when an old-shape session.yaml carries a key the current
+    schema rejects. The wrapper extracts the offending key(s) from the
+    pydantic error message and points at the regeneration path; it
+    does not encode any knowledge of legacy field names.
+    """
     path = session_yaml_path(project_dir, session_id)
     if not path.exists():
         raise FileNotFoundError(f"Session file not found: {path}")
@@ -55,7 +76,18 @@ def load_session(project_dir: Path, session_id: str) -> AgentSession:
         frontmatter, body = parse_frontmatter_body(text)
     except ParseError as exc:
         raise ValueError(f"Could not parse {path}: {exc}") from exc
-    return AgentSession.model_validate({**frontmatter, "body": body})
+    try:
+        return AgentSession.model_validate({**frontmatter, "body": body})
+    except ValidationError as exc:
+        offending = sorted(
+            {".".join(str(part) for part in err["loc"]) for err in exc.errors()}
+        )
+        raise SessionLoadError(
+            f"Could not load {path}: AgentSession schema rejected "
+            f"{len(offending)} field(s): {offending}. The session.yaml "
+            f"shape may be stale; re-spawn the session or rewrite by "
+            f"hand to match `tripwire.models.session.AgentSession`."
+        ) from exc
 
 
 def save_session(

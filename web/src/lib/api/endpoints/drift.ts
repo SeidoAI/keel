@@ -7,9 +7,8 @@ import { queryKeys, staleTime } from "../queryKeys";
  * Typed client for `/api/projects/:pid/drift`.
  *
  * The standalone `/drift` page was retired in v0.9.7; the same data
- * now surfaces as a header card on the Concept Graph page (per
- * `[[principle-concept-graph-as-definition]]` — drift as a metric,
- * not a separate view).
+ * now surfaces as a header card on the Concept Graph page. Wraps
+ * the substrate shipped in `tripwire/core/drift.py`.
  */
 export interface DriftBreakdown {
   stale_pins: number;
