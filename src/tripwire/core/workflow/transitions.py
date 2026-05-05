@@ -43,6 +43,7 @@ from tripwire.core.events.log import emit_event, read_events
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
 from tripwire.core.workflow.loader import load_workflows
+from tripwire.models.session import AgentSession
 from tripwire.core.workflow.schema import (
     NextSpec,
     Workflow,
@@ -303,7 +304,10 @@ def _run_gate(
 
     # 5. Artifacts — target-status consumed paths must exist.
     missing_artifacts = _missing_consumed_artifacts(
-        project_dir, session_id=session_id, target=target
+        project_dir,
+        session_id=session_id,
+        target=target,
+        session=session,
     )
     if missing_artifacts:
         return _reject(
@@ -440,15 +444,53 @@ def _invoked_prompt_checks_at_status(
     return invoked
 
 
+class _SafeFormatDict(dict):
+    """``str.format_map`` companion that leaves unknown ``{name}``
+    placeholders intact instead of raising ``KeyError``.
+    """
+
+    def __missing__(self, key: str) -> str:
+        return "{" + key + "}"
+
+
 def _missing_consumed_artifacts(
-    project_dir: Path, *, session_id: str, target: WorkflowStatus
+    project_dir: Path,
+    *,
+    session_id: str,
+    target: WorkflowStatus,
+    session: AgentSession | None = None,
 ) -> list[str]:
-    """Return workflow-declared consumed artifact paths that do not exist."""
+    """Return workflow-declared consumed artifact paths that do not exist.
+
+    Path templates can carry placeholders beyond ``{session_id}`` (e.g.
+    ``{issue_key}``, ``{nnn}``, ``{yyyy-mm-dd}``). The first is
+    resolvable from the session's bound issue; the latter two only
+    settle at write-time. Use a name-blind safe formatter that leaves
+    unknowns in place, then skip any path still carrying ``{...}``
+    after the substitution — there's no way to know whether such a
+    file exists, and the gate must not crash mid-transition for a
+    template the runtime can't fully resolve yet.
+    """
+    context: dict[str, str] = {"session_id": session_id}
+    if session is not None and session.issues:
+        # The session's first issue key is the canonical binding for
+        # `{issue_key}` template paths. If the session is bound to
+        # multiple issues, additional issue artifacts surface through
+        # the per-issue paths declared elsewhere.
+        context["issue_key"] = session.issues[0]
+    safe = _SafeFormatDict(context)
+
     missing: list[str] = []
     for artifact in target.artifacts.consumes:
         if not artifact.path:
             continue
-        rel = artifact.path.format(session_id=session_id)
+        rel = artifact.path.format_map(safe)
+        if "{" in rel:
+            # An unresolved placeholder remains (e.g. `{nnn}` or
+            # `{yyyy-mm-dd}` — settled at write-time). Cannot answer
+            # "does the file exist" for such a template at gate-check;
+            # skip rather than crash.
+            continue
         if not (project_dir / rel).exists():
             missing.append(rel)
     return missing

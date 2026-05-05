@@ -511,3 +511,145 @@ def test_transition_reloads_session_inside_lock(
     assert completed
     assert completed[-1]["details"]["from_status"] == "queued"
     assert completed[-1]["details"]["to_status"] == "executing"
+
+
+# ============================================================================
+# Codex P2 — _missing_consumed_artifacts must not crash on unresolved
+# template placeholders mid-transition.
+# ============================================================================
+
+
+def test_missing_consumed_artifacts_resolves_issue_key_from_session(
+    tmp_path: Path,
+) -> None:
+    """When a consumed-artifact path uses ``{issue_key}``, the helper
+    resolves it from ``session.issues[0]`` rather than crashing on
+    KeyError.
+    """
+    from tripwire.core.workflow.schema import (
+        WorkflowArtifactRef,
+        WorkflowStatus,
+        WorkflowStatusArtifacts,
+        NextSpec,
+    )
+    from tripwire.core.workflow.transitions import _missing_consumed_artifacts
+    from tripwire.models.session import AgentSession
+    from datetime import datetime, timezone
+
+    target = WorkflowStatus(
+        id="executing",
+        next=NextSpec(kind="terminal"),
+        artifacts=WorkflowStatusArtifacts(
+            consumes=[
+                WorkflowArtifactRef(
+                    id="developer-doc",
+                    label="developer.md",
+                    path="issues/{issue_key}/developer.md",
+                )
+            ]
+        ),
+    )
+    session = AgentSession(
+        id="test-session",
+        name="Test",
+        agent="backend-coder",
+        issues=["SEI-42"],
+        repos=[],
+        status="planned",
+        created_at=datetime.now(tz=timezone.utc),
+        updated_at=datetime.now(tz=timezone.utc),
+    )
+
+    # No file on disk — helper should report the resolved path as
+    # missing, not crash.
+    missing = _missing_consumed_artifacts(
+        tmp_path, session_id="test-session", target=target, session=session
+    )
+    assert missing == ["issues/SEI-42/developer.md"]
+
+
+def test_missing_consumed_artifacts_skips_unresolved_placeholders(
+    tmp_path: Path,
+) -> None:
+    """Placeholders that only settle at write-time (``{nnn}``,
+    ``{yyyy-mm-dd}``) cannot be answered at gate-check; the helper
+    must skip such paths rather than raise.
+    """
+    from tripwire.core.workflow.schema import (
+        WorkflowArtifactRef,
+        WorkflowStatus,
+        WorkflowStatusArtifacts,
+        NextSpec,
+    )
+    from tripwire.core.workflow.transitions import _missing_consumed_artifacts
+
+    target = WorkflowStatus(
+        id="verified",
+        next=NextSpec(kind="terminal"),
+        artifacts=WorkflowStatusArtifacts(
+            consumes=[
+                WorkflowArtifactRef(
+                    id="completion-comment",
+                    label="completion comment",
+                    path=(
+                        "issues/{issue_key}/comments/"
+                        "{nnn}-completion-{yyyy-mm-dd}.yaml"
+                    ),
+                )
+            ]
+        ),
+    )
+
+    # No session bound; even with one, `{nnn}`/`{yyyy-mm-dd}` remain
+    # unresolved. Helper returns empty list rather than KeyError.
+    missing = _missing_consumed_artifacts(
+        tmp_path, session_id="test-session", target=target, session=None
+    )
+    assert missing == []
+
+
+def test_missing_consumed_artifacts_handles_session_without_issues(
+    tmp_path: Path,
+) -> None:
+    """A session with no bound issues + a path requiring ``{issue_key}``
+    leaves the placeholder unresolved, which means the helper skips
+    the path (cannot answer existence) instead of crashing.
+    """
+    from tripwire.core.workflow.schema import (
+        WorkflowArtifactRef,
+        WorkflowStatus,
+        WorkflowStatusArtifacts,
+        NextSpec,
+    )
+    from tripwire.core.workflow.transitions import _missing_consumed_artifacts
+    from tripwire.models.session import AgentSession
+    from datetime import datetime, timezone
+
+    target = WorkflowStatus(
+        id="executing",
+        next=NextSpec(kind="terminal"),
+        artifacts=WorkflowStatusArtifacts(
+            consumes=[
+                WorkflowArtifactRef(
+                    id="developer-doc",
+                    label="developer.md",
+                    path="issues/{issue_key}/developer.md",
+                )
+            ]
+        ),
+    )
+    session = AgentSession(
+        id="test-session",
+        name="Test",
+        agent="backend-coder",
+        issues=[],
+        repos=[],
+        status="planned",
+        created_at=datetime.now(tz=timezone.utc),
+        updated_at=datetime.now(tz=timezone.utc),
+    )
+
+    missing = _missing_consumed_artifacts(
+        tmp_path, session_id="test-session", target=target, session=session
+    )
+    assert missing == []
