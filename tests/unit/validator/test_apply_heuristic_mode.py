@@ -191,6 +191,36 @@ def test_as_tripwires_ignores_existing_marker(tmp_path: Path):
     assert out[0].severity == "error"
 
 
+def test_as_tripwires_does_not_write_markers(tmp_path: Path):
+    """CI gating must not pollute the local suppression state.
+
+    If `as_tripwires` wrote markers, a follow-up `--quiet-heuristics`
+    dev run would silently drop the very findings that just failed
+    CI. Run a finding through `as_tripwires` against an empty marker
+    dir and assert no marker landed on disk.
+    """
+    from tripwire._internal.heuristics import has_marker
+
+    finding = _heuristic_finding()
+    chash = condition_hash(
+        finding.code, finding.message, finding.file or "", finding.field or ""
+    )
+    expected_uuid = f"path:{condition_hash('nodes/x.yaml')}"
+    key = MarkerKey("v_stale_concept", expected_uuid, chash)
+
+    assert not has_marker(tmp_path, key)
+    _apply_heuristic_mode(
+        [finding],
+        project_dir=tmp_path,
+        ctx=_ctx(tmp_path),
+        mode="as_tripwires",
+    )
+    assert not has_marker(tmp_path, key), (
+        "as_tripwires must not write markers — CI mode cannot pollute "
+        "the local --quiet-heuristics suppression state"
+    )
+
+
 # ============================================================================
 # Entity uuid resolution.
 # ============================================================================

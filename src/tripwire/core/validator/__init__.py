@@ -979,7 +979,10 @@ def _apply_heuristic_mode(
       the marker for surviving findings.
     * ``"none"`` — drop every heuristic finding without writing markers.
     * ``"as_tripwires"`` — promote every heuristic finding to
-      ``severity="error"``; markers do not suppress in this mode.
+      ``severity="error"``; markers are neither read nor written in
+      this mode (CI gating must not pollute the local suppression
+      state, otherwise a follow-up ``--quiet-heuristics`` dev run
+      would silently drop the very findings that just failed CI).
     """
     if mode not in _VALID_HEURISTIC_MODES:
         raise ValueError(
@@ -1032,7 +1035,7 @@ def _apply_heuristic_mode(
                 after=finding.after,
             )
 
-        if mode in ("surface", "quiet", "as_tripwires"):
+        if mode in ("surface", "quiet"):
             try:
                 write_marker(
                     project_dir,
