@@ -73,6 +73,42 @@ class TestSaveAndLoad:
         with pytest.raises(FileNotFoundError):
             load_session(project_dir, "does-not-exist")
 
+    def test_load_unknown_field_raises_session_load_error(
+        self, project_dir: Path, tmp_path: Path
+    ) -> None:
+        """A session.yaml carrying a field outside the AgentSession
+        schema (e.g. a stale name from before a rename) raises
+        SessionLoadError, which wraps pydantic's ValidationError with
+        a single migration instruction. The wrapper is name-blind —
+        the offending field name is extracted from the pydantic error
+        rather than known by load_session itself.
+        """
+        from tripwire.core.session_store import SessionLoadError
+
+        sdir = project_dir / "sessions" / "stale-shape"
+        sdir.mkdir(parents=True)
+        (sdir / "session.yaml").write_text(
+            "---\n"
+            "uuid: 11111111-1111-4111-8111-111111111111\n"
+            "id: stale-shape\n"
+            "name: Stale\n"
+            "agent: backend-coder\n"
+            "issues: []\n"
+            "repos: []\n"
+            "status: planned\n"
+            "created_at: 2026-04-30T00:00:00Z\n"
+            "updated_at: 2026-04-30T00:00:00Z\n"
+            "current_station_instance: workflow:stale-shape:planned:1\n"
+            "---\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(SessionLoadError) as excinfo:
+            load_session(project_dir, "stale-shape")
+        # Wrapper surfaces the offending field but the wrapper's code
+        # never names it explicitly. Pydantic supplies the name.
+        assert "current_station_instance" in str(excinfo.value)
+        assert "re-spawn" in str(excinfo.value).lower()
+
     def test_session_exists_true_only_when_yaml_present(
         self, project_dir: Path
     ) -> None:
