@@ -43,7 +43,6 @@ from tripwire.core.events.log import emit_event, read_events
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
 from tripwire.core.workflow.loader import load_workflows
-from tripwire.models.session import AgentSession
 from tripwire.core.workflow.schema import (
     NextSpec,
     Workflow,
@@ -53,6 +52,7 @@ from tripwire.core.workflow.schema import (
     WorkflowStatus,
 )
 from tripwire.models.enums import SessionStatus
+from tripwire.models.session import AgentSession
 
 logger = logging.getLogger(__name__)
 

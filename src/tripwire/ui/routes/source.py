@@ -84,9 +84,7 @@ async def get_source(path: str = Query(...)) -> dict[str, Any]:
     if size > MAX_SOURCE_BYTES:
         raise HTTPException(
             status_code=413,
-            detail=(
-                f"source file too large: {size} bytes > {MAX_SOURCE_BYTES} limit"
-            ),
+            detail=(f"source file too large: {size} bytes > {MAX_SOURCE_BYTES} limit"),
         )
     try:
         content = p.read_text(encoding="utf-8")
@@ -127,7 +125,7 @@ async def open_source(req: OpenRequest) -> dict[str, Any]:
             )
         cmd = [opener, str(p)]
     try:
-        subprocess.Popen(  # noqa: S603 — args validated above, no shell=True
+        subprocess.Popen(
             cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

@@ -37,9 +37,7 @@ def _heuristic_finding(
 
 
 def _non_heuristic_finding() -> CheckResult:
-    return CheckResult(
-        code="uuid/missing", severity="error", message="missing uuid"
-    )
+    return CheckResult(code="uuid/missing", severity="error", message="missing uuid")
 
 
 # ============================================================================
@@ -66,9 +64,7 @@ def test_surface_writes_marker_for_heuristic_finding(tmp_path: Path):
     # Heuristic for stale_concept is entity=node — no entity match in the
     # empty context, so falls back to the path-hash uuid.
     expected_uuid = f"path:{condition_hash('nodes/x.yaml')}"
-    assert has_marker(
-        tmp_path, MarkerKey("v_stale_concept", expected_uuid, chash)
-    )
+    assert has_marker(tmp_path, MarkerKey("v_stale_concept", expected_uuid, chash))
 
 
 def test_surface_does_not_write_marker_for_non_heuristic(tmp_path: Path):
@@ -235,9 +231,7 @@ def test_project_singleton_uuid_for_project_scoped_heuristic(tmp_path: Path):
     _apply_heuristic_mode(
         [finding], project_dir=tmp_path, ctx=_ctx(tmp_path), mode="surface"
     )
-    chash = condition_hash(
-        finding.code, finding.message, finding.file or "", ""
-    )
+    chash = condition_hash(finding.code, finding.message, finding.file or "", "")
     # v_sequence_drift's entity is "project" → marker keyed under singleton.
     assert has_marker(
         tmp_path, MarkerKey("v_sequence_drift", PROJECT_SINGLETON_UUID, chash)
@@ -249,7 +243,9 @@ def test_unknown_mode_raises():
 
     with pytest.raises(ValueError, match="unknown heuristic_mode"):
         _apply_heuristic_mode(
-            [], project_dir=Path("/tmp"), ctx=ValidationContext(project_dir=Path("/tmp")),
+            [],
+            project_dir=Path("/tmp"),
+            ctx=ValidationContext(project_dir=Path("/tmp")),
             mode="bogus",
         )
 

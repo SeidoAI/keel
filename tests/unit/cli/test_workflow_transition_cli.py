@@ -526,15 +526,16 @@ def test_missing_consumed_artifacts_resolves_issue_key_from_session(
     resolves it from ``session.issues[0]`` rather than crashing on
     KeyError.
     """
+    from datetime import datetime, timezone
+
     from tripwire.core.workflow.schema import (
+        NextSpec,
         WorkflowArtifactRef,
         WorkflowStatus,
         WorkflowStatusArtifacts,
-        NextSpec,
     )
     from tripwire.core.workflow.transitions import _missing_consumed_artifacts
     from tripwire.models.session import AgentSession
-    from datetime import datetime, timezone
 
     target = WorkflowStatus(
         id="executing",
@@ -576,10 +577,10 @@ def test_missing_consumed_artifacts_skips_unresolved_placeholders(
     must skip such paths rather than raise.
     """
     from tripwire.core.workflow.schema import (
+        NextSpec,
         WorkflowArtifactRef,
         WorkflowStatus,
         WorkflowStatusArtifacts,
-        NextSpec,
     )
     from tripwire.core.workflow.transitions import _missing_consumed_artifacts
 
@@ -592,8 +593,7 @@ def test_missing_consumed_artifacts_skips_unresolved_placeholders(
                     id="completion-comment",
                     label="completion comment",
                     path=(
-                        "issues/{issue_key}/comments/"
-                        "{nnn}-completion-{yyyy-mm-dd}.yaml"
+                        "issues/{issue_key}/comments/{nnn}-completion-{yyyy-mm-dd}.yaml"
                     ),
                 )
             ]
@@ -615,15 +615,16 @@ def test_missing_consumed_artifacts_handles_session_without_issues(
     leaves the placeholder unresolved, which means the helper skips
     the path (cannot answer existence) instead of crashing.
     """
+    from datetime import datetime, timezone
+
     from tripwire.core.workflow.schema import (
+        NextSpec,
         WorkflowArtifactRef,
         WorkflowStatus,
         WorkflowStatusArtifacts,
-        NextSpec,
     )
     from tripwire.core.workflow.transitions import _missing_consumed_artifacts
     from tripwire.models.session import AgentSession
-    from datetime import datetime, timezone
 
     target = WorkflowStatus(
         id="executing",

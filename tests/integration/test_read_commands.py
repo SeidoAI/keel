@@ -229,7 +229,10 @@ class TestValidate:
             cli, ["validate", "--project-dir", str(target), "--strict"]
         )
         assert with_flag.exit_code != 0
-        assert "no such option" in with_flag.output.lower() or "--strict" in with_flag.output
+        assert (
+            "no such option" in with_flag.output.lower()
+            or "--strict" in with_flag.output
+        )
 
     def test_fix_repairs_sequence_drift(
         self, runner: CliRunner, tmp_path: Path

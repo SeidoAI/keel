@@ -49,7 +49,9 @@ def test_quiet_heuristics_flag_maps_to_quiet_mode():
         "tripwire.cli.validate.validate_project",
         side_effect=_stub_validate_project(captured),
     ):
-        result = runner.invoke(validate_cmd, ["--quiet-heuristics", "--project-dir", "."])
+        result = runner.invoke(
+            validate_cmd, ["--quiet-heuristics", "--project-dir", "."]
+        )
     assert result.exit_code == 0, result.output
     assert captured["heuristic_mode"] == "quiet"
 

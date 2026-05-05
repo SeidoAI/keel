@@ -24,7 +24,6 @@ The four-primitive vocabulary (recap):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
 
 from tripwire._internal.heuristics._acks import (
     gc_markers,

@@ -130,9 +130,7 @@ def test_gc_markers_removes_only_dead_entities(tmp_path: Path):
     assert has_marker(tmp_path, MarkerKey("v_mega_issue", dead_uuid, "h2")) is False
     # Project-singleton marker is always preserved.
     assert (
-        has_marker(
-            tmp_path, MarkerKey("v_node_ratio", PROJECT_SINGLETON_UUID, "h3")
-        )
+        has_marker(tmp_path, MarkerKey("v_node_ratio", PROJECT_SINGLETON_UUID, "h3"))
         is True
     )
 

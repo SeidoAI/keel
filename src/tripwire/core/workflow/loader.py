@@ -111,7 +111,13 @@ def _audit_workflow_shape(wf_id: str, raw: dict) -> list[WorkflowFinding]:
     """
     findings: list[WorkflowFinding] = []
 
-    def _emit(unknown: set[str], recognized: frozenset[str], context: str, *, status: str | None) -> None:
+    def _emit(
+        unknown: set[str],
+        recognized: frozenset[str],
+        context: str,
+        *,
+        status: str | None,
+    ) -> None:
         for key in sorted(unknown):
             findings.append(
                 WorkflowFinding(

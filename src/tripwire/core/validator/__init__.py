@@ -1092,8 +1092,7 @@ def validate_project(
 
     started = time.monotonic()
     logger.info(
-        "validate_project: starting (project=%s, strict=%s, fix=%s, "
-        "heuristic_mode=%s)",
+        "validate_project: starting (project=%s, strict=%s, fix=%s, heuristic_mode=%s)",
         project_dir,
         strict,
         fix,

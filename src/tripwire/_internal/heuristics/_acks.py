@@ -90,7 +90,9 @@ def write_marker(
         try:
             existing = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(existing, dict):
-                payload.update({k: v for k, v in existing.items() if isinstance(v, str)})
+                payload.update(
+                    {k: v for k, v in existing.items() if isinstance(v, str)}
+                )
         except (OSError, json.JSONDecodeError):
             pass
     payload.setdefault("first_fired_at", now)
