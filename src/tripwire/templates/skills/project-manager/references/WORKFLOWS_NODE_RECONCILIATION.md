@@ -1,167 +1,107 @@
 # Workflow: Concept-Freshness / Node Reconciliation
 
-Concept nodes carry a `source` block — `repo`, `path`, `branch`,
-`content_hash` — pinning each node to a specific revision of the
-code it describes. The hash is a provenance contract: it lets the
-graph age cleanly against a moving source repo instead of quietly
-diverging. This workflow closes the loop — it takes nodes flagged
-as stale, walks each one, and resolves the divergence to a known
-state: refreshed, accepted, or deleted.
+Concept nodes pin a `source` (repo, path, branch, content_hash) so
+the graph ages cleanly against a moving source repo. This workflow
+closes the loop: stale nodes get walked and resolved as refreshed,
+accepted, or deleted.
 
-The `concept-freshness` workflow lives in `workflow.yaml` with three
-statuses: `detected → reviewing → reconciled`. Trigger is the
-overseer signal `signal.stale_node_count_high`; the `code-review`
-workflow's `node-reconcile` station also cross-links into
-`detected`.
+`concept-freshness` in `workflow.yaml` runs `detected → reviewing →
+reconciled`. Triggered by `signal.stale_node_count_high`;
+`code-review.node-reconcile` cross-links into `detected` too.
 
-## When this workflow fires
+## When it fires
 
-Two upstream sources:
-
-1. **`signal.stale_node_count_high`** from `pm-monitor`. The monitor
-   tick scans `nodes/` and counts `v_freshness` failures (each node
-   whose stored `content_hash` no longer matches the SHA256 of its
-   `source.path` on `source.branch`). When the count crosses the
-   `monitor.stale_node_count_high` threshold (default 5) the signal
-   fires and dispatch routes to `concept-freshness.detected`. See
+1. **`signal.stale_node_count_high`** from `pm-monitor` — count of
+   `v_freshness` failures crosses `monitor.stale_node_count_high`
+   (default 5). Dispatch → `concept-freshness.detected`. See
    `MONITOR_CRITERIA.md`.
-2. **`code-review.node-reconcile → concept-freshness.detected,
-   kind: triggers`**. After a session merges, the touched-source
-   rehash on `node-reconcile` typically yields one or more refreshed
-   `content_hash` values; the cross-link kicks the project-wide
-   freshness scan so unrelated stale nodes get picked up while the
-   PM is already in reconciliation context. See
-   `WORKFLOWS_CODE_REVIEW.md`.
+2. **`code-review.node-reconcile → detected`** — after a session
+   merges, the touched-source rehash usually refreshes a few hashes;
+   the cross-link kicks a project-wide scan while the PM is already
+   in reconciliation context. See `WORKFLOWS_CODE_REVIEW.md`.
 
-The workflow runs PM-driven. Subagent dispatch is permitted but the
-default is inline — reconciliation decisions are judgment calls
-that benefit from the PM's full context.
+PM-driven. Subagent dispatch allowed; default is inline (judgment
+calls benefit from full context).
 
-## Walking the staleness queue (`reviewing`)
-
-The PM lists every node currently failing `v_freshness`:
+## Walking the queue (`reviewing`)
 
 ```bash
 tripwire validate --json | jq '.errors[] | select(.code == "v_freshness")'
 ```
 
-For each result the PM reads:
+For each result: read the node file (`nodes/<id>.yaml`) and the
+current `source.path` content. Decide in order:
 
-- The node file (`nodes/<id>.yaml`) — frontmatter + body.
-- The current source (`source.path` on `source.branch`) — the file
-  the node points at, as it stands on the latest commit.
+1. **Refresh** — source moved, body still right. Default.
+2. **Accept divergence** — source moved, body intentionally describes
+   the older / aspirational design.
+3. **Delete** — source gone, concept obsolete.
 
-Three outcomes per node, decided in order:
-
-1. **Refresh** — source moved, body still describes the right thing.
-   Default outcome.
-2. **Accept divergence** — source moved, body is intentionally
-   describing the older or aspirational design.
-3. **Delete** — source has gone away or the concept itself is
-   obsolete.
-
-### Worked example
-
-`nodes/file-watcher.yaml` has `source.path:
-src/tripwire/_internal/watcher.py` and
-`content_hash: sha256:abc…`. The current SHA of `watcher.py` is
-`def…`. The PM reads both:
-
-- The node body talks about a 100ms debounce.
-- The current `watcher.py` debounces at 250ms and added a
-  burst-mode coalescer.
-
-This is a **refresh**: the body needs to mention 250ms and the
-coalescer, and `content_hash` needs to bump to `def…`.
+**Example.** `file-watcher.yaml` points at `watcher.py`,
+`content_hash: sha256:abc…`. Current SHA is `def…`. Body mentions a
+100ms debounce; current code debounces at 250ms with a burst
+coalescer. This is a **refresh**: body updated, hash bumped to `def…`.
 
 ## Refresh
 
 ```bash
 sha256sum src/tripwire/_internal/watcher.py
-# → def7c1...  src/tripwire/_internal/watcher.py
 ```
 
-Edit `nodes/file-watcher.yaml`:
-
-- Update body sections that describe behaviour the source has
-  changed.
-- Update `source.content_hash` to the new SHA (`sha256:def7c1…`).
-- Update `source.branch` if the node was pinned to a feature branch
-  that has since merged.
-- Bump `updated_at` to today.
-
-Then `tripwire validate` — the `v_freshness` error for this node
-should clear.
+Edit the node file: update affected body sections, set
+`source.content_hash` to the new SHA, update `source.branch` if it
+moved, bump `updated_at`. Re-validate — `v_freshness` clears.
 
 ## Accept divergence
 
-Rare. Used when the body is intentionally describing the older
-design (because it's the contract the rest of the graph references)
-or an aspirational design that the source hasn't caught up to.
+Rare. The body intentionally describes an older contract (because
+the rest of the graph references it that way) or an aspirational
+design the source hasn't caught up to.
 
-In the body, append a `## Divergence` section that names what's
-changed in the source and why the node body wasn't rewritten:
+Append a `## Divergence` body section naming what changed and why it
+wasn't rewritten:
 
 ```markdown
 ## Divergence
 
-As of 2026-05-04 the live `watcher.py` debounces at 250ms, not
-100ms. The 100ms figure is preserved here because
-`[[websocket-hub]]` and `[[event-emitter]]` reference it as the
-contract; the divergence is tracked in issue SEI-87.
+As of 2026-05-04 `watcher.py` debounces at 250ms, not 100ms. 100ms
+is preserved here because [[websocket-hub]] and [[event-emitter]]
+reference it as the contract; tracked in SEI-87.
 ```
 
-Update `source.content_hash` to the current source SHA — accepting
-divergence still means re-pinning, otherwise the next freshness
-scan re-fires the same alert. Bump `updated_at`.
+Update `source.content_hash` anyway — accepting still means
+re-pinning, or the next scan re-fires.
 
 ## Delete
 
-When the source file has been removed or the concept itself is no
-longer meaningful:
-
 1. `rm nodes/<id>.yaml`.
-2. `tripwire refs reverse <id>` — list every node whose `related:`
-   list includes the deleted id.
-3. For each, edit out the dropped id from `related:`. The graph
-   stays bidirectionally clean.
+2. `tripwire refs reverse <id>` — find every node whose `related:`
+   includes the deleted id.
+3. Edit each to drop the id (graph stays bidirectional).
 4. Validate.
 
-If reverse-refs is non-trivial (the deleted node was central),
-prefer accept-divergence over delete; deletion cascades are easy to
-get wrong.
+If reverse-refs is non-trivial, prefer accept-divergence — deletion
+cascades are easy to get wrong.
 
 ## Bidirectional `related:`
 
-Every concept node's `related:` entries are bidirectional by
-contract. If `nodes/a.yaml` lists `b` in `related:`, then
-`nodes/b.yaml` must list `a`. The validator surfaces asymmetric
-edges as warnings (`w_related_asymmetric`); reconciliation is the
-right time to clean them up. See `VALIDATION.md` and `SKILL.md`.
-
-When refresh adds a new related concept (because the rewritten body
-now references something it didn't before), update both sides.
+`a.related ⊇ {b}` ⟺ `b.related ⊇ {a}`. Validator warns
+(`w_related_asymmetric`) on asymmetric edges; reconciliation is when
+to clean them up. When a refresh adds a new related concept, update
+both sides.
 
 ## Reaching `reconciled`
 
-The terminal status. Exit conditions:
+Exit conditions: every entry-time `v_freshness` failure handled (refresh
+/ accept / delete); `tripwire validate` reports zero `v_freshness`;
+reverse-ref cleanup committed.
 
-- Every node that was failing `v_freshness` at workflow entry has
-  been refreshed, marked accept-divergence, or deleted.
-- `tripwire validate` reports zero `v_freshness` errors.
-- Reverse-ref cleanup committed for any deletions.
-
-Commit convention: `reconcile: <node-list> after freshness scan`
-or `reconcile: <node-list> after #<pr>` when triggered by a
-specific merge. See `COMMIT_CONVENTIONS.md`.
+Commit: `reconcile: <node-list> after freshness scan` (or
+`after #<pr>` when triggered by a merge). See `COMMIT_CONVENTIONS.md`.
 
 ## See also
 
-- `SKILL.md` — PM agent entry point, `related:` bidirectional rule.
-- `WORKFLOWS_CODE_REVIEW.md` — the cross-link source from
-  `node-reconcile`.
-- `MONITOR_CRITERIA.md` — `signal.stale_node_count_high` threshold
-  and dispatch.
-- `VALIDATION.md` — `v_freshness` and the related warning codes.
-- `templates/skills/verification/` — checklist consulted when a
-  refresh has to re-walk the source against acceptance criteria.
+- `SKILL.md` — PM entry point, bidirectional `related:` rule.
+- `WORKFLOWS_CODE_REVIEW.md` — `node-reconcile` cross-link source.
+- `MONITOR_CRITERIA.md` — `signal.stale_node_count_high` threshold.
+- `VALIDATION.md` — `v_freshness` and related codes.

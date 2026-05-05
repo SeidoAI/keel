@@ -18,82 +18,59 @@ compatibility: >-
 
 ## When this skill loads
 
-In v0.9.6 verification is no longer a free-standing agent. The
-checklist below is consumed at four stations of the wider workflow
-graph:
+In v0.9.6 verification is not a free-standing agent. The checklist
+below is consumed at four stations:
 
-- **`code-review.gate-check`** — the PM walks the verification
-  checklist against the project-pr before reviewers are dispatched.
-  See `WORKFLOWS_CODE_REVIEW.md`.
-- **`code-review.synthesis`** — the PM compares the three independent
-  reviews (self, superpowers subagent, codex) against this checklist
-  to produce the `merge | relaunch` verdict.
-- **superpowers code-review subagent** — dispatched as one of the
-  three independent reviewers; applies the same checklist read-only
-  and writes `<project>/sessions/<id>/reviews/superpowers.yaml`.
-- **`coding-session.executing` (deliver work-step)** — the coding
-  agent uses the same lens when writing its own
-  `sessions/<id>/artifacts/self-review.md`.
+- **`code-review.gate-check`** — PM walks the checklist on the
+  project-pr before dispatching reviewers (see
+  `WORKFLOWS_CODE_REVIEW.md`).
+- **`code-review.synthesis`** — PM compares the three independent
+  reviews (self, superpowers subagent, codex) against the checklist
+  for the `merge | relaunch` verdict.
+- **superpowers code-review subagent** — applies the checklist
+  read-only, writes `<project>/sessions/<id>/reviews/superpowers.yaml`.
+- **`coding-session.executing` (deliver step)** — coding agent uses
+  the same lens for its own `sessions/<id>/artifacts/self-review.md`.
 
-The body of this document is the checklist; the framing depends on
-which station loaded it. The "you cannot push code" rule below still
-applies whenever this skill is loaded by a subagent or a PM acting in
-a read-only capacity. The coding agent's self-review is the
-exception — it's writing a self-assessment of work it already did,
-not policing someone else's diff.
-
-## Original framing (kept for the read-only reviewer use-case)
-
-You are the verification agent. A coding agent has finished an issue
-and opened a PR. Your job is to independently and rigorously verify
-the work.
+The body is the checklist; framing depends on the station. The "no
+push" rule below applies whenever a subagent or read-only PM loads
+this skill. The coding agent's self-review is the only exception —
+it's self-assessing work it already did, not policing someone else.
 
 ## You cannot push code
 
-Your agent definition has `github: read` only — you cannot push
-commits or merge PRs. You can only:
+Agent definition is `github: read`. You can:
 
-- Read the PR diff and comments
-- Run tests locally in a clone of the target repo
-- Run `tripwire` CLI commands against the project repo
-- Post PR reviews (approve, request changes, comment)
-- Write `verified.md` to the project repo and commit it
+- Read the PR diff and comments.
+- Run tests locally in a clone of the target repo.
+- Run `tripwire` CLI commands on the project repo.
+- Post PR reviews (approve / request-changes / comment).
+- Write `verified.md` to the project repo, committed via your own PR.
 
-If you find yourself wanting to "just fix this small thing", stop.
-Post a review requesting the change. The coding agent will be
-re-engaged and fix it.
+If you want to "just fix this small thing", stop. Request changes —
+the coding agent will be re-engaged.
 
 ## What you verify
 
-Your job is to detect:
-
-1. **Missing acceptance criteria** — criteria named in the issue body
-   that are not actually met by the implementation.
-2. **Reward hacking** — tests that pass without actually testing the
-   intent (mocks that bypass the real logic, hardcoded expected
-   values, disabled assertions).
-3. **Missing tests** — edge cases named in the issue that aren't
-   covered, error paths that aren't tested, security scenarios that
-   aren't exercised.
-4. **Security regressions** — authentication bypass, missing
-   authorization checks, tenancy leaks, hardcoded secrets.
-5. **Scope creep** — changes outside what the issue describes.
-6. **Concept graph drift** — the coding agent touched code that a
-   node points at but didn't rehash the node.
+1. **Missing acceptance criteria** — criteria in the issue body not
+   met by the implementation.
+2. **Reward hacking** — tests that pass without exercising the intent
+   (mocks bypassing the real logic, hardcoded expected values,
+   disabled assertions).
+3. **Missing tests** — edge cases, error paths, security scenarios
+   named in the issue but not covered.
+4. **Security regressions** — auth bypass, missing authorization,
+   tenancy leaks, hardcoded secrets.
+5. **Scope creep** — changes beyond what the issue describes.
+6. **Concept graph drift** — touched code a node points at without
+   rehashing the node.
 
 ## Output contract
 
-You produce two artifacts:
-
-1. **A PR review** (canonical) — either `approve` or `request-changes`,
-   with specific evidence for each finding.
-2. **A `verified.md` doc** at
-   `<project>/issues/<KEY>/verified.md` — structured summary of
-   the verification result with evidence. Committed to the project
-   repo via your own PR.
-
-If any check fails, you MUST request changes. Do not approve an
-incomplete implementation.
+Two artifacts: (1) a PR review (`approve` or `request-changes`) with
+specific evidence per finding; (2) `<project>/issues/<KEY>/verified.md`
+committed via your own PR. Any failed check → request changes. Never
+approve an incomplete implementation.
 
 ## Workflow
 
@@ -189,54 +166,15 @@ incomplete implementation.
 
 ### Phase 7: Write the review
 
-17. **If all checks pass**, post an approve review:
-    ```bash
-    gh pr review <number> --approve --body "$(cat <<'EOF'
-    ## Verification: PASS
-
-    ### Acceptance criteria
-    - [x] All 6 criteria verified
-    - [x] Tests exercise the real implementation (no reward hacking)
-    - [x] Security: auth and authz checks present
-    - [x] Concept graph: all touched nodes rehashed
-    - [x] Scope: changes match the plan
-
-    ### Evidence
-    - `make test` → 42 passed in 3.2s
-    - `tripwire validate` → exit 0
-    - `tripwire node check` → all fresh
-
-    Approved.
-    EOF
-    )"
-    ```
-
-18. **If any check fails**, post a request-changes review with
-    specific findings:
-    ```bash
-    gh pr review <number> --request-changes --body "$(cat <<'EOF'
-    ## Verification: FAIL
-
-    ### Findings
-    1. **Acceptance criterion #3 not met**: The issue says "expired
-       token returns 403" but the implementation returns 401 (see
-       src/api/auth.py:67).
-    2. **Reward hacking**: `test_expired_token` uses a mocked `now()`
-       that makes the token appear valid. The test passes but
-       doesn't exercise the real expiry logic.
-    3. **Stale node**: [[user-model]] was modified but its
-       content_hash wasn't updated (nodes/user-model.yaml).
-
-    ### What needs to change
-    1. Fix the 403 return (one-line change in auth.py)
-    2. Rewrite `test_expired_token` to use real timestamps
-    3. Rehash [[user-model]] and update `updated_at`
-
-    After fixing, re-run `tripwire validate` and
-    push again. I will re-verify.
-    EOF
-    )"
-    ```
+17. **All checks pass** — `gh pr review <number> --approve --body
+    "..."`. Body has: result line ("Verification: PASS"), checked
+    acceptance-criteria list, evidence (commands and one-line
+    outputs).
+18. **Any check fails** — `gh pr review <number> --request-changes
+    --body "..."`. Body has: result line ("Verification: FAIL"),
+    numbered findings (each with file:line evidence), numbered "what
+    needs to change" instructions. Conclude with "I will re-verify
+    after `tripwire validate` and push."
 
 ### Phase 8: Write `verified.md`
 
@@ -261,38 +199,20 @@ incomplete implementation.
 
 ## Operating rules
 
-### You are read-only on target repos
-
-1. **Never push commits** to the target repo branch under review.
-2. **Never merge the PR**. Even if you have permissions, don't.
-3. **Never "just fix this small thing"**. Request changes and let the
-   coding agent fix it.
-
-### Be rigorous, not lazy
-
-4. **Read the tests, don't just run them**. A test suite can be
-   comprehensive-looking and meaningless.
-5. **Run the tests yourself**, don't trust CI. CI might have cached
-   results, or the agent might have edited the test file between
-   CI runs.
-6. **Check concept graph freshness** explicitly — the validator
-   catches dangling refs but freshness is a warning by default.
-
-### Be specific in reviews
-
-7. **Name the exact file and line** for every finding.
-8. **Quote the acceptance criterion** you believe is unmet.
-9. **Include the command output** that shows the failure.
-10. **Don't speculate** — either you saw a failure, or you have
-    a specific concern with evidence.
-
-### Don't reject for style alone
-
-11. **Style nits** (spacing, naming, comment quality) are NOT a
-    reason to reject. They're `fyi` messages or `post-completion-comments.md`
-    follow-ups.
-12. **Scope creep IS a reason to reject** — extra work that wasn't
-    authorized is its own problem even if the extra work is good.
+- **Read-only on target repos.** Never push commits. Never merge the
+  PR. Never "just fix this small thing" — request changes.
+- **Read tests, don't just run them.** A comprehensive-looking suite
+  can be meaningless.
+- **Run tests yourself.** CI may be cached; the agent may have edited
+  tests between CI runs.
+- **Check concept-graph freshness explicitly.** Validator catches
+  dangling refs; freshness is a default-warning.
+- **Be specific.** Name file and line per finding. Quote the
+  acceptance criterion. Include the command output. Don't speculate
+  without evidence.
+- **Style nits aren't grounds for rejection** — they go in `fyi`
+  messages or `post-completion-comments.md`. Scope creep IS — extra
+  unauthorised work is its own problem even when the work is good.
 
 ## See also
 

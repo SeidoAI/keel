@@ -108,11 +108,14 @@ def test_total_templates_under_budget() -> None:
     bumped to 335KB for workflow.yaml source-of-truth gates and prompt-check
     invocation instructions, then to 345KB when the default process map
     started declaring PM workflows, routes, commands, skills, and emitted
-    artifacts as first-class workflow.yaml data.
+    artifacts as first-class workflow.yaml data. v0.9.6 then ran a
+    conciseness pass across all four skills and the workflow.yaml.j2
+    template (-51KB vs. pre-trim) and bumps to 360KB to absorb the
+    PM-expansion content that survived the trim.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 345_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 345KB."
+    assert total < 360_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 360KB."
     )
 
 

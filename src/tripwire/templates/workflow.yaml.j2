@@ -46,9 +46,6 @@ workflows:
             skills: [project-manager]
       - id: executing
         next: in_review
-        # Mid-execute the agent opens both PRs; that hands off to the
-        # pr-lifecycle workflow which owns each PR's draft → ready →
-        # reviewing → approved → merged|rejected state machine.
         cross_links:
           - workflow: pr-lifecycle
             status: draft
@@ -97,11 +94,6 @@ workflows:
             skills: [verification, agent-messaging]
       - id: in_review
         next: verified
-        # Once a session is in_review, two things happen in parallel:
-        # the dedicated code-review workflow takes ownership of the PR
-        # pair (gate-check → reviews → synthesis), and the project-side
-        # PR enters its own pr-lifecycle. The cross-links make those
-        # handoffs first-class on the unified canvas.
         cross_links:
           - workflow: code-review
             status: received
@@ -153,8 +145,6 @@ workflows:
             skills: [project-manager, agent-messaging]
       - id: completed
         terminal: true
-        # Session done implies the bound issue is ready to close. The
-        # cross-link makes the issue-closure workflow the auto-target.
         cross_links:
           - workflow: issue-closure
             status: closing
@@ -318,11 +308,7 @@ workflows:
             - followups-not-filed
             - stopped-to-ask
             - write-count
-            - cost-ceiling
-            # NOTE: cost-ceiling is conceptually a hard-cap tripwire
-            # (pass/fail rather than a prompt) but classified here because
-            # the runtime impl is registered as a JIT prompt today. Stage
-            # 2 of the workflow codification reclassifies it.
+            - cost-ceiling  # impl in src/tripwire/_internal/jit_prompts/; reclassified to tripwires in stage 2
         skills: [project-manager, verification]
         emits:
           artifacts:
@@ -341,7 +327,6 @@ workflows:
   pm-scoping:
     actor: pm-agent
     trigger: command.pm-scope
-    brief-description: "turn intent into scoped work."
     statuses:
       - id: intake
         next: draft
@@ -461,7 +446,6 @@ workflows:
   pm-triage:
     actor: pm-agent
     trigger: command.pm-triage
-    brief-description: "inbox in, action out."
     statuses:
       - id: intake
         next: classify
@@ -547,7 +531,6 @@ workflows:
   pm-incremental-update:
     actor: pm-agent
     trigger: command.pm-edit
-    brief-description: "small edits, validated, then published."
     statuses:
       - id: inspect
         next: edit
@@ -651,7 +634,6 @@ workflows:
   project-maintenance:
     actor: pm-agent
     trigger: command.pm-status
-    brief-description: "periodic project sweep."
     statuses:
       - id: inspect
         next: report
@@ -733,13 +715,9 @@ workflows:
   pm-monitor:
     actor: pm-agent
     trigger: command.pm-monitor
-    brief-description: "ongoing overseer: scan, classify, dispatch."
     statuses:
       - id: scan
         next: classify
-        # Hard-stop the scan if the on-disk state can't be read at all
-        # — there's no useful classification path if the inputs are
-        # corrupt.
         tripwires:
           - v_workflow_well_formed
         work_steps:
@@ -761,8 +739,6 @@ workflows:
             skills: [project-manager, agent-messaging]
       - id: classify
         next: dispatch
-        # Stale-concept count is itself a signal source — re-using the
-        # heuristic suppresses repeat warnings unless the count moves.
         heuristics:
           - v_stale_concept
         work_steps:
@@ -836,9 +812,6 @@ workflows:
         kind: forward
         label: classify signals
         skills: [project-manager]
-      # Each dispatch route names the signals that drive it. The
-      # `signals:` field is consumed by the spec validator and the UI
-      # legend; the runtime evaluates them in `classify`.
       - id: dispatch-launch-session
         actor: pm-agent
         from: classify
@@ -900,20 +873,13 @@ workflows:
   # code-review — multi-reviewer cycle. Cross-cutting workflow that
   # takes a coding-session's PR pair through gate-check, three
   # independent reviews (self/superpowers/codex), synthesis, and
-  # either merge+node-reconcile or relaunch. Triggered by
-  # `signal.session_pr_pair_open` from pm-monitor; cross-link source
-  # for concept-freshness.detected on merge and coding-session.executing
-  # on relaunch.
+  # either merge+node-reconcile or relaunch.
   code-review:
     actor: pm-agent
     trigger: signal.session_pr_pair_open
-    brief-description: "two PRs in: review, decide, reconcile, merge."
     statuses:
       - id: received
         next: gate-check
-        # Hard gates on the PR-pair preconditions. v_freshness keeps
-        # us from reviewing a stale branch; v_workflow_well_formed
-        # is the always-on schema check.
         tripwires:
           - v_freshness
         work_steps:
@@ -923,8 +889,6 @@ workflows:
             skills: [project-manager]
       - id: gate-check
         next: independent-reviews
-        # Branch must pass `tripwire validate` AND the verification
-        # checklist must be walked + verified.md written.
         tripwires:
           - v_artifact_presence
           - v_handoff_artifact
@@ -966,9 +930,6 @@ workflows:
           - if: review.verdict == merge
             then: node-reconcile
           - else: relaunch
-        # JIT prompt: hidden ack-required, surfaces if the PM seems to
-        # have skipped reading the reviews. Heuristic placeholder for
-        # stage 2 when scope-creep detection lands.
         jit_prompts:
           - self-review
         work_steps:
@@ -1006,7 +967,6 @@ workflows:
             skills: [project-manager]
       - id: merge
         terminal: true
-        # Final hard gates before pulling the trigger on the merges.
         tripwires:
           - v_done_implies_issue_artifacts_on_main
         work_steps:
@@ -1104,20 +1064,12 @@ workflows:
         label: merge PRs
         skills: [project-manager]
 
-  # inbox-handling — what happens to an inbox row from intake to
-  # closure. Cross-link target from pm-monitor.dispatch (escalation
-  # bucket), pm-triage.act (won't-do or duplicate), and
-  # code-review.synthesis (off-track findings).
   inbox-handling:
     actor: pm-agent
     trigger: signal.inbox_inbound_new
-    brief-description: "inbox row from intake to closure."
     statuses:
       - id: pending
         next: triaged
-        # Concept-name-prose flag at intake time so the PM nudges
-        # toward structured node references when the inbox row will
-        # later seed a scoped issue.
         heuristics:
           - v_concept_name_prose
         work_steps:
@@ -1127,8 +1079,6 @@ workflows:
             skills: [project-manager, agent-messaging]
       - id: triaged
         next: resolved
-        # Reference integrity: any handle the row points at must
-        # actually resolve before resolution.
         tripwires:
           - v_reference_integrity
         prompt_checks: [pm-edit]
@@ -1172,15 +1122,9 @@ workflows:
         label: resolve
         skills: [project-manager]
 
-  # pr-lifecycle — the PR object's own state transitions, separate from
-  # the coding-session that owns it. Cross-link target from
-  # coding-session.executing (PR opened) and code-review (review
-  # outcome). Models draft → ready → reviewing → approved → merged
-  # | rejected.
   pr-lifecycle:
     actor: pm-agent
     trigger: pr.opened
-    brief-description: "PR object lifecycle."
     statuses:
       - id: draft
         next: ready
@@ -1191,8 +1135,6 @@ workflows:
             skills: [backend-development]
       - id: ready
         next: reviewing
-        # Branch alive + handoff artifact + comment provenance: the
-        # gates a PM relies on before advancing the PR into review.
         tripwires:
           - v_freshness
           - v_handoff_artifact
@@ -1295,15 +1237,9 @@ workflows:
         label: merge
         skills: [project-manager]
 
-  # phase-advancement — explicit phase boundary workflow. Drives the
-  # `project.phase` field through scoping → scoped → executing → reviewing.
-  # The PM advances each phase after the prior phase's requirements are
-  # met. v_phase_requirements gates the scoping → scoped boundary
-  # (gap-analysis.md + compliance.md present + complete).
   phase-advancement:
     actor: pm-agent
     trigger: command.pm-phase
-    brief-description: "advance project.phase through scoping → reviewing."
     statuses:
       - id: scoping
         next: scoped
@@ -1314,8 +1250,6 @@ workflows:
             skills: [project-manager]
       - id: scoped
         next: executing
-        # Phase-requirements is the explicit gap-analysis + compliance
-        # docs check. The PM gates the boundary on this.
         tripwires:
           - v_phase_requirements
         work_steps:
@@ -1368,19 +1302,12 @@ workflows:
         label: advance to reviewing
         skills: [project-manager]
 
-  # issue-closure — split out from pm-incremental-update.publish when
-  # the command is pm-issue-close. Cross-link target from
-  # coding-session.completed (auto-close on session done) and
-  # pm-incremental-update.publish (manual close).
   issue-closure:
     actor: pm-agent
     trigger: command.pm-issue-close
-    brief-description: "close an issue cleanly: gates + comment + artifacts."
     statuses:
       - id: closing
         next: closed
-        # Hard gate: every required artifact for the issue must exist
-        # on merged main before the issue closes.
         tripwires:
           - v_done_implies_issue_artifacts_on_main
           - v_done_implies_session_completed
@@ -1417,21 +1344,12 @@ workflows:
         label: finalize
         skills: [project-manager]
 
-  # concept-freshness — project-wide reconciliation loop for stale
-  # concept nodes. Cross-link target from pm-monitor.dispatch (when
-  # `signal.stale_node_count_high` fires) and code-review.node-reconcile
-  # (after a session-driven reconcile, kicks the broader scan).
-  # Walks each stale node and resolves it to refresh / accept-divergence
-  # / delete. See `WORKFLOWS_NODE_RECONCILIATION.md`.
   concept-freshness:
     actor: pm-agent
     trigger: signal.stale_node_count_high
-    brief-description: "stale-node queue → reviewed → reconciled."
     statuses:
       - id: detected
         next: reviewing
-        # Always-on schema check; the staleness queue itself is what
-        # triggered entry, no further entry tripwire needed.
         work_steps:
           - id: enumerate-stale-nodes
             actor: pm-agent
@@ -1439,8 +1357,6 @@ workflows:
             skills: [project-manager]
       - id: reviewing
         next: reconciled
-        # Reference integrity guards related: cleanup when a deletion
-        # outcome cascades through the graph.
         tripwires:
           - v_reference_integrity
         work_steps:
@@ -1458,7 +1374,70 @@ workflows:
             skills: [project-manager]
       - id: reconciled
         terminal: true
-        # Exit gate: zero `v_freshness` errors at terminal entry.
+        tripwires:
+          - v_freshness
+        work_steps:
+          - id: emit-reconcile-event
+            actor: pm-agent
+            label: emit reconcile event
+            skills: [project-manager]
+    routes:
+      - id: freshness-detected
+        actor: pm-agent
+        trigger: signal.stale_node_count_high == true
+        signals: [signal.stale_node_count_high]
+        from: source:nodes
+        to: detected
+        kind: forward
+        label: receive staleness queue
+        skills: [project-manager]
+      - id: enter-reviewing
+        actor: pm-agent
+        trigger: detected.enumerated
+        from: detected
+        to: reviewing
+        kind: forward
+        label: walk the queue
+        skills: [project-manager]
+      - id: enter-reconciled
+        actor: pm-agent
+        trigger: reviewing.queue_empty
+        from: reviewing
+        to: reconciled
+        kind: forward
+        label: reconcile complete
+        skills: [project-manager]
+
+  concept-freshness:
+    actor: pm-agent
+    trigger: signal.stale_node_count_high
+    statuses:
+      - id: detected
+        next: reviewing
+        work_steps:
+          - id: enumerate-stale-nodes
+            actor: pm-agent
+            label: enumerate stale nodes
+            skills: [project-manager]
+      - id: reviewing
+        next: reconciled
+        tripwires:
+          - v_reference_integrity
+        work_steps:
+          - id: read-source-and-node
+            actor: pm-agent
+            label: read live source against node body
+            skills: [project-manager]
+          - id: decide-outcome
+            actor: pm-agent
+            label: decide refresh / accept-divergence / delete
+            skills: [project-manager]
+          - id: apply-outcome
+            actor: pm-agent
+            label: apply outcome (rehash, edit body, or delete)
+            skills: [project-manager]
+      - id: reconciled
+        terminal: true
         tripwires:
           - v_freshness
         work_steps:

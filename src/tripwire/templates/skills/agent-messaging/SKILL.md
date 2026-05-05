@@ -17,175 +17,84 @@ compatibility: >-
 
 # Agent Messaging
 
-You have an MCP server named `agent-messaging` mounted in your container.
-It exposes two tools:
+The `agent-messaging` MCP server exposes:
 
-- **`send_message`** — post a message to the human operator via the
-  project dashboard
-- **`check_messages`** — read any pending responses to your messages
+- **`send_message`** — post to the human via the project dashboard.
+- **`check_messages`** — read pending responses.
 
-Use it to coordinate with the human in real time. Messages are NOT
-committed to git as they happen — they are ephemeral. When your session
-completes, the full message log is persisted to
-`sessions/<id>/messages.yaml` in the project repo.
+Messages are ephemeral; the full log persists to
+`sessions/<id>/messages.yaml` when the session completes.
 
-## When you MUST send a message
+## Type catalogue
 
-These are non-negotiable. Skipping them breaks the orchestration flow.
-
-### Status heartbeat (every ~5 minutes of active work)
-
-Every 5 minutes of active work, send a `status` message so the UI and
-the PM agent can see what you're doing. Status messages have a
-structured body: `{state, summary}` where:
-
-- `state` is one of the values in `<project>/enums/agent_state.yaml`
-  (investigating, planning, awaiting_plan_approval, implementing,
-  testing, debugging, refactoring, documenting, self_verifying,
-  blocked, handed_off, done)
-- `summary` is 1-2 plain-text sentences
-
-Always `informational` priority — status messages never block.
-
-Example:
-```json
-{
-  "type": "status",
-  "priority": "informational",
-  "body": {
-    "state": "implementing",
-    "summary": "Wired the JWT middleware into the auth router. Now writing unit tests for the validation logic."
-  }
-}
-```
-
-Send a status message on every state transition too (e.g. moving from
-`investigating` → `planning`, or from `implementing` → `testing`).
-
-### Plan approval (if the project requires it)
-
-Check `<project>/templates/artifacts/manifest.yaml`: if the `plan`
-artifact has `approval_gate: true`, you MUST send a `plan_approval`
-message after writing `plan.md` and before starting implementation:
-
-```json
-{
-  "type": "plan_approval",
-  "priority": "blocking",
-  "body": "## My plan\n\n(the contents of plan.md)..."
-}
-```
-
-Then **stop and exit**. The orchestrator will re-engage you with the
-human's response via `check_messages`.
-
-The `awaiting_plan_approval` agent state corresponds to the
-`plan_approval` JIT prompt fired during `coding-session.executing`
-in `workflow.yaml`. The session blocks until the human responds in
-the plan thread or the agent receives a `--ack`. See
-`.claude/skills/project-manager/references/WORKFLOWS_CODE_REVIEW.md`
-for how the review side picks up after approval, and the
-`coding-session` workflow node in `workflow.yaml` for the route that
-emits this state.
-
-### Blocking questions (when you can't proceed)
-
-If you have a genuine ambiguity that blocks correct work, send a
-`question` message with `priority: blocking` and stop:
-
-```json
-{
-  "type": "question",
-  "priority": "blocking",
-  "body": "Should `/auth/refresh` rotate the refresh token or keep the same one? The contract in [[contract-auth-token]] doesn't specify. Option A: rotate (safer, more complex). Option B: reuse (simpler, less safe). I lean toward A unless you disagree."
-}
-```
-
-Good blocking questions:
-- Have specific options, not just "what should I do?"
-- Reference the ambiguous source (a node, a doc, a conflicting rule)
-- Include your preferred answer with reasoning
-
-## When you MAY send a message
-
-### Progress updates (`informational`)
-
-Milestones worth surfacing but not blocking work. Keep going after
-sending:
-
-```json
-{
-  "type": "progress",
-  "priority": "informational",
-  "body": "Unit tests passing. Moving to integration tests now."
-}
-```
-
-### FYI (`informational`)
-
-Things you discovered that are interesting but outside your scope:
-
-```json
-{
-  "type": "fyi",
-  "priority": "informational",
-  "body": "Found an unrelated bug in [[user-model]].find_by_email — it catches all exceptions instead of NotFound. Not touching it in this issue but worth a follow-up."
-}
-```
-
-## When you MUST stop after sending
-
-These messages are `blocking` — sending them means your work is
-paused until a human responds:
-
-- `plan_approval` — waiting for approval to start implementation
-- `question` — needs an answer before you can proceed
-- `stuck` — tried 3+ approaches, genuinely can't make progress
-- `escalation` — need elevated permissions or scope change
-- `handover` — passing the work to a human; don't expect a response
-
-After sending any of these, exit your agent loop. The orchestrator
-will re-engage you with the response when one arrives.
-
-## Message type catalogue
-
-Full details in `references/MESSAGE_TYPES.md`. Quick reference:
-
-| Type | Priority | After sending | Use when |
+| Type | Priority | After | Use when |
 |---|---|---|---|
-| `status` | informational | keep working | heartbeat every ~5 min |
-| `plan_approval` | blocking | STOP | before starting implementation (if gate enabled) |
-| `question` | blocking | STOP | ambiguity blocks correct work |
-| `stuck` | blocking | STOP | tried multiple approaches, can't proceed |
-| `escalation` | blocking | STOP | need elevated permissions or scope change |
-| `handover` | blocking | STOP | giving up, passing to human |
+| `status` | informational | keep working | heartbeat every ~5 min, every state transition |
 | `progress` | informational | keep working | milestone reached |
-| `fyi` | informational | keep working | found something interesting |
+| `fyi` | informational | keep working | found something interesting / out of scope |
+| `plan_approval` | blocking | STOP | before implementation (if gate enabled) |
+| `question` | blocking | STOP | ambiguity blocks correct work |
+| `stuck` | blocking | STOP | tried 3+ approaches, can't proceed |
+| `escalation` | blocking | STOP | need elevated permissions or scope change |
+| `handover` | blocking | STOP | passing to human; no response expected |
+
+After any blocking message, exit the agent loop — the orchestrator
+re-engages you with the response.
+
+## Mandatory messages
+
+**Status heartbeat.** Every ~5 min of active work and every state
+transition. Body: `{state, summary}` — `state` from
+`<project>/enums/agent_state.yaml` (`investigating`, `planning`,
+`awaiting_plan_approval`, `implementing`, `testing`, `debugging`,
+`refactoring`, `documenting`, `self_verifying`, `blocked`,
+`handed_off`, `done`). `summary` is 1-2 plain sentences. Priority is
+always `informational`.
+
+```json
+{"type": "status", "priority": "informational",
+ "body": {"state": "implementing",
+          "summary": "Wired JWT middleware. Now writing validation tests."}}
+```
+
+**Plan approval.** If `manifest.yaml` has `approval_gate: true` on the
+`plan` artifact, send a `plan_approval` (priority `blocking`, body =
+plan content) after writing `plan.md` and before implementing. Then
+exit. This corresponds to the `plan_approval` JIT prompt on
+`coding-session.executing` (see workflow.yaml and PM skill's
+`WORKFLOWS_CODE_REVIEW.md`).
+
+**Blocking questions.** Genuine ambiguity that blocks correct work.
+Good questions have specific options, reference the ambiguous source,
+and include your preferred answer with reasoning. Don't ask "what
+should I do?".
+
+```json
+{"type": "question", "priority": "blocking",
+ "body": "Should /auth/refresh rotate the refresh token? Contract in [[contract-auth-token]] doesn't specify. A: rotate (safer, complex). B: reuse (simpler, less safe). I lean A."}
+```
 
 ## Reading responses
 
-After you've been re-engaged following a blocking message, call
-`check_messages` to read any responses. Don't assume the answer is
-already in your context — the orchestrator passes it via the tool,
-not inline.
+After re-engagement, call `check_messages` first — responses don't
+appear inline. Result shape:
 
 ```
-# After re-engagement, first thing:
-check_messages() → [{"in_reply_to": "msg-123", "body": "Go with option A", "author": "maia"}]
+[{"in_reply_to": "msg-123", "body": "Go with option A", "author": "maia"}]
 ```
 
-## The five anti-patterns
+## Anti-patterns
 
-Full discussion in `references/ANTI_PATTERNS.md`. Short list:
+1. Spamming `status` (every 5 minutes, not every 5 seconds).
+2. Using `blocking` when `informational` would do.
+3. Sending `plan_approval` when the manifest doesn't require it.
+4. Asking questions without specific options + preferred answer.
+5. Forgetting `check_messages` after re-engagement.
 
-1. **Spamming status messages** — every 5 minutes is the target, not every 5 seconds.
-2. **Blocking when informational would do** — save `blocking` for when you genuinely cannot proceed.
-3. **Sending plan approval when not required** — check the manifest first.
-4. **Asking questions without options** — good questions have specific choices and a preferred answer.
-5. **Forgetting to check messages after re-engagement** — the response is there, but only if you ask for it.
+Full discussion: `references/ANTI_PATTERNS.md`.
 
 ## See also
 
-- `references/MESSAGE_TYPES.md` — full type catalogue with examples
-- `references/EXAMPLES.md` — worked examples of every message type
+- `references/MESSAGE_TYPES.md` — full catalogue with examples
+- `references/EXAMPLES.md` — worked examples per type
 - `references/ANTI_PATTERNS.md` — common mistakes
