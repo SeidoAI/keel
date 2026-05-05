@@ -104,6 +104,20 @@ def _declared_prompt_check_refs(
     workflow: str,
     prompt_check_id: str,
 ) -> list[str]:
+    """Return the set of status ids where ``prompt_check_id`` is declared.
+
+    Walks both placements:
+    - Status-level (``statuses[].prompt_checks``).
+    - Route-level (``routes[].controls.prompt_checks``); the route's
+      ``to_ref`` (target status) is what gets recorded so the calling
+      event-emit semantics match the status-level pattern.
+
+    The v0.9.6 default template uses route-level placement for most
+    prompt-checks (e.g. ``coding-session.session-create.controls
+    .prompt_checks: [pm-session-create]``). Without the route walk,
+    ``tripwire prompt-check invoke <id>`` would reject those as "not
+    declared" and the gate would fail with ``prompt_checks_missing``.
+    """
     spec = load_workflows(project_dir)
     refs: list[str] = []
     target = spec.workflows.get(workflow)
@@ -112,6 +126,10 @@ def _declared_prompt_check_refs(
     for status in target.statuses:
         if prompt_check_id in status.prompt_checks:
             refs.append(status.id)
+    for route in target.routes:
+        if prompt_check_id in route.controls.prompt_checks:
+            if route.to_ref and route.to_ref not in refs:
+                refs.append(route.to_ref)
     return refs
 
 

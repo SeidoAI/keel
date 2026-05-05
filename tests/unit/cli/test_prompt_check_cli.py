@@ -99,3 +99,101 @@ def test_prompt_check_invoke_rejects_undeclared_check(tmp_path: Path) -> None:
 
     assert result.exit_code != 0
     assert "not declared in workflow.yaml" in result.output
+
+
+def test_declared_prompt_check_refs_includes_route_level_declarations(
+    tmp_path: Path,
+) -> None:
+    """Codex P1 #1: route-level `controls.prompt_checks` placements were
+    invisible to the declared-refs walker. The v0.9.6 default template
+    puts most prompt-checks on routes (`session-create`,
+    `planned-to-queued`, etc.), so without this fix every legitimate
+    invocation got rejected as ``not declared in workflow.yaml`` and
+    the gate failed with ``prompt_checks_missing``.
+    """
+    from tripwire.cli.prompt_check import _declared_prompt_check_refs
+
+    (tmp_path / "project.yaml").write_text(
+        "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
+        "status_transitions:\n  planned: []\nrepos: {}\nnext_issue_number: 1\n"
+        "next_session_number: 1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                    controls:
+                      prompt_checks: [pm-session-queue]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    refs = _declared_prompt_check_refs(
+        tmp_path, workflow="coding-session", prompt_check_id="pm-session-queue"
+    )
+    assert refs == ["queued"], (
+        "route-level prompt_check declaration must surface as the "
+        "route's to_ref (target status) so the calling event-emit "
+        "semantics match the status-level pattern"
+    )
+
+
+def test_declared_prompt_check_refs_dedups_status_and_route_placements(
+    tmp_path: Path,
+) -> None:
+    """If the same prompt-check id is declared on both a status and a
+    route into that status, the result list is de-duplicated."""
+    from tripwire.cli.prompt_check import _declared_prompt_check_refs
+
+    (tmp_path / "project.yaml").write_text(
+        "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
+        "status_transitions:\n  planned: []\nrepos: {}\nnext_issue_number: 1\n"
+        "next_session_number: 1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    terminal: true
+                    prompt_checks: [pm-session-queue]
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                    controls:
+                      prompt_checks: [pm-session-queue]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    refs = _declared_prompt_check_refs(
+        tmp_path, workflow="coding-session", prompt_check_id="pm-session-queue"
+    )
+    assert refs == ["queued"]
