@@ -312,7 +312,12 @@ def test_loader_parses_explicit_routes(tmp_path: Path) -> None:
     assert route.emits.status_changes == ["executing"]
 
 
-def test_loader_reports_stale_stations_key(tmp_path: Path) -> None:
+def test_loader_emits_no_statuses_declared_when_block_missing(tmp_path: Path) -> None:
+    """Hard-migration policy: a workflow with no `statuses:` block fails
+    loudly with a generic error. Stale shapes (e.g. an old `stations:`
+    block from before the rename) hit the same code path — the loader
+    never knew the old key name.
+    """
     from tripwire.core.workflow.loader import load_workflows
     from tripwire.core.workflow.schema import validate_workflow_spec
 
@@ -339,8 +344,53 @@ def test_loader_reports_stale_stations_key(tmp_path: Path) -> None:
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
-    assert [finding.code for finding in findings] == ["workflow/stale_stations_key"]
-    assert "stale `stations:`" in findings[0].message
+    codes = [finding.code for finding in findings]
+    assert "workflow/no_statuses_declared" in codes
+    assert "workflow/stale_stations_key" not in codes
+    finding = next(f for f in findings if f.code == "workflow/no_statuses_declared")
+    assert finding.severity == "error"
+    assert "no `statuses:`" in finding.message
+
+
+def test_loader_emits_unknown_key_for_each_offending_field(tmp_path: Path) -> None:
+    """Hard-migration policy: any key not in the recognized set at any
+    level fires a `workflow/unknown_key` finding. The check is
+    name-blind — it surfaces stale shapes (e.g. a stale `validators:`
+    list on a status) and plain typos with the same mechanism.
+    """
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                actorr: typo
+                statuses:
+                  - id: s
+                    terminal: true
+                    validators: [v_uuid_present]
+                routes:
+                  - id: r1
+                    from: s
+                    to: s
+                    kind: side
+                    controls:
+                      validators: [v_uuid_present]
+            """
+        ),
+        encoding="utf-8",
+    )
+    spec = load_workflows(tmp_path)
+    findings = spec.load_findings
+    codes = [f.code for f in findings]
+    assert codes.count("workflow/unknown_key") == 3, [f.message for f in findings]
+    messages = [f.message for f in findings if f.code == "workflow/unknown_key"]
+    assert any("'actorr'" in m and "workflow 'w'" in m for m in messages)
+    assert any("'validators'" in m and "status 's'" in m for m in messages)
+    assert any("'validators'" in m and "route 'r1' `controls:`" in m for m in messages)
 
 
 def test_loader_supports_multiple_workflows(tmp_path: Path) -> None:

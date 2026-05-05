@@ -40,10 +40,199 @@ from tripwire.core.workflow.schema import (
 
 WORKFLOW_FILENAME = "workflow.yaml"
 
+# Recognized-key sets at every workflow.yaml level. Keep these in sync
+# with the parser. Any key not in the set fires a `workflow/unknown_key`
+# finding at load time. The check is deliberately name-blind — it
+# surfaces stale shapes (e.g. an old `stations:` or `validators:` block
+# from before a rename), forward-incompatible additions, and plain
+# typos with one mechanism.
+_RECOGNIZED_WORKFLOW_KEYS = frozenset(
+    {"actor", "trigger", "brief-description", "brief_description", "statuses", "routes"}
+)
+_RECOGNIZED_STATUS_KEYS = frozenset(
+    {
+        "id",
+        "next",
+        "terminal",
+        "prompt_checks",
+        "tripwires",
+        "heuristics",
+        "jit_prompts",
+        "artifacts",
+        "work_steps",
+        "cross_links",
+    }
+)
+_RECOGNIZED_ROUTE_KEYS = frozenset(
+    {
+        "id",
+        "actor",
+        "command",
+        "trigger",
+        "signals",
+        "from",
+        "to",
+        "kind",
+        "label",
+        "controls",
+        "skills",
+        "emits",
+    }
+)
+_RECOGNIZED_CONTROLS_KEYS = frozenset(
+    {"tripwires", "heuristics", "jit_prompts", "prompt_checks"}
+)
+_RECOGNIZED_CROSS_LINK_KEYS = frozenset(
+    {"workflow", "status", "label", "kind", "pm_subagent_dispatch"}
+)
+_RECOGNIZED_ARTIFACTS_KEYS = frozenset({"produces", "consumes"})
+_RECOGNIZED_ARTIFACT_REF_KEYS = frozenset({"id", "label", "path"})
+_RECOGNIZED_WORK_STEP_KEYS = frozenset({"id", "actor", "label", "skills"})
+_RECOGNIZED_EMITS_KEYS = frozenset(
+    {"artifacts", "events", "comments", "status_changes"}
+)
+_RECOGNIZED_NEXT_BRANCH_KEYS = frozenset({"if", "then", "else"})
+
 
 def workflow_path(project_dir: Path) -> Path:
     """Return ``<project_dir>/workflow.yaml`` (may not exist)."""
     return project_dir / WORKFLOW_FILENAME
+
+
+def _audit_workflow_shape(wf_id: str, raw: dict) -> list[WorkflowFinding]:
+    """Walk the raw workflow tree and emit ``workflow/unknown_key`` for
+    every field the schema doesn't recognize at any level.
+
+    Hard-migration policy: the loader is name-blind. It does not know
+    what previous releases called any key — it only knows what v0.9.6's
+    schema accepts. Stale shapes therefore surface as a single error
+    code with the offending key in the message, alongside the
+    recognized-key list so the author can correct the file.
+    """
+    findings: list[WorkflowFinding] = []
+
+    def _emit(unknown: set[str], recognized: frozenset[str], context: str, *, status: str | None) -> None:
+        for key in sorted(unknown):
+            findings.append(
+                WorkflowFinding(
+                    code="workflow/unknown_key",
+                    workflow=wf_id,
+                    status=status,
+                    message=(
+                        f"unknown key {key!r} in {context}; recognized "
+                        f"keys are {sorted(recognized)}"
+                    ),
+                )
+            )
+
+    if isinstance(raw, dict):
+        _emit(
+            set(raw.keys()) - _RECOGNIZED_WORKFLOW_KEYS,
+            _RECOGNIZED_WORKFLOW_KEYS,
+            f"workflow {wf_id!r}",
+            status=None,
+        )
+
+        for status_raw in raw.get("statuses") or []:
+            if not isinstance(status_raw, dict):
+                continue
+            sid = str(status_raw.get("id") or "<unknown>")
+            _emit(
+                set(status_raw.keys()) - _RECOGNIZED_STATUS_KEYS,
+                _RECOGNIZED_STATUS_KEYS,
+                f"status {sid!r}",
+                status=sid,
+            )
+
+            for branch in _next_branches(status_raw.get("next")):
+                _emit(
+                    set(branch.keys()) - _RECOGNIZED_NEXT_BRANCH_KEYS,
+                    _RECOGNIZED_NEXT_BRANCH_KEYS,
+                    f"status {sid!r} `next:` branch",
+                    status=sid,
+                )
+
+            artifacts_raw = status_raw.get("artifacts")
+            if isinstance(artifacts_raw, dict):
+                _emit(
+                    set(artifacts_raw.keys()) - _RECOGNIZED_ARTIFACTS_KEYS,
+                    _RECOGNIZED_ARTIFACTS_KEYS,
+                    f"status {sid!r} `artifacts:`",
+                    status=sid,
+                )
+                for bucket in ("produces", "consumes"):
+                    for ref in artifacts_raw.get(bucket) or []:
+                        if isinstance(ref, dict):
+                            _emit(
+                                set(ref.keys()) - _RECOGNIZED_ARTIFACT_REF_KEYS,
+                                _RECOGNIZED_ARTIFACT_REF_KEYS,
+                                f"status {sid!r} `artifacts.{bucket}` entry",
+                                status=sid,
+                            )
+
+            for step in status_raw.get("work_steps") or []:
+                if isinstance(step, dict):
+                    _emit(
+                        set(step.keys()) - _RECOGNIZED_WORK_STEP_KEYS,
+                        _RECOGNIZED_WORK_STEP_KEYS,
+                        f"status {sid!r} work-step",
+                        status=sid,
+                    )
+
+            for link in status_raw.get("cross_links") or []:
+                if isinstance(link, dict):
+                    _emit(
+                        set(link.keys()) - _RECOGNIZED_CROSS_LINK_KEYS,
+                        _RECOGNIZED_CROSS_LINK_KEYS,
+                        f"status {sid!r} cross-link",
+                        status=sid,
+                    )
+
+        for route_raw in raw.get("routes") or []:
+            if not isinstance(route_raw, dict):
+                continue
+            rid = str(route_raw.get("id") or "<unknown>")
+            _emit(
+                set(route_raw.keys()) - _RECOGNIZED_ROUTE_KEYS,
+                _RECOGNIZED_ROUTE_KEYS,
+                f"route {rid!r}",
+                status=None,
+            )
+
+            controls_raw = route_raw.get("controls")
+            if isinstance(controls_raw, dict):
+                _emit(
+                    set(controls_raw.keys()) - _RECOGNIZED_CONTROLS_KEYS,
+                    _RECOGNIZED_CONTROLS_KEYS,
+                    f"route {rid!r} `controls:`",
+                    status=None,
+                )
+
+            emits_raw = route_raw.get("emits")
+            if isinstance(emits_raw, dict):
+                _emit(
+                    set(emits_raw.keys()) - _RECOGNIZED_EMITS_KEYS,
+                    _RECOGNIZED_EMITS_KEYS,
+                    f"route {rid!r} `emits:`",
+                    status=None,
+                )
+                for ref in emits_raw.get("artifacts") or []:
+                    if isinstance(ref, dict):
+                        _emit(
+                            set(ref.keys()) - _RECOGNIZED_ARTIFACT_REF_KEYS,
+                            _RECOGNIZED_ARTIFACT_REF_KEYS,
+                            f"route {rid!r} `emits.artifacts` entry",
+                            status=None,
+                        )
+
+    return findings
+
+
+def _next_branches(value: Any) -> list[dict]:
+    """Return dict branches under a status `next:` block (skip strings/non-dicts)."""
+    if not isinstance(value, list):
+        return []
+    return [b for b in value if isinstance(b, dict)]
 
 
 def load_workflows(project_dir: Path) -> WorkflowSpec:
@@ -96,19 +285,38 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
         else None
     )
     findings: list[WorkflowFinding] = []
-    if "stations" in raw:
+    findings.extend(_audit_workflow_shape(wf_id, raw))
+    statuses_raw = raw.get("statuses")
+    statuses: list[WorkflowStatus] = []
+    # A workflow without statuses is a load error, not a silently-empty
+    # workflow. Anyone hitting this from a stale shape (e.g. an old
+    # `stations:` block from before the rename) gets the same generic
+    # message — the loader never knew the old key name.
+    if not statuses_raw:
         findings.append(
             WorkflowFinding(
-                code="workflow/stale_stations_key",
+                code="workflow/no_statuses_declared",
                 workflow=wf_id,
                 status=None,
                 message=(
-                    "workflow.yaml uses stale `stations:`; use `statuses:` instead"
+                    f"workflow {wf_id!r} declares no `statuses:`. Each "
+                    f"workflow must list at least one status. If you're "
+                    f"upgrading from an earlier release, the workflow.yaml "
+                    f"shape is stale — regenerate via `tripwire init` or "
+                    f"rewrite by hand to match `references/SCHEMA_WORKFLOW.md`."
                 ),
             )
         )
-    statuses_raw = raw.get("statuses") or []
-    statuses: list[WorkflowStatus] = []
+        return (
+            Workflow(
+                id=wf_id,
+                actor=actor,
+                trigger=trigger,
+                statuses=[],
+                brief_description=brief_description,
+            ),
+            findings,
+        )
     if not isinstance(statuses_raw, list):
         return (
             Workflow(
