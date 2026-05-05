@@ -29,10 +29,20 @@ jobs:
       - name: Build frontend
         run: npm run build
         working-directory: web
-      - name: Build
+      - name: Build wheel and sdist
         env:
           TRIPWIRE_SKIP_FRONTEND_BUILD: "1"
-        run: uv build
+        # `uv build` defaults to sdist → wheel-from-sdist for reproducibility,
+        # but our sdist excludes `src/tripwire/ui/static` (it's a regenerated
+        # artifact). Building the wheel from sdist therefore drops the npm
+        # bundle even though we just produced it. Build them independently
+        # so the wheel target reads `static/` from the source tree, where
+        # `npm run build` above placed it. The hatch hook is the safety net
+        # but is opted-out via TRIPWIRE_SKIP_FRONTEND_BUILD here — we already
+        # built the bundle, no need to rebuild it.
+        run: |
+          uv build --wheel
+          uv build --sdist
       # TRIPWIRE_SKIP_FRONTEND_BUILD disabled the hatch hook's internal
       # index.html sanity check, so re-assert it here before publishing.
       # Catches a silent emptyOutDir misconfig that would otherwise ship
