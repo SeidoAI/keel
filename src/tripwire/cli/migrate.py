@@ -230,10 +230,17 @@ def migrate_graph_cmd(project_dir: Path, dry_run: bool) -> None:
                     capture_output=True,
                 )
             except subprocess.CalledProcessError as exc:
-                raise click.ClickException(
-                    f"git mv {src_rel} {dest_rel} failed: "
-                    f"{exc.stderr.decode('utf-8', errors='replace').strip()}"
-                ) from exc
+                stderr = exc.stderr.decode("utf-8", errors="replace").strip()
+                # Gitignored / untracked files (the runtime lock) can't
+                # be `git mv`'d. Fall back to plain shutil.move — git
+                # neither tracked the source nor needs to know about
+                # the destination.
+                if "not under version control" in stderr:
+                    shutil.move(str(src), str(dest))
+                else:
+                    raise click.ClickException(
+                        f"git mv {src_rel} {dest_rel} failed: {stderr}"
+                    ) from exc
         else:
             shutil.move(str(src), str(dest))
 
