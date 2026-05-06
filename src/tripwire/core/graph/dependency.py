@@ -217,7 +217,6 @@ def _compute_critical_path(ids: set[str], edges: list[GraphEdge]) -> list[str]:
 # so dep-graph rendering stays consistent regardless of which name a
 # project's data is at.
 _STATUS_COLORS = {
-    # Canonical (v0.9.4)
     "planned": "#cccccc",
     "queued": "#9cb3ff",
     "executing": "#ffd866",
@@ -226,13 +225,6 @@ _STATUS_COLORS = {
     "completed": "#7bed9f",
     "abandoned": "#777777",
     "deferred": "#bbbbbb",
-    # Legacy aliases — kept until v1.0 so projects that haven't backfilled
-    # their PT data render with the right palette.
-    "backlog": "#cccccc",
-    "todo": "#9cb3ff",
-    "in_progress": "#ffd866",
-    "done": "#7bed9f",
-    "canceled": "#777777",
 }
 
 

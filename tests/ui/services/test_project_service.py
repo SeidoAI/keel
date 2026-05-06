@@ -47,7 +47,7 @@ def _make_project(
         issue_dir = root / "issues" / f"TST-{i + 1}"
         issue_dir.mkdir()
         (issue_dir / "issue.yaml").write_text(
-            f"---\nid: TST-{i + 1}\ntitle: Issue {i + 1}\nstatus: todo\n"
+            f"---\nid: TST-{i + 1}\ntitle: Issue {i + 1}\nstatus: queued\n"
             "priority: medium\nexecutor: ai\nverifier: required\nkind: feat\n---\n"
             "## Context\ntest\n",
             encoding="utf-8",
@@ -415,8 +415,8 @@ def _make_rich_project(root: Path, name: str = "rich", key_prefix: str = "RCH") 
         "base_branch: main\n"
         "environments:\n  - dev\n  - prod\n"
         "repos:\n  SeidoAI/web:\n    local: /tmp/web\n"
-        "statuses:\n  - todo\n  - done\n"
-        "status_transitions:\n  todo: [done]\n  done: []\n"
+        "statuses:\n  - queued\n  - completed\n"
+        "status_transitions:\n  queued: [completed]\n  completed: []\n"
         "label_categories:\n"
         "  executor: [ai, human]\n"
         "  verifier: [required, optional]\n"
@@ -483,8 +483,8 @@ class TestGetProject:
         assert detail.base_branch == "main"
         assert detail.environments == ["dev", "prod"]
         assert detail.repos == {"SeidoAI/web": {"local": "/tmp/web"}}
-        assert detail.statuses == ["todo", "done"]
-        assert detail.status_transitions == {"todo": ["done"], "done": []}
+        assert detail.statuses == ["queued", "completed"]
+        assert detail.status_transitions == {"queued": ["completed"], "completed": []}
         assert detail.label_categories["executor"] == ["ai", "human"]
         assert detail.graph["node_types"] == ["model", "decision"]
         assert detail.orchestration["default_pattern"] == "default"
