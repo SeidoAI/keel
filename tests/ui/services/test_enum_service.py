@@ -16,7 +16,7 @@ from tripwire.ui.services.enum_service import (
 
 
 def _write_enum(project_dir: Path, name: str, content: str) -> None:
-    d = project_dir / "enums"
+    d = project_dir / "templates" / "enums"
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{name}.yaml").write_text(content, encoding="utf-8")
 

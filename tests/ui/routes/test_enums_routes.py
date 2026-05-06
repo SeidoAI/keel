@@ -17,8 +17,8 @@ from tripwire.ui.services import project_service as _project_svc
 @pytest.fixture
 def enum_project(tmp_path: Path) -> Path:
     proj = make_project(tmp_path / "proj")
-    enums = proj / "enums"
-    enums.mkdir()
+    enums = proj / "templates" / "enums"
+    enums.mkdir(parents=True)
     # Structured form.
     (enums / "issue_status.yaml").write_text(
         yaml.safe_dump(

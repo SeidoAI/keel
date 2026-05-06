@@ -170,12 +170,7 @@ def load_enum(project_dir: Path, enum_name: str) -> list[str]:
 
     Raises FileNotFoundError if none of the above exist.
     """
-    # v0.10.0: support both canonical (`templates/enums/`) and legacy
-    # (`enums/`) layouts via the resolver.
-    project_path = (
-        paths.resolve_template_dir(project_dir, paths.ENUMS_DIR)
-        / f"{enum_name}.yaml"
-    )
+    project_path = project_dir / paths.ENUMS_DIR / f"{enum_name}.yaml"
     if project_path.is_file():
         return list(_load_enum_yaml(project_path, enum_name).value_ids())
 
@@ -201,7 +196,7 @@ def load_enums(project_dir: Path) -> EnumRegistry:
     returned can be queried for valid values without further IO.
     """
     registry = EnumRegistry()
-    enums_dir = paths.resolve_template_dir(project_dir, paths.ENUMS_DIR)
+    enums_dir = project_dir / paths.ENUMS_DIR
 
     for enum_name in DEFAULT_ENUMS:
         project_path = enums_dir / f"{enum_name}.yaml"

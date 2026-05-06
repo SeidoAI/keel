@@ -111,10 +111,16 @@ def _count_issues(project_dir: Path) -> int:
 
 
 def _count_nodes(project_dir: Path) -> int:
+    from tripwire.core.paths import GRAPH_INDEX_FILENAME
+
     nodes = project_dir / "nodes"
     if not nodes.is_dir():
         return 0
-    return sum(1 for p in nodes.glob("*.yaml"))
+    return sum(
+        1
+        for p in nodes.glob("*.yaml")
+        if p.name != GRAPH_INDEX_FILENAME
+    )
 
 
 def _count_sessions(project_dir: Path) -> int:

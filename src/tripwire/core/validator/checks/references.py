@@ -186,8 +186,8 @@ def check_reference_integrity(ctx: ValidationContext) -> list[CheckResult]:
 
 
 def _discover_agent_ids(project_dir: Path) -> set[str]:
-    """Read `<project>/templates/agents/*.yaml` (legacy: `<project>/agents/*.yaml`) and return the set of declared agent ids."""
-    agents_dir = paths.resolve_template_dir(project_dir, paths.AGENTS_DIR)
+    """Read `<project>/templates/agents/*.yaml` and return the set of declared agent ids."""
+    agents_dir = project_dir / paths.AGENTS_DIR
     if not agents_dir.is_dir():
         return set()
     ids: set[str] = set()

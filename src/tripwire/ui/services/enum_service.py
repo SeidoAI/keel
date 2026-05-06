@@ -147,9 +147,7 @@ def _parse_enum_yaml(path: Path, name: str) -> EnumDescriptor:
 
 
 def _enums_dir(project_dir: Path) -> Path:
-    # v0.10.0: support both canonical (`templates/enums/`) and legacy
-    # (`enums/`) layouts via the resolver.
-    return paths.resolve_template_dir(project_dir, paths.ENUMS_DIR)
+    return project_dir / paths.ENUMS_DIR
 
 
 # ---------------------------------------------------------------------------

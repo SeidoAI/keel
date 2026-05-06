@@ -133,16 +133,12 @@ def _template_base_name(path: str) -> str:
 def _collect_templates(project_dir: Path) -> list[tuple[str, str]]:
     """Return [(relative_path, kind), ...] for every template file.
 
-    `kind` is the canonical subdirectory name (e.g. ``templates/agents``)
-    — a crude categorisation the `list` output uses so users can see at
-    a glance what each template is for. The actual filesystem location
-    may be the legacy flat layout for pre-v0.10.0 projects; the resolver
-    handles that transparently while keeping the report's `kind` column
-    canonical.
+    `kind` is the subdirectory name — a crude categorisation the `list`
+    output uses so users can see at a glance what each template is for.
     """
     rows: list[tuple[str, str]] = []
     for subdir in TEMPLATE_SUBDIRS:
-        abs_dir = paths.resolve_template_dir(project_dir, subdir)
+        abs_dir = project_dir / subdir
         if not abs_dir.is_dir():
             continue
         for f in sorted(abs_dir.rglob("*")):

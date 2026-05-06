@@ -177,11 +177,8 @@ def _collect_orchestration(
     project_dir: Path, project: ProjectConfig
 ) -> OrchestrationInfo:
     pattern_name = project.orchestration.default_pattern
-    # v0.10.0: resolve through the canonical/legacy fallback so existing
-    # flat-layout projects still find their orchestration patterns.
-    resolved_dir = paths.resolve_template_dir(project_dir, ORCHESTRATION_DIR)
-    pattern_path = resolved_dir / f"{pattern_name}.yaml"
-    pattern_rel = str(pattern_path.relative_to(project_dir))
+    pattern_rel = f"{ORCHESTRATION_DIR}/{pattern_name}.yaml"
+    pattern_path = project_dir / pattern_rel
     return OrchestrationInfo(
         pattern=pattern_name,
         path=pattern_rel,
@@ -205,7 +202,7 @@ def _collect_templates(project_dir: Path) -> list[str]:
         SESSION_TEMPLATES_DIR,
         paths.TEMPLATES_ARTIFACTS_DIR,
     ):
-        abs_dir = paths.resolve_template_dir(project_dir, rel_dir)
+        abs_dir = project_dir / rel_dir
         if not abs_dir.is_dir():
             continue
         for f in sorted(abs_dir.rglob("*")):

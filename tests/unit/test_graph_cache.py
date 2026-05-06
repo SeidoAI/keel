@@ -140,7 +140,7 @@ class TestLoadSave:
     def test_version_mismatch_treated_as_missing(self, tmp_path: Path) -> None:
         make_project(tmp_path)
         # Write a v1 cache
-        (tmp_path / "graph").mkdir(exist_ok=True)
+        (tmp_path / "nodes").mkdir(exist_ok=True)
         (tmp_path / INDEX_REL_PATH).write_text(
             yaml.safe_dump({"version": 1, "files": {}})
         )
@@ -148,7 +148,7 @@ class TestLoadSave:
 
     def test_corrupt_yaml_treated_as_missing(self, tmp_path: Path) -> None:
         make_project(tmp_path)
-        (tmp_path / "graph").mkdir(exist_ok=True)
+        (tmp_path / "nodes").mkdir(exist_ok=True)
         (tmp_path / INDEX_REL_PATH).write_text("not: : : valid:\n")
         assert load_index(tmp_path) is None
 

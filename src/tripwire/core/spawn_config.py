@@ -137,10 +137,7 @@ def _apply_agent_yaml_overrides(
     Mutates ``resolved`` in place. Tolerant of missing / malformed
     agent yamls — they're metadata, not load-bearing config.
     """
-    agent_yaml = (
-        paths.resolve_template_dir(project_dir, paths.AGENTS_DIR)
-        / f"{agent_id}.yaml"
-    )
+    agent_yaml = project_dir / paths.AGENTS_DIR / f"{agent_id}.yaml"
     if not agent_yaml.is_file():
         return
     try:

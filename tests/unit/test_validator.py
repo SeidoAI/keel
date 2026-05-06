@@ -1258,9 +1258,19 @@ class TestPhaseRequirements:
 
 
 def _file_snapshots(project_dir: Path) -> dict[str, str]:
-    """Read every YAML file in the project tree into a path→content dict."""
+    """Read every authored YAML file in the project tree into a path→content dict.
+
+    Skips ``nodes/tripwire-graph-index.yaml`` — the derived graph cache
+    carries a ``last_incremental_update`` timestamp that changes on
+    every rebuild, so it can never be byte-identical across two runs
+    even when the source files are.
+    """
+    from tripwire.core.paths import GRAPH_INDEX_FILENAME
+
     out: dict[str, str] = {}
     for path in sorted(project_dir.rglob("*.yaml")):
+        if path.name == GRAPH_INDEX_FILENAME:
+            continue
         rel = str(path.relative_to(project_dir))
         out[rel] = path.read_text(encoding="utf-8")
     return out

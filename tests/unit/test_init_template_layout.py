@@ -78,6 +78,31 @@ def test_init_writes_consolidated_templates_layout(tmp_path: Path):
         assert (project / state).is_dir(), f"state dir {state}/ missing"
 
 
+def test_init_does_not_create_graph_directory(tmp_path: Path):
+    """v0.10.0 collapses the graph cache from `graph/index.yaml` into
+    `nodes/tripwire-graph-index.yaml`. A fresh project must not ship a
+    standalone `graph/` directory.
+    """
+    runner = CliRunner()
+    project = tmp_path / "fresh"
+    result = runner.invoke(
+        cli,
+        [
+            "init",
+            "--non-interactive",
+            "--no-git",
+            "--no-remote",
+            "--name",
+            "fresh",
+            "--key-prefix",
+            "FRS",
+            str(project),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert not (project / "graph").exists(), "graph/ must not exist post-init"
+
+
 def test_init_populates_templates_agents_with_yaml_files(tmp_path: Path):
     """Sanity: at least one packaged agent YAML lands under templates/agents/."""
     runner = CliRunner()

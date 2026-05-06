@@ -10,8 +10,8 @@ from tripwire.core.enum_loader import load_enums
 
 
 def write_enum(project_dir: Path, name: str, values: list[dict]) -> None:
-    enums_dir = project_dir / "enums"
-    enums_dir.mkdir(exist_ok=True)
+    enums_dir = project_dir / "templates" / "enums"
+    enums_dir.mkdir(parents=True, exist_ok=True)
     (enums_dir / f"{name}.yaml").write_text(
         yaml.safe_dump({"name": name, "values": values}),
         encoding="utf-8",

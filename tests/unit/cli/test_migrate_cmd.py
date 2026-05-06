@@ -120,7 +120,7 @@ class TestMigrateTemplates:
         project = _make_legacy_project(tmp_path / "proj")
         # Pre-create the canonical dir alongside the legacy one.
         (project / "templates").mkdir()
-        (project / "templates" / "agents").mkdir()
+        (project / "templates" / "agents").mkdir(parents=True)
         (project / "templates" / "agents" / "preexisting.yaml").write_text(
             "# foreign\n"
         )
