@@ -27,6 +27,7 @@ from tripwire.cli.init import init_cmd
 from tripwire.cli.issue import issue_cmd
 from tripwire.cli.jit_prompts import jit_prompts_cmd
 from tripwire.cli.lint import lint_cmd
+from tripwire.cli.migrate import migrate_cmd
 from tripwire.cli.next_key import next_key_cmd
 from tripwire.cli.node import node_cmd
 from tripwire.cli.plan import plan_cmd
@@ -124,6 +125,7 @@ cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)
 cli.add_command(completion_cmd)
 cli.add_command(config_cmd)
+cli.add_command(migrate_cmd)
 cli.add_command(ui_cmd)
 cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
