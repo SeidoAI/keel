@@ -198,12 +198,27 @@ def classify(
     ):
         return _event(project_id, "scoping-artifact", stem, action, rel_posix)
 
-    # agents/<id>.yaml
+    # agents/<id>.yaml — legacy flat layout (pre-v0.10.0)
+    # templates/agents/<id>.yaml — canonical (v0.10.0+)
     if len(parts) == 2 and parts[0] == "agents" and suffix == ".yaml":
         return _event(project_id, "agent_def", stem, action, rel_posix)
+    if (
+        len(parts) == 3
+        and parts[0] == "templates"
+        and parts[1] == "agents"
+        and suffix == ".yaml"
+    ):
+        return _event(project_id, "agent_def", stem, action, rel_posix)
 
-    # enums/<id>.yaml
+    # enums/<id>.yaml — legacy / templates/enums/<id>.yaml — canonical
     if len(parts) == 2 and parts[0] == "enums" and suffix == ".yaml":
+        return _event(project_id, "enum", stem, action, rel_posix)
+    if (
+        len(parts) == 3
+        and parts[0] == "templates"
+        and parts[1] == "enums"
+        and suffix == ".yaml"
+    ):
         return _event(project_id, "enum", stem, action, rel_posix)
 
     return None

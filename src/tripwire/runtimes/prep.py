@@ -868,8 +868,13 @@ def run(
         install_claude_settings(worktree=Path(wt.worktree_path))
 
     # Look up the agent's declared skills
+    from tripwire.core import paths as _paths
+
     skill_names: list[str] = []
-    agent_yaml = project_dir / "agents" / f"{session.agent}.yaml"
+    agent_yaml = (
+        _paths.resolve_template_dir(project_dir, _paths.AGENTS_DIR)
+        / f"{session.agent}.yaml"
+    )
     if agent_yaml.is_file():
         try:
             agent_data = _yaml.safe_load(agent_yaml.read_text(encoding="utf-8")) or {}

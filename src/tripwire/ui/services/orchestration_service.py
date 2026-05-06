@@ -73,7 +73,12 @@ class OrchestrationPattern(BaseModel):
 
 
 def _pattern_file(project_dir: Path, pattern_name: str) -> Path:
-    return project_dir / paths.ORCHESTRATION_DIR / f"{pattern_name}.yaml"
+    # v0.10.0: support both canonical (`templates/orchestration/`) and
+    # legacy (`orchestration/`) layouts via the resolver.
+    return (
+        paths.resolve_template_dir(project_dir, paths.ORCHESTRATION_DIR)
+        / f"{pattern_name}.yaml"
+    )
 
 
 def _load_pattern_yaml(path: Path) -> dict[str, Any]:
