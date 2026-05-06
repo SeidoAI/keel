@@ -291,6 +291,15 @@ def discover_projects(config: UserConfig) -> list[ProjectSummary]:
         for name in _FALLBACK_ROOTS:
             _add(_find_projects_in_root(home / name, max_depth=2))
 
+    # 4. Previously-seeded paths that aren't reachable via the wide scan.
+    #    Used by the cwd-augmentation path in ``cli/ui.py``: when
+    #    ``tripwire ui`` is launched from a project dir not covered by
+    #    ``project_roots``, that path is seeded with ``pin=False`` and
+    #    must show up in the picker — even though wide discovery missed
+    #    it. Stale entries (seeded then deleted/moved) drop out via
+    #    ``_try_load_summary`` returning ``None``.
+    _add(list(_project_index.values()))
+
     summaries = []
     for project_dir in candidates:
         summary = _try_load_summary(project_dir)
@@ -327,10 +336,17 @@ def seed_project_index(project_dirs: list[Path], *, pin: bool = True) -> None:
     for d in project_dirs:
         resolved = d.resolve()
         _project_index[_project_id(resolved)] = resolved
-    if project_dirs and pin:
-        _pinned = True
-        # Drop any stale wider cache so the next read reflects the pin.
+    if project_dirs:
+        # Any non-empty seed must invalidate the cached summary list. With
+        # ``pin=False`` (the cwd-augmentation case) the wider scan already
+        # populated ``_discovery_cache``; if cwd was missed by that scan, the
+        # caller has just appended it to the index and the cache is now
+        # stale. Clearing here unconditionally lets the next ``list_projects``
+        # call see every seeded path within milliseconds instead of waiting
+        # for the 60s TTL.
         _discovery_cache = None
+        if pin:
+            _pinned = True
 
 
 def reload_project_index() -> None:
