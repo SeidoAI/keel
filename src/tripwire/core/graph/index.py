@@ -31,7 +31,7 @@ from tripwire.models.graph import EdgeKind, GraphEdge, GraphIndex
 # Legacy → canonical edge-kind mapping
 # ---------------------------------------------------------------------------
 
-# Keys are the legacy strings actually stored in `graph/index.yaml`.
+# Keys are the legacy strings actually stored in `nodes/tripwire-graph-index.yaml`.
 # Values are the canonical EdgeKind values (KUI-131's 7-kind taxonomy).
 _LEGACY_TO_CANONICAL: dict[str, str] = {
     "references": EdgeKind.REFS.value,
@@ -204,7 +204,7 @@ class UnifiedIndex:
 def load(project_dir: Path) -> UnifiedIndex:
     """Load the unified index for `project_dir`.
 
-    Falls back to an empty cache if `graph/index.yaml` is missing — the
+    Falls back to an empty cache if `nodes/tripwire-graph-index.yaml` is missing — the
     facade is still usable but will return empty queries. The caller
     can run `core.graph.cache.ensure_fresh` first if it wants to be
     sure the index reflects the current filesystem.

@@ -1,6 +1,6 @@
 """Graph models — the cache schema and computed graph results.
 
-The cache (`<project>/graph/index.yaml`) is committed to git and incrementally
+The cache (`<project>/nodes/tripwire-graph-index.yaml`) is committed to git and incrementally
 updated by `tripwire validate`. Reads of the graph (UI, CLI, agent) go
 through the cache for O(1) lookups instead of rescanning every file.
 
@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class EdgeType(StrEnum):
     """Legacy edge type strings preserved for on-disk YAML compatibility.
 
-    These are the strings actually written into `graph/index.yaml`. v0.9's
+    These are the strings actually written into `nodes/tripwire-graph-index.yaml`. v0.9's
     canonical taxonomy lives on :class:`EdgeKind`; the unified-index facade
     in `core.graph.index` translates between them.
     """
@@ -134,7 +134,7 @@ class GraphNode(BaseModel):
 
 
 class GraphIndex(BaseModel):
-    """The cache committed to `<project>/graph/index.yaml`.
+    """The cache committed to `<project>/nodes/tripwire-graph-index.yaml`.
 
     This is a derived view of the underlying files. Deleting it and running
     `tripwire validate` always rebuilds it correctly. The cache is

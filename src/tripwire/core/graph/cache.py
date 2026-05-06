@@ -1,6 +1,6 @@
 """Incremental graph index cache (v2 schema).
 
-`graph/index.yaml` is committed to git as a derived view of the underlying
+`nodes/tripwire-graph-index.yaml` is committed to git as a derived view of the underlying
 issue and node files. It is never the source of truth — deleting it always
 rebuilds correctly from the files. The cache exists purely so UI and CLI
 reads are O(1) instead of rescanning N files every time.
@@ -656,7 +656,7 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
 
     Called when the cache is missing, version-mismatched, or corrupt. Also
     a handy forcing function if you ever suspect the cache is wrong —
-    delete `graph/index.yaml` and run `validate`.
+    delete `nodes/tripwire-graph-index.yaml` and run `validate`.
     """
     logger.info("graph_cache: full rebuild starting (project=%s)", project_dir)
     started = time.monotonic()
@@ -835,7 +835,7 @@ def ensure_fresh(project_dir: Path) -> bool:
     """Make sure the cache reflects the current state of the filesystem.
 
     Decision tree:
-    1. If `graph/index.yaml` is missing or version-mismatched → full rebuild
+    1. If `nodes/tripwire-graph-index.yaml` is missing or version-mismatched → full rebuild
     2. Otherwise walk `issues/` and `nodes/` and compare file mtimes
        against the stored fingerprints:
        - For every file on disk whose mtime or sha is newer than the cache,

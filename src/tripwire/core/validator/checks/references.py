@@ -151,7 +151,7 @@ def check_reference_integrity(ctx: ValidationContext) -> list[CheckResult]:
                     file=entity.rel_path,
                     field="agent",
                     message=(
-                        f"session.agent {session.agent!r} has no matching definition in agents/."
+                        f"session.agent {session.agent!r} has no matching definition in templates/agents/."
                     ),
                 )
             )

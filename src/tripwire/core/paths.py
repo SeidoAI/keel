@@ -34,7 +34,7 @@ CLAUDE_MD = "CLAUDE.md"
 ISSUES_DIR = "issues"
 
 # Concept nodes are source entities — peers of issues and sessions.
-# The derived graph cache lives separately at `graph/index.yaml`.
+# The derived graph cache lives separately at `nodes/tripwire-graph-index.yaml`.
 NODES_DIR = "nodes"
 
 INBOX_DIR = "inbox"
@@ -101,7 +101,7 @@ GRAPH_LOCK = f"{NODES_DIR}/{GRAPH_INDEX_LOCK_FILENAME}"
 # Reserved node id — refuses to be loaded as a concept node by the
 # validator and the node store, even though the file lives under
 # ``nodes/``. Pre-v0.10.0 projects must run ``tripwire migrate graph``
-# to move ``graph/index.yaml`` and ``graph/.index.lock`` into ``nodes/``
+# to move ``nodes/tripwire-graph-index.yaml`` and ``nodes/.tripwire-graph-index.lock`` into ``nodes/``
 # under their new canonical names.
 GRAPH_INDEX_NODE_ID = "tripwire-graph-index"
 

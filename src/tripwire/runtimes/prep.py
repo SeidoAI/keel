@@ -437,7 +437,7 @@ def copy_skills(*, worktree: Path, skill_names: list[str]) -> None:
             if not skill_src.is_file():
                 raise RuntimeError(
                     f"Skill '{name}' not found in tripwire.templates.skills. "
-                    f"Check agents/<id>.yaml.context.skills."
+                    f"Check templates/agents/<id>.yaml.context.skills."
                 )
 
         dest_root = worktree / ".claude" / "skills"

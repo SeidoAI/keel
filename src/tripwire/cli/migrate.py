@@ -19,8 +19,9 @@ import click
 from tripwire.core import paths
 
 # Source (flat) → destination (under templates/) mapping for the v0.10.0
-# layout migration. Mirrors the canonical/legacy pairs in
-# ``core/paths.py``'s ``_LEGACY_TEMPLATE_PATHS``.
+# layout migration. The destination paths are now the canonical layout
+# (defined as constants on ``core/paths.py``); the legacy source names
+# are inlined here because this command is the only consumer.
 _TEMPLATE_RENAMES: tuple[tuple[str, str], ...] = (
     ("agents", paths.AGENTS_DIR),                       # → templates/agents
     ("enums", paths.ENUMS_DIR),                          # → templates/enums

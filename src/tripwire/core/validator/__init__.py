@@ -1078,7 +1078,7 @@ def validate_project(
     call with `fix=True` to apply auto-fixes after the agent has done its
     initial pass.
 
-    Always rebuilds the graph cache (`graph/index.yaml`) as a side effect —
+    Always rebuilds the graph cache (`nodes/tripwire-graph-index.yaml`) as a side effect —
     incrementally if the cache is already up to date, as a full rebuild if
     the cache is missing or corrupt.
 
@@ -1170,7 +1170,7 @@ def validate_project(
                     severity="warning",
                     file=graph_cache.INDEX_REL_PATH,
                     message=f"Could not rebuild graph cache: {exc}",
-                    fix_hint="Delete graph/index.yaml and re-run validate.",
+                    fix_hint="Delete nodes/tripwire-graph-index.yaml and re-run validate.",
                 )
             )
 

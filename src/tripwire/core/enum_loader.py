@@ -1,7 +1,7 @@
-"""Dynamic enum loading from `<project>/enums/`.
+"""Dynamic enum loading from `<project>/templates/enums/`.
 
 Enums are not hardcoded — they are YAML files in the project repo at
-`<project>/enums/<name>.yaml`, copied from packaged defaults at
+`<project>/templates/enums/<name>.yaml`, copied from packaged defaults at
 `templates/enums/` on `tripwire init`. After init, the project owns its
 enums and can add states, rename labels, recolor for the UI, or remove states
 it doesn't use.
@@ -54,7 +54,7 @@ class LoadedEnum:
     description: str | None
     values: tuple[EnumValue, ...]
     source: (
-        str  # "project" if from <project>/enums/, "default" if from packaged defaults
+        str  # "project" if from <project>/templates/enums/, "default" if from packaged defaults
     )
 
     def value_ids(self) -> tuple[str, ...]:
@@ -191,7 +191,7 @@ def load_enum(project_dir: Path, enum_name: str) -> list[str]:
 def load_enums(project_dir: Path) -> EnumRegistry:
     """Load all active enums for a project.
 
-    For each known enum name, prefer `<project>/enums/<name>.yaml` if present;
+    For each known enum name, prefer `<project>/templates/enums/<name>.yaml` if present;
     otherwise fall back to the packaged default StrEnum class. The registry
     returned can be queried for valid values without further IO.
     """
