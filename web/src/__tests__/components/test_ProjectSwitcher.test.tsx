@@ -102,12 +102,20 @@ describe("groupProjectsByWorkspace", () => {
     ]);
   });
 
-  test("missing workspace shows fallback name", () => {
+  test("project with workspace_id not in discovered list collapses into Unworkspaced", () => {
+    // Realistic cause: cache race where /api/projects ships ahead of
+    // /api/workspaces, or a stale workspace_id from before the user
+    // removed a workspace_root from config. Either way, surfacing an
+    // "Unknown workspace" group has no useful UI affordance — the
+    // project lands in Unworkspaced, which is recoverable.
     const projects = [
       projectSummary({ id: "x", name: "x", workspace_id: "ghost-ws" }),
     ];
     const groups = groupProjectsByWorkspace(projects, []);
-    expect(groups[0]?.workspaceName).toBe("Unknown workspace");
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.workspaceId).toBe("__none__");
+    expect(groups[0]?.workspaceName).toBe("Unworkspaced");
+    expect(groups[0]?.projects.map((p) => p.id)).toEqual(["x"]);
   });
 });
 
@@ -243,6 +251,33 @@ describe("<ProjectSwitcher />", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /beta/ }));
 
     await waitFor(() => expect(observedPath).toBe("/p/p2/board"));
+  });
+
+  test("renders project phase as the dropdown badge (replaces issue key)", async () => {
+    server.use(
+      http.get("/api/projects", () =>
+        HttpResponse.json([
+          projectSummary({
+            id: "p1",
+            name: "alpha",
+            key_prefix: "ALP",
+            phase: "executing",
+          }),
+        ]),
+      ),
+    );
+
+    renderWithProviders(
+      <ProjectSwitcher projectId="p1" currentLabel="alpha" />,
+      { initialPath: "/p/p1/board" },
+    );
+
+    openDropdown(screen.getByRole("button", { name: /switch project/i }));
+    const item = await screen.findByRole("menuitem", { name: /alpha/ });
+    // The phase appears as the right-side badge.
+    expect(item.textContent).toContain("executing");
+    // The pre-v0.11 issue-key badge is gone.
+    expect(item.textContent).not.toContain("ALP");
   });
 
   test("renders fallback when projects list is empty", async () => {

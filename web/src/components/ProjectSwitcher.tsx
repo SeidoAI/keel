@@ -137,8 +137,8 @@ function SwitcherGroup({
           <span className="truncate text-(--color-ink)">
             {p.name.replace(/^project-/, "")}
           </span>
-          <span className="font-mono text-[10px] text-(--color-ink-3)">
-            {p.key_prefix}
+          <span className="text-[10px] uppercase tracking-[0.12em] text-(--color-ink-3)">
+            {p.phase}
           </span>
         </DropdownMenuItem>
       ))}
@@ -160,14 +160,22 @@ export function groupProjectsByWorkspace(
   const groupsById = new Map<string, ProjectGroup>();
 
   for (const p of projects) {
-    const wsId = p.workspace_id ?? NO_WORKSPACE;
+    // If workspace_id is set but the workspace isn't in the discovery
+    // result (cache races, /api/projects ahead of /api/workspaces, the
+    // backend pointer resolved to a directory not registered in
+    // workspace_roots), fall through to the Unworkspaced bucket
+    // rather than spawning a phantom "Unknown workspace" group.
+    const wsId =
+      p.workspace_id && wsById.has(p.workspace_id)
+        ? p.workspace_id
+        : NO_WORKSPACE;
     if (!groupsById.has(wsId)) {
       groupsById.set(wsId, {
         workspaceId: wsId,
         workspaceName:
           wsId === NO_WORKSPACE
             ? UNWORKSPACED_HEADING
-            : (wsById.get(wsId)?.name ?? "Unknown workspace"),
+            : wsById.get(wsId)!.name,
         projects: [],
       });
     }
