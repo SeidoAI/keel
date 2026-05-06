@@ -90,6 +90,27 @@ class TestSet:
         assert result.exit_code == 0
         assert "does not exist" in result.output
 
+    def test_set_doesnt_pollute_with_defaults(
+        self, tmp_path: Path, _redirect_default_config: Path
+    ):
+        """v0.10.0 review fix: setting one field should not write every
+        other field's default into the YAML. Hand-crafted minimal
+        configs ought to stay minimal after CLI use.
+        """
+        root = tmp_path / "r"
+        root.mkdir()
+        result = runner.invoke(
+            cli, ["config", "set", "project-roots", str(root)]
+        )
+        assert result.exit_code == 0
+        on_disk = yaml.safe_load(_redirect_default_config.read_text())
+        # Only project_roots should be persisted — port/open_browser/
+        # workspace_roots are defaults, omitted.
+        assert on_disk == {"project_roots": [str(root)]}
+        assert "port" not in on_disk
+        assert "open_browser" not in on_disk
+        assert "workspace_roots" not in on_disk
+
     def test_show_round_trips_set(
         self, tmp_path: Path, _redirect_default_config: Path
     ):

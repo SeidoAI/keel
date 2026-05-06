@@ -88,9 +88,17 @@ def save_user_config(config: UserConfig, path: Path | None = None) -> Path:
     """Write *config* to *path* (default ``~/.tripwire/config.yaml``).
 
     Creates the parent directory if needed. Returns the path written to.
+
+    Uses ``exclude_defaults=True`` so a hand-crafted minimal config (just
+    ``project_roots: [...]``) doesn't bloat with default-valued fields
+    (``port: 8000``, ``open_browser: true``, ``workspace_roots: []``)
+    on every CLI write. Round-trips cleanly because ``load_user_config``
+    re-applies defaults at read time.
     """
     config_path = path if path is not None else _DEFAULT_CONFIG_PATH
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = config.model_dump(mode="json", exclude_none=True)
+    payload = config.model_dump(
+        mode="json", exclude_none=True, exclude_defaults=True
+    )
     config_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")
     return config_path
