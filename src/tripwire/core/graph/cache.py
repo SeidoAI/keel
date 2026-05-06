@@ -1,6 +1,6 @@
 """Incremental graph index cache (v2 schema).
 
-`graph/index.yaml` is committed to git as a derived view of the underlying
+`nodes/tripwire-graph-index.yaml` is committed to git as a derived view of the underlying
 issue and node files. It is never the source of truth — deleting it always
 rebuilds correctly from the files. The cache exists purely so UI and CLI
 reads are O(1) instead of rescanning N files every time.
@@ -83,8 +83,8 @@ def _index_lock(
 ) -> Iterator[None]:
     """Acquire an exclusive `flock` on the graph index lock file.
 
-    Creates `graph/.index.lock` if it doesn't exist. Same polling pattern as
-    `core/key_allocator.py`.
+    Creates ``nodes/.tripwire-graph-index.lock`` if it doesn't exist.
+    Same polling pattern as ``core/key_allocator.py``.
     """
     lock_path = project_dir / LOCK_REL_PATH
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -114,7 +114,7 @@ def _index_lock(
 
 
 def load_index(project_dir: Path) -> GraphIndex | None:
-    """Load `graph/index.yaml`, or return None if the file is missing.
+    """Load ``nodes/tripwire-graph-index.yaml``, or return None if missing.
 
     Version mismatch and parse errors also return None — the caller (usually
     `ensure_fresh`) will then trigger a full rebuild. This is intentional:
@@ -138,7 +138,7 @@ def load_index(project_dir: Path) -> GraphIndex | None:
 
 
 def save_index(project_dir: Path, cache: GraphIndex) -> None:
-    """Write the cache to `graph/index.yaml` atomically.
+    """Write the cache to ``nodes/tripwire-graph-index.yaml`` atomically.
 
     Uses a tmp-file + rename so partial writes never leave a corrupt cache
     on disk.
@@ -656,7 +656,7 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
 
     Called when the cache is missing, version-mismatched, or corrupt. Also
     a handy forcing function if you ever suspect the cache is wrong —
-    delete `graph/index.yaml` and run `validate`.
+    delete `nodes/tripwire-graph-index.yaml` and run `validate`.
     """
     logger.info("graph_cache: full rebuild starting (project=%s)", project_dir)
     started = time.monotonic()
@@ -684,6 +684,10 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
         nodes_root = paths.nodes_dir(project_dir)
         if nodes_root.is_dir():
             for abs_path in sorted(nodes_root.glob("*.yaml")):
+                # Skip the cache file itself — it lives in `nodes/`
+                # since v0.10.0 but is not a concept node.
+                if abs_path.name == paths.GRAPH_INDEX_FILENAME:
+                    continue
                 rel_path = str(abs_path.relative_to(project_dir))
                 parsed = _load_node_file(project_dir, rel_path)
                 if parsed is None:
@@ -831,7 +835,7 @@ def ensure_fresh(project_dir: Path) -> bool:
     """Make sure the cache reflects the current state of the filesystem.
 
     Decision tree:
-    1. If `graph/index.yaml` is missing or version-mismatched → full rebuild
+    1. If `nodes/tripwire-graph-index.yaml` is missing or version-mismatched → full rebuild
     2. Otherwise walk `issues/` and `nodes/` and compare file mtimes
        against the stored fingerprints:
        - For every file on disk whose mtime or sha is newer than the cache,
@@ -863,6 +867,13 @@ def ensure_fresh(project_dir: Path) -> bool:
     nodes_root = paths.nodes_dir(project_dir)
     if nodes_root.is_dir():
         for abs_path in nodes_root.glob("*.yaml"):
+            # The cache file itself lives in `nodes/` since v0.10.0;
+            # don't track it as a source — that would re-trigger a
+            # rebuild on every `ensure_fresh` call (the rebuild writes
+            # the cache, the next call sees a "new" mtime, infinite
+            # loop on `last_incremental_update`).
+            if abs_path.name == paths.GRAPH_INDEX_FILENAME:
+                continue
             current_files.add(str(abs_path.relative_to(project_dir)))
 
     # KUI-132 / A7: also track session and comment files.

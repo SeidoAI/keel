@@ -68,10 +68,10 @@ class TestProject:
             name="seido",
             key_prefix="SEI",
             base_branch="main",
-            statuses=["backlog", "todo", "done"],
+            statuses=["planned", "queued", "done"],
             status_transitions={
-                "backlog": ["todo"],
-                "todo": ["done"],
+                "planned": ["queued"],
+                "queued": ["done"],
                 "done": [],
             },
             repos={"SeidoAI/x": RepoEntry(local="~/x")},
@@ -81,7 +81,7 @@ class TestProject:
         reloaded = load_project(tmp_path)
         assert reloaded.name == "seido"
         assert reloaded.next_issue_number == 5
-        assert reloaded.status_transitions["todo"] == ["done"]
+        assert reloaded.status_transitions["queued"] == ["done"]
 
 
 # ----------------------------------------------------------------------------
@@ -94,7 +94,7 @@ class TestIssueStore:
         issue = Issue(
             id="TST-1",
             title="Test issue",
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",
@@ -113,7 +113,7 @@ class TestIssueStore:
         issue = Issue(
             id="TST-1",
             title="t",
-            status="todo",
+            status="queued",
             priority="low",
             executor="ai",
             verifier="none",
@@ -129,7 +129,7 @@ class TestIssueStore:
         issue = Issue(
             id="TST-1",
             title="t",
-            status="todo",
+            status="queued",
             priority="low",
             executor="ai",
             verifier="none",
@@ -148,7 +148,7 @@ class TestIssueStore:
                 Issue(
                     id=f"TST-{n}",
                     title=f"Issue {n}",
-                    status="todo",
+                    status="queued",
                     priority="low",
                     executor="ai",
                     verifier="none",
@@ -165,7 +165,7 @@ class TestIssueStore:
             Issue(
                 id="TST-1",
                 title="t",
-                status="todo",
+                status="queued",
                 priority="low",
                 executor="ai",
                 verifier="none",
@@ -177,7 +177,7 @@ class TestIssueStore:
         original = Issue(
             id="TST-1",
             title="t",
-            status="todo",
+            status="queued",
             priority="low",
             executor="ai",
             verifier="none",
@@ -241,7 +241,7 @@ class TestCacheInvalidationOnSave:
         issue = Issue(
             id="TST-42",
             title="Cache me",
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",
@@ -261,7 +261,7 @@ class TestCacheInvalidationOnSave:
         issue = Issue(
             id="TST-99",
             title="No cache",
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",

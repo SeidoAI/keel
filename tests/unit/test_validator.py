@@ -101,7 +101,7 @@ def write_issue(
         "uuid": str(_uuid.uuid4()),
         "id": key,
         "title": f"Test {key}",
-        "status": "queued",  # v0.9.4 canonical (was "todo")
+        "status": "queued",  # v0.9.4 canonical (was "queued")
         "priority": "medium",
         "executor": "ai",
         "verifier": "required",
@@ -217,7 +217,7 @@ def save_test_issue(
     fm: dict[str, Any] = {
         "id": key,
         "title": f"Test {key}",
-        "status": "todo",
+        "status": "queued",
         "priority": "medium",
         "executor": "ai",
         "verifier": "required",
@@ -369,7 +369,7 @@ class TestUuidPresence:
             {
                 "id": "TST-1",
                 "title": "x",
-                "status": "todo",
+                "status": "queued",
                 "priority": "medium",
                 "executor": "ai",
                 "verifier": "required",
@@ -599,12 +599,12 @@ class TestStatusTransitions:
         # reachable from backlog (dropped from every transitions list).
         write_project_yaml(
             tmp_path,
-            statuses=["backlog", "todo", "done", "canceled"],
+            statuses=["planned", "queued", "done", "abandoned"],
             status_transitions={
-                "backlog": ["todo"],
-                "todo": ["done"],
+                "planned": ["queued"],
+                "queued": ["done"],
                 "done": [],
-                "canceled": [],
+                "abandoned": [],
             },
         )
         write_node(tmp_path, "user-model")
@@ -733,7 +733,7 @@ class TestAutoFix:
             {
                 "id": "TST-1",
                 "title": "x",
-                "status": "todo",
+                "status": "queued",
                 "priority": "medium",
                 "executor": "ai",
                 "verifier": "required",
@@ -1258,9 +1258,19 @@ class TestPhaseRequirements:
 
 
 def _file_snapshots(project_dir: Path) -> dict[str, str]:
-    """Read every YAML file in the project tree into a path→content dict."""
+    """Read every authored YAML file in the project tree into a path→content dict.
+
+    Skips ``nodes/tripwire-graph-index.yaml`` — the derived graph cache
+    carries a ``last_incremental_update`` timestamp that changes on
+    every rebuild, so it can never be byte-identical across two runs
+    even when the source files are.
+    """
+    from tripwire.core.paths import GRAPH_INDEX_FILENAME
+
     out: dict[str, str] = {}
     for path in sorted(project_dir.rglob("*.yaml")):
+        if path.name == GRAPH_INDEX_FILENAME:
+            continue
         rel = str(path.relative_to(project_dir))
         out[rel] = path.read_text(encoding="utf-8")
     return out
@@ -1287,7 +1297,7 @@ class TestAutoFixIdempotency:
             {
                 "id": "TST-1",
                 "title": "x",
-                "status": "todo",
+                "status": "queued",
                 "priority": "medium",
                 "executor": "ai",
                 "verifier": "required",

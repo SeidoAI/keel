@@ -47,7 +47,7 @@ def _make_project(
         issue_dir = root / "issues" / f"TST-{i + 1}"
         issue_dir.mkdir()
         (issue_dir / "issue.yaml").write_text(
-            f"---\nid: TST-{i + 1}\ntitle: Issue {i + 1}\nstatus: todo\n"
+            f"---\nid: TST-{i + 1}\ntitle: Issue {i + 1}\nstatus: queued\n"
             "priority: medium\nexecutor: ai\nverifier: required\nkind: feat\n---\n"
             "## Context\ntest\n",
             encoding="utf-8",
@@ -279,6 +279,51 @@ class TestDiscoverProjects:
         # have been discovered if pinning weren't engaged.
         assert (decoy / "project.yaml").is_file()
 
+    def test_seed_with_pin_false_invalidates_cache(self, tmp_path: Path):
+        """v0.10.0 regression (codex P2 + Claude review): a non-empty seed
+        must clear `_discovery_cache` even when `pin=False` so the cwd-
+        augmentation case in `tripwire ui` doesn't leave the picker
+        dropdown showing a stale list for the 60s TTL.
+        """
+        existing = _make_project(tmp_path / "existing", name="existing", key_prefix="EXI")
+        latecomer = _make_project(tmp_path / "latecomer", name="late", key_prefix="LAT")
+
+        # Pre-warm the cache via a config that only sees the existing project.
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "fakehome"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            cfg = UserConfig(project_roots=[existing.parent])
+            warm = discover_projects(cfg)
+        assert {Path(s.dir).resolve() for s in warm} == {
+            existing.resolve(),
+            latecomer.resolve(),
+        }
+        # Narrow the cache to one project so the augmentation path has
+        # something to add. (We can't easily replay the cwd-augmentation
+        # scenario without a real CLI invocation, so we exercise the
+        # underlying invariant directly: seed_project_index with pin=False
+        # must clear the cache so the next discover sees the new path.)
+        reload_project_index()
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "fakehome"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            cfg_narrow = UserConfig(project_roots=[existing])
+            stale = discover_projects(cfg_narrow)
+        assert {Path(s.dir).resolve() for s in stale} == {existing.resolve()}
+
+        # Augmentation: caller seeds latecomer with pin=False (mimics
+        # cli/ui.py's cwd-augmentation path). This MUST invalidate the
+        # cache so the next list_projects call returns both.
+        seed_project_index([latecomer], pin=False)
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "fakehome"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            after = discover_projects(cfg_narrow)
+        assert latecomer.resolve() in {Path(s.dir).resolve() for s in after}
+
 
 class TestCache:
     def test_cache_hit(self, tmp_path: Path):
@@ -370,8 +415,8 @@ def _make_rich_project(root: Path, name: str = "rich", key_prefix: str = "RCH") 
         "base_branch: main\n"
         "environments:\n  - dev\n  - prod\n"
         "repos:\n  SeidoAI/web:\n    local: /tmp/web\n"
-        "statuses:\n  - todo\n  - done\n"
-        "status_transitions:\n  todo: [done]\n  done: []\n"
+        "statuses:\n  - queued\n  - completed\n"
+        "status_transitions:\n  queued: [completed]\n  completed: []\n"
         "label_categories:\n"
         "  executor: [ai, human]\n"
         "  verifier: [required, optional]\n"
@@ -438,8 +483,8 @@ class TestGetProject:
         assert detail.base_branch == "main"
         assert detail.environments == ["dev", "prod"]
         assert detail.repos == {"SeidoAI/web": {"local": "/tmp/web"}}
-        assert detail.statuses == ["todo", "done"]
-        assert detail.status_transitions == {"todo": ["done"], "done": []}
+        assert detail.statuses == ["queued", "completed"]
+        assert detail.status_transitions == {"queued": ["completed"], "completed": []}
         assert detail.label_categories["executor"] == ["ai", "human"]
         assert detail.graph["node_types"] == ["model", "decision"]
         assert detail.orchestration["default_pattern"] == "default"

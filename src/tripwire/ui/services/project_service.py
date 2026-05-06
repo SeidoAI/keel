@@ -57,6 +57,10 @@ class ProjectSummary(BaseModel):
     issue_count: int
     node_count: int
     session_count: int
+    # v0.10.0 — opaque id of the workspace this project belongs to (or
+    # ``None`` if the project's ``project.yaml`` has no ``workspace.path``
+    # pointer, or that pointer doesn't resolve to a known workspace).
+    workspace_id: str | None = None
 
 
 class ProjectDetail(ProjectSummary):
@@ -107,10 +111,16 @@ def _count_issues(project_dir: Path) -> int:
 
 
 def _count_nodes(project_dir: Path) -> int:
+    from tripwire.core.paths import GRAPH_INDEX_FILENAME
+
     nodes = project_dir / "nodes"
     if not nodes.is_dir():
         return 0
-    return sum(1 for p in nodes.glob("*.yaml"))
+    return sum(
+        1
+        for p in nodes.glob("*.yaml")
+        if p.name != GRAPH_INDEX_FILENAME
+    )
 
 
 def _count_sessions(project_dir: Path) -> int:
@@ -133,6 +143,19 @@ def _try_load_summary(abs_dir: Path) -> ProjectSummary | None:
         logger.warning("Skipping %s: %s", abs_dir, exc)
         return None
 
+    workspace_id: str | None = None
+    if config.workspace and config.workspace.path:
+        # Lazy import — workspace_service can't be imported at module load
+        # because it depends on this module via UserConfig discovery.
+        from tripwire.ui.services.workspace_service import get_workspace_id_for_project
+
+        try:
+            workspace_id = get_workspace_id_for_project(abs_dir, config.workspace.path)
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning(
+                "Could not resolve workspace for %s: %s", abs_dir, exc
+            )
+
     return ProjectSummary(
         id=_project_id(abs_dir),
         name=config.name,
@@ -142,6 +165,7 @@ def _try_load_summary(abs_dir: Path) -> ProjectSummary | None:
         issue_count=_count_issues(abs_dir),
         node_count=_count_nodes(abs_dir),
         session_count=_count_sessions(abs_dir),
+        workspace_id=workspace_id,
     )
 
 
@@ -273,6 +297,15 @@ def discover_projects(config: UserConfig) -> list[ProjectSummary]:
         for name in _FALLBACK_ROOTS:
             _add(_find_projects_in_root(home / name, max_depth=2))
 
+    # 4. Previously-seeded paths that aren't reachable via the wide scan.
+    #    Used by the cwd-augmentation path in ``cli/ui.py``: when
+    #    ``tripwire ui`` is launched from a project dir not covered by
+    #    ``project_roots``, that path is seeded with ``pin=False`` and
+    #    must show up in the picker — even though wide discovery missed
+    #    it. Stale entries (seeded then deleted/moved) drop out via
+    #    ``_try_load_summary`` returning ``None``.
+    _add(list(_project_index.values()))
+
     summaries = []
     for project_dir in candidates:
         summary = _try_load_summary(project_dir)
@@ -292,23 +325,34 @@ def get_project_dir(project_id: str) -> Path | None:
     return _project_index.get(project_id)
 
 
-def seed_project_index(project_dirs: list[Path]) -> None:
+def seed_project_index(project_dirs: list[Path], *, pin: bool = True) -> None:
     """Populate the project index from an explicit list of directories.
 
-    Used by ``start_server`` when the CLI's ``--project-dir`` flag bypasses
-    ``discover_projects()``. When called with a non-empty list this also
-    *pins* discovery to those paths — subsequent ``discover_projects``
-    calls return only the seeded set instead of widening to CWD,
-    ``config.project_roots`` and the fallback locations.
+    When *pin* is True (the default), discovery is pinned to *project_dirs* —
+    subsequent ``discover_projects`` calls return only the seeded set instead
+    of widening to CWD, ``config.project_roots`` and the fallback locations.
+    Used by ``--project-dir`` and by tests that want isolated fixtures.
+
+    When *pin* is False, *project_dirs* is added to the index without
+    bypassing wider discovery — the cwd-augmentation case where a user runs
+    ``tripwire ui`` from a project dir wants that project visible *and*
+    every project under ``config.project_roots`` to remain discoverable.
     """
     global _project_index, _pinned, _discovery_cache
     for d in project_dirs:
         resolved = d.resolve()
         _project_index[_project_id(resolved)] = resolved
     if project_dirs:
-        _pinned = True
-        # Drop any stale wider cache so the next read reflects the pin.
+        # Any non-empty seed must invalidate the cached summary list. With
+        # ``pin=False`` (the cwd-augmentation case) the wider scan already
+        # populated ``_discovery_cache``; if cwd was missed by that scan, the
+        # caller has just appended it to the index and the cache is now
+        # stale. Clearing here unconditionally lets the next ``list_projects``
+        # call see every seeded path within milliseconds instead of waiting
+        # for the 60s TTL.
         _discovery_cache = None
+        if pin:
+            _pinned = True
 
 
 def reload_project_index() -> None:
@@ -384,6 +428,19 @@ def get_project(project_id: str) -> ProjectDetail:
     # live in model metadata and can be surfaced later without schema change.
     config_data: dict[str, Any] = config.model_dump(mode="json")
 
+    workspace_id: str | None = None
+    if config.workspace and config.workspace.path:
+        from tripwire.ui.services.workspace_service import get_workspace_id_for_project
+
+        try:
+            workspace_id = get_workspace_id_for_project(
+                project_dir, config.workspace.path
+            )
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning(
+                "Could not resolve workspace for %s: %s", project_dir, exc
+            )
+
     return ProjectDetail(
         id=_project_id(project_dir),
         name=config.name,
@@ -393,6 +450,7 @@ def get_project(project_id: str) -> ProjectDetail:
         issue_count=_count_issues(project_dir),
         node_count=_count_nodes(project_dir),
         session_count=_count_sessions(project_dir),
+        workspace_id=workspace_id,
         description=config.description,
         base_branch=config.base_branch,
         environments=list(config.environments),
