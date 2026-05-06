@@ -76,22 +76,39 @@ def ui_cmd(
     config = load_user_config()
 
     # 3. Resolve project directories.
+    #
+    # `pin` controls whether the resolved project_dirs *restrict* discovery
+    # (the --project-dir case — user explicitly scoped this run to one
+    # project) or merely *augment* it (cwd / wide-discovery cases — the
+    # user wants the dropdown to show everything they have).
+    from tripwire.ui.services.project_service import discover_projects
+
     if project_dir is not None:
         project_dirs = [project_dir.expanduser().resolve()]
-    elif (cwd_project := _find_project_root(Path.cwd())) is not None:
-        project_dirs = [cwd_project]
+        pin = True
     else:
-        from tripwire.ui.services.project_service import discover_projects
+        # Wide discovery first — surfaces every project under
+        # `config.project_roots` and the fallback locations.
+        discovered = discover_projects(config)
+        project_dirs = [Path(p.dir) for p in discovered]
 
-        projects = discover_projects(config)
-        if not projects:
+        # Augment with cwd's project if we're inside one and it didn't
+        # already show up in discovery.
+        cwd_project = _find_project_root(Path.cwd())
+        if cwd_project is not None:
+            cwd_resolved = cwd_project.resolve()
+            if cwd_resolved not in {p.resolve() for p in project_dirs}:
+                project_dirs.append(cwd_resolved)
+
+        if not project_dirs:
             click.echo(
                 "No projects found.\n"
                 "Hint: run `tripwire init` in a project directory, or add paths\n"
-                "to ~/.tripwire/config.yaml under `project_roots`."
+                "to ~/.tripwire/config.yaml under `project_roots`\n"
+                "(see `tripwire config --help`)."
             )
             sys.exit(1)
-        project_dirs = [Path(p.dir) for p in projects]
+        pin = False
 
     # 4. Launch the server.
     start_server(
@@ -100,4 +117,5 @@ def ui_cmd(
         project_dirs=project_dirs,
         dev_mode=dev,
         open_browser=not no_browser,
+        pin=pin,
     )

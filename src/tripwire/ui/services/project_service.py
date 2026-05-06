@@ -292,20 +292,24 @@ def get_project_dir(project_id: str) -> Path | None:
     return _project_index.get(project_id)
 
 
-def seed_project_index(project_dirs: list[Path]) -> None:
+def seed_project_index(project_dirs: list[Path], *, pin: bool = True) -> None:
     """Populate the project index from an explicit list of directories.
 
-    Used by ``start_server`` when the CLI's ``--project-dir`` flag bypasses
-    ``discover_projects()``. When called with a non-empty list this also
-    *pins* discovery to those paths — subsequent ``discover_projects``
-    calls return only the seeded set instead of widening to CWD,
-    ``config.project_roots`` and the fallback locations.
+    When *pin* is True (the default), discovery is pinned to *project_dirs* —
+    subsequent ``discover_projects`` calls return only the seeded set instead
+    of widening to CWD, ``config.project_roots`` and the fallback locations.
+    Used by ``--project-dir`` and by tests that want isolated fixtures.
+
+    When *pin* is False, *project_dirs* is added to the index without
+    bypassing wider discovery — the cwd-augmentation case where a user runs
+    ``tripwire ui`` from a project dir wants that project visible *and*
+    every project under ``config.project_roots`` to remain discoverable.
     """
     global _project_index, _pinned, _discovery_cache
     for d in project_dirs:
         resolved = d.resolve()
         _project_index[_project_id(resolved)] = resolved
-    if project_dirs:
+    if project_dirs and pin:
         _pinned = True
         # Drop any stale wider cache so the next read reflects the pin.
         _discovery_cache = None

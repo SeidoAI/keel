@@ -6,11 +6,27 @@ import builtins
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from tripwire.cli.main import cli
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def _reset_project_index():
+    """Clear the project_service module-level cache between tests.
+
+    Without this, an earlier test's `_project_index` / `_pinned` / cache
+    leaks into the next, causing assertions about discovered project_dirs
+    to see stale entries.
+    """
+    from tripwire.ui.services.project_service import reload_project_index
+
+    reload_project_index()
+    yield
+    reload_project_index()
 
 
 class TestUiHelp:
@@ -67,8 +83,12 @@ class TestCwdAutodetect:
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
         monkeypatch.chdir(proj)
-        with patch("tripwire.ui.server.start_server") as mock_start:
-            result = runner.invoke(cli, ["ui"])
+        with patch(
+            "tripwire.ui.services.project_service.discover_projects",
+            return_value=[],
+        ):
+            with patch("tripwire.ui.server.start_server") as mock_start:
+                result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["project_dirs"] == [proj.resolve()]
 
@@ -79,8 +99,12 @@ class TestCwdAutodetect:
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
         monkeypatch.chdir(proj / "issues" / "KUI-1")
-        with patch("tripwire.ui.server.start_server") as mock_start:
-            result = runner.invoke(cli, ["ui"])
+        with patch(
+            "tripwire.ui.services.project_service.discover_projects",
+            return_value=[],
+        ):
+            with patch("tripwire.ui.server.start_server") as mock_start:
+                result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["project_dirs"] == [proj.resolve()]
 
@@ -149,6 +173,145 @@ class TestServerLaunch:
         kwargs = mock_start.call_args.kwargs
         assert kwargs["dev_mode"] is True
         assert kwargs["open_browser"] is False
+
+
+class TestPinBehavior:
+    """v0.10.0: only `--project-dir` should pin discovery.
+
+    Bare `tripwire ui` from inside a project (or anywhere with
+    `project_roots` configured) should keep wider discovery active so
+    the project switcher can list every known project.
+    """
+
+    def test_project_dir_pins(self, tmp_path: Path):
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "project.yaml").write_text(
+            "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        with patch("tripwire.ui.server.start_server") as mock_start:
+            result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
+        assert result.exit_code == 0
+        assert mock_start.call_args.kwargs["pin"] is True
+
+    def test_bare_ui_from_project_dir_does_not_pin(
+        self, tmp_path: Path, monkeypatch
+    ):
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "project.yaml").write_text(
+            "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        monkeypatch.chdir(proj)
+        with patch("tripwire.ui.server.start_server") as mock_start:
+            result = runner.invoke(cli, ["ui"])
+        assert result.exit_code == 0
+        assert mock_start.call_args.kwargs["pin"] is False
+
+    def test_bare_ui_from_subdir_does_not_pin(
+        self, tmp_path: Path, monkeypatch
+    ):
+        proj = tmp_path / "proj"
+        (proj / "issues" / "KUI-1").mkdir(parents=True)
+        (proj / "project.yaml").write_text(
+            "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        monkeypatch.chdir(proj / "issues" / "KUI-1")
+        with patch("tripwire.ui.server.start_server") as mock_start:
+            result = runner.invoke(cli, ["ui"])
+        assert result.exit_code == 0
+        assert mock_start.call_args.kwargs["pin"] is False
+
+    def test_wide_discovery_does_not_pin(self, tmp_path: Path, monkeypatch):
+        """When discover_projects returns hits but cwd has no project."""
+        from tripwire.ui.services.project_service import ProjectSummary
+
+        sentinel = tmp_path / "discovered"
+        sentinel.mkdir()
+        (sentinel / "project.yaml").write_text(
+            "name: dis\nkey_prefix: DIS\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        monkeypatch.chdir(tmp_path)
+        with patch(
+            "tripwire.ui.services.project_service.discover_projects",
+            return_value=[
+                ProjectSummary(
+                    id="abc",
+                    name="dis",
+                    key_prefix="DIS",
+                    dir=str(sentinel),
+                    phase="scoping",
+                    issue_count=0,
+                    node_count=0,
+                    session_count=0,
+                )
+            ],
+        ):
+            with patch("tripwire.ui.server.start_server") as mock_start:
+                result = runner.invoke(cli, ["ui"])
+        assert result.exit_code == 0
+        assert mock_start.call_args.kwargs["pin"] is False
+        # And project_dirs reflects the discovered project, not cwd.
+        assert mock_start.call_args.kwargs["project_dirs"] == [Path(str(sentinel))]
+
+
+class TestSeedProjectIndexPin:
+    """seed_project_index(pin=) controls whether discovery widens later."""
+
+    def test_pin_true_blocks_wider_discovery(self, tmp_path: Path):
+        from tripwire.ui.config import UserConfig
+        from tripwire.ui.services.project_service import (
+            discover_projects,
+            reload_project_index,
+            seed_project_index,
+        )
+
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "project.yaml").write_text(
+            "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+
+        try:
+            seed_project_index([proj], pin=True)
+            # discover_projects with empty config still pinned to seed.
+            results = discover_projects(UserConfig())
+            assert {Path(s.dir).resolve() for s in results} == {proj.resolve()}
+        finally:
+            reload_project_index()
+
+    def test_pin_false_allows_wider_discovery(self, tmp_path: Path, monkeypatch):
+        from tripwire.ui.config import UserConfig
+        from tripwire.ui.services.project_service import (
+            discover_projects,
+            reload_project_index,
+            seed_project_index,
+        )
+
+        proj_a = tmp_path / "a"
+        proj_a.mkdir()
+        (proj_a / "project.yaml").write_text(
+            "name: a\nkey_prefix: A\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        proj_b = tmp_path / "b"
+        proj_b.mkdir()
+        (proj_b / "project.yaml").write_text(
+            "name: b\nkey_prefix: B\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+
+        # cwd = an empty dir; project_roots covers both projects.
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.chdir(empty)
+
+        try:
+            seed_project_index([proj_a], pin=False)
+            results = discover_projects(UserConfig(project_roots=[tmp_path]))
+            dirs = {Path(s.dir).resolve() for s in results}
+            assert proj_a.resolve() in dirs
+            assert proj_b.resolve() in dirs
+        finally:
+            reload_project_index()
 
 
 def _make_import_blocker(blocked_module: str):
