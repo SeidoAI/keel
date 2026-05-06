@@ -185,8 +185,15 @@ def get_workspace_id_for_project(
 ) -> str | None:
     """Resolve a project's ``workspace.path`` pointer to a workspace id.
 
-    Returns ``None`` if the pointer doesn't resolve to an actual
-    workspace (broken symlink, dir missing, dir not a workspace, etc.).
+    Returns ``None`` when the pointer doesn't resolve to a known
+    workspace — either because the dir doesn't exist, doesn't have a
+    ``workspace.yaml``, or because the workspace isn't under any
+    registered ``workspace_roots``. Returning a value the picker can't
+    name back gives the user an "Unknown workspace" group with no
+    escape; gating on registration makes the project land in
+    "Unworkspaced" instead, which is accurate and recoverable via
+    ``tripwire config add workspace-root <path>``.
+
     Used by :func:`project_service._try_load_summary` to populate
     ``ProjectSummary.workspace_id``.
     """
@@ -196,7 +203,14 @@ def get_workspace_id_for_project(
         return None
     if not (target / "workspace.yaml").is_file():
         return None
-    return _workspace_id(target)
+
+    # Lazily populate the index so this works on the first request after
+    # process start (before any /api/workspaces hit).
+    if not _workspace_dirs_by_id:
+        discover_workspaces(load_user_config())
+
+    candidate = _workspace_id(target)
+    return candidate if candidate in _workspace_dirs_by_id else None
 
 
 __all__ = [

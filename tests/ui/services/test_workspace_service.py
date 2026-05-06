@@ -142,27 +142,36 @@ class TestListAndGetDir:
 
 
 class TestGetWorkspaceIdForProject:
-    def test_resolves_pointer_to_workspace(self, tmp_path: Path):
+    def test_resolves_pointer_to_registered_workspace(
+        self, tmp_path: Path, monkeypatch
+    ):
         ws_dir = _make_workspace(tmp_path / "workspaces" / "seido")
         proj_dir = tmp_path / "projects" / "kbp"
         proj_dir.mkdir(parents=True)
-        # Seed the workspace into the index so id derivation matches.
+        # Register the workspace so the gate in
+        # `get_workspace_id_for_project` recognises it.
+        cfg = UserConfig(workspace_roots=[ws_dir.parent])
+        from tripwire.ui.services import workspace_service as ws_svc
+
+        monkeypatch.setattr(ws_svc, "load_user_config", lambda: cfg)
         ws_id = get_workspace_id_for_project(
             proj_dir, "../../workspaces/seido"
         )
         assert ws_id is not None
         assert len(ws_id) == 12  # blake2s-6 hex
 
-    def test_id_matches_discover_id(self, tmp_path: Path):
+    def test_id_matches_discover_id(self, tmp_path: Path, monkeypatch):
         ws_dir = _make_workspace(tmp_path / "workspaces" / "seido")
         proj_dir = tmp_path / "projects" / "kbp"
         proj_dir.mkdir(parents=True)
+        cfg = UserConfig(workspace_roots=[ws_dir.parent])
+        from tripwire.ui.services import workspace_service as ws_svc
+
+        monkeypatch.setattr(ws_svc, "load_user_config", lambda: cfg)
         from_pointer = get_workspace_id_for_project(
             proj_dir, "../../workspaces/seido"
         )
-        from_discovery = discover_workspaces(
-            UserConfig(workspace_roots=[ws_dir.parent])
-        )[0].id
+        from_discovery = discover_workspaces(cfg)[0].id
         assert from_pointer == from_discovery
 
     def test_broken_pointer_returns_none(self, tmp_path: Path):
@@ -177,3 +186,28 @@ class TestGetWorkspaceIdForProject:
         decoy.mkdir()
         (decoy / "README.md").write_text("not a workspace")
         assert get_workspace_id_for_project(proj_dir, "../decoy") is None
+
+    def test_pointer_to_unregistered_workspace_returns_none(
+        self, tmp_path: Path, monkeypatch
+    ):
+        """v0.10.0 fix: a project whose workspace.path points at a real
+        workspace.yaml but the workspace itself isn't under any
+        registered ``workspace_roots`` must NOT surface a workspace_id.
+
+        Without this gate, the picker dropdown renders an "Unknown
+        workspace" group with no way for the user to recover (the name
+        only resolves via ``GET /api/workspaces``, which only returns
+        registered workspaces).
+        """
+        # Make the workspace exist on disk but DON'T register it.
+        ws_dir = _make_workspace(tmp_path / "elsewhere" / "seido")
+        proj_dir = tmp_path / "projects" / "kbp"
+        proj_dir.mkdir(parents=True)
+        empty_cfg = UserConfig(workspace_roots=[])
+        from tripwire.ui.services import workspace_service as ws_svc
+
+        monkeypatch.setattr(ws_svc, "load_user_config", lambda: empty_cfg)
+        ws_id = get_workspace_id_for_project(
+            proj_dir, "../../elsewhere/seido"
+        )
+        assert ws_id is None
