@@ -44,8 +44,9 @@ glossary terms with project-specific meaning, metrics driving process
 review, personas (PM agent, coding agent, reviewer), invariants the
 system must preserve, anti-patterns the team has ruled out.
 
-Bad (keep as prose): single helper functions, local variables, page-specific
-UX details, things internal to one file that nothing else references.
+Bad (keep as prose): single helper functions, local variables,
+page-specific UX details, things internal to one file that nothing else
+references.
 
 ## Granularity benchmarks
 
