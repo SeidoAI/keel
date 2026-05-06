@@ -24,7 +24,7 @@ def enum_project(tmp_path: Path) -> Path:
         yaml.safe_dump(
             {
                 "values": [
-                    {"value": "todo", "label": "Todo", "color": "#888"},
+                    {"value": "queued", "label": "Todo", "color": "#888"},
                     {"value": "done", "label": "Done", "color": "#0a0"},
                 ]
             }
@@ -68,7 +68,7 @@ class TestGetEnum:
         body = r.json()
         assert body["name"] == "issue_status"
         values = [v["value"] for v in body["values"]]
-        assert values == ["todo", "done"]
+        assert values == ["queued", "done"]
         # colour preserved
         assert body["values"][0]["color"] == "#888"
 

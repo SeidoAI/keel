@@ -67,7 +67,7 @@ def make_issue(
     issue = Issue(
         id=key,
         title=f"Test {key}",
-        status="todo",
+        status="queued",
         priority="medium",
         executor="ai",
         verifier="required",

@@ -53,9 +53,9 @@ def test_project_enum_overrides_default(tmp_path: Path) -> None:
     assert issue_status is not None
     assert issue_status.source == "project"
     assert issue_status.value_ids() == ("open", "closed")
-    assert "todo" not in issue_status.value_ids()  # default value not present
+    assert "queued" not in issue_status.value_ids()  # default value not present
     assert registry.is_valid("issue_status", "open")
-    assert not registry.is_valid("issue_status", "todo")
+    assert not registry.is_valid("issue_status", "queued")
 
 
 def test_project_can_extend_default_with_extra_value(tmp_path: Path) -> None:
@@ -64,16 +64,16 @@ def test_project_can_extend_default_with_extra_value(tmp_path: Path) -> None:
         tmp_path,
         "issue_status",
         [
-            {"id": "backlog", "label": "Backlog"},
-            {"id": "todo", "label": "To Do"},
-            {"id": "in_progress", "label": "In Progress"},
+            {"id": "planned", "label": "Backlog"},
+            {"id": "queued", "label": "To Do"},
+            {"id": "executing", "label": "In Progress"},
             {"id": "qa", "label": "QA"},
             {"id": "done", "label": "Done"},
         ],
     )
     registry = load_enums(tmp_path)
     assert registry.is_valid("issue_status", "qa")
-    assert registry.is_valid("issue_status", "todo")
+    assert registry.is_valid("issue_status", "queued")
     assert not registry.is_valid("issue_status", "verifying")  # we removed it
 
 
@@ -97,7 +97,7 @@ def test_value_color_preserved(tmp_path: Path) -> None:
     write_enum(
         tmp_path,
         "issue_status",
-        [{"id": "todo", "label": "To Do", "color": "blue"}],
+        [{"id": "queued", "label": "To Do", "color": "blue"}],
     )
     registry = load_enums(tmp_path)
     issue_status = registry.get("issue_status")
