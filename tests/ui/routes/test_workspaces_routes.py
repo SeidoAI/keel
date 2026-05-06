@@ -53,8 +53,8 @@ class TestListWorkspacesRoute:
     def test_returns_discovered_workspaces(
         self, tmp_path: Path, monkeypatch
     ):
-        ws_a = _make_workspace(tmp_path / "ws-a", slug="alpha", name="Alpha")
-        ws_b = _make_workspace(tmp_path / "ws-b", slug="beta", name="Beta")
+        _make_workspace(tmp_path / "ws-a", slug="alpha", name="Alpha")
+        _make_workspace(tmp_path / "ws-b", slug="beta", name="Beta")
         config = UserConfig(workspace_roots=[tmp_path])
         monkeypatch.setattr(_ws_svc, "load_user_config", lambda: config)
         client = TestClient(create_app(dev_mode=True))

@@ -46,7 +46,7 @@ def _check_port(host: str, port: int) -> tuple[str, str]:
     """
     url = f"http://{host}:{port}"
     try:
-        with urllib.request.urlopen(  # noqa: S310 — localhost only
+        with urllib.request.urlopen(
             f"{url}/api/health", timeout=_PROBE_TIMEOUT
         ) as response:
             body = response.read().decode("utf-8")

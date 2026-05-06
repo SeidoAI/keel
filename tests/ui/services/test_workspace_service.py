@@ -200,7 +200,7 @@ class TestGetWorkspaceIdForProject:
         registered workspaces).
         """
         # Make the workspace exist on disk but DON'T register it.
-        ws_dir = _make_workspace(tmp_path / "elsewhere" / "seido")
+        _make_workspace(tmp_path / "elsewhere" / "seido")
         proj_dir = tmp_path / "projects" / "kbp"
         proj_dir.mkdir(parents=True)
         empty_cfg = UserConfig(workspace_roots=[])

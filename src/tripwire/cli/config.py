@@ -13,7 +13,6 @@ import click
 import yaml
 
 from tripwire.ui.config import (
-    UserConfig,
     _DEFAULT_CONFIG_PATH,
     load_user_config,
     save_user_config,

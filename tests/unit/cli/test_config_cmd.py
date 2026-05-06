@@ -9,7 +9,6 @@ import yaml
 from click.testing import CliRunner
 
 from tripwire.cli.main import cli
-from tripwire.ui.config import _DEFAULT_CONFIG_PATH
 
 runner = CliRunner()
 

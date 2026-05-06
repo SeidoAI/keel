@@ -22,7 +22,6 @@ from pydantic import BaseModel, ConfigDict
 
 from tripwire.core.workspace_store import load_workspace
 from tripwire.ui.config import UserConfig, load_user_config
-from tripwire.ui.services.project_service import _find_projects_in_root
 
 logger = logging.getLogger("tripwire.ui.services.workspace_service")
 
@@ -216,8 +215,8 @@ def get_workspace_id_for_project(
 __all__ = [
     "WorkspaceSummary",
     "discover_workspaces",
-    "list_workspaces",
     "get_workspace_dir",
     "get_workspace_id_for_project",
+    "list_workspaces",
     "reload_workspace_index",
 ]
