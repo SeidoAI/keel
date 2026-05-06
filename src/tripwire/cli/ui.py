@@ -6,13 +6,20 @@ Heavy imports (FastAPI, uvicorn) happen inside the command body so that
 
 from __future__ import annotations
 
+import json
 import sys
+import urllib.error
+import urllib.request
+import webbrowser
 from pathlib import Path
 
 import click
 
 # Modules whose absence indicates a minimal [projects] install.
 _UI_MODULES = frozenset({"fastapi", "uvicorn", "watchdog", "websockets"})
+
+# Single-instance probe: GET timeout (seconds).
+_PROBE_TIMEOUT = 0.5
 
 
 def _find_project_root(start: Path) -> Path | None:
@@ -21,6 +28,38 @@ def _find_project_root(start: Path) -> Path | None:
         if (candidate / "project.yaml").is_file():
             return candidate
     return None
+
+
+def _check_port(host: str, port: int) -> tuple[str, str]:
+    """Probe ``/api/health`` to detect an already-running tripwire instance.
+
+    Returns one of:
+
+    * ``("free", url)`` — connection refused / timeout / non-HTTP response.
+      The caller can bind on this port.
+    * ``("reuse", url)`` — port answers and the response is a tripwire
+      health payload. The caller should open the URL and exit instead of
+      double-binding.
+    * ``("conflict", url)`` — port answers but is not a tripwire instance.
+      The caller should fail loudly so the user picks a different port.
+    """
+    url = f"http://{host}:{port}"
+    try:
+        with urllib.request.urlopen(  # noqa: S310 — localhost only
+            f"{url}/api/health", timeout=_PROBE_TIMEOUT
+        ) as response:
+            body = response.read().decode("utf-8")
+    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError):
+        return ("free", url)
+
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return ("conflict", url)
+
+    if isinstance(payload, dict) and payload.get("service") == "tripwire":
+        return ("reuse", url)
+    return ("conflict", url)
 
 
 @click.command(name="ui")
@@ -110,9 +149,28 @@ def ui_cmd(
             sys.exit(1)
         pin = False
 
-    # 4. Launch the server.
+    # 4. Single-instance probe: if a tripwire UI is already on this port,
+    #    open the existing instance instead of double-binding. Skipped in
+    #    dev mode (Vite proxies /api but no tripwire is listening yet).
+    host = "127.0.0.1"
+    if not dev:
+        verdict, existing_url = _check_port(host, port)
+        if verdict == "reuse":
+            click.echo(f"Tripwire UI is already running at {existing_url}")
+            if not no_browser:
+                webbrowser.open(existing_url)
+            return
+        if verdict == "conflict":
+            click.echo(
+                f"Port {port} is in use by another service "
+                f"(not a tripwire UI). Pick a different --port.",
+                err=True,
+            )
+            sys.exit(1)
+
+    # 5. Launch the server.
     start_server(
-        host="127.0.0.1",
+        host=host,
         port=port,
         project_dirs=project_dirs,
         dev_mode=dev,
