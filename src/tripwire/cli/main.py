@@ -15,6 +15,7 @@ from tripwire.cli.agenda import agenda_cmd
 from tripwire.cli.artifacts import artifacts_cmd
 from tripwire.cli.ci import ci_cmd
 from tripwire.cli.completion import completion_cmd
+from tripwire.cli.config import config_cmd
 from tripwire.cli.drift import drift_cmd
 from tripwire.cli.enums import enums_cmd
 from tripwire.cli.events import events_cmd
@@ -122,6 +123,7 @@ cli.add_command(templates_cmd)
 cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)
 cli.add_command(completion_cmd)
+cli.add_command(config_cmd)
 cli.add_command(ui_cmd)
 cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
