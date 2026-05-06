@@ -57,6 +57,10 @@ class ProjectSummary(BaseModel):
     issue_count: int
     node_count: int
     session_count: int
+    # v0.10.0 — opaque id of the workspace this project belongs to (or
+    # ``None`` if the project's ``project.yaml`` has no ``workspace.path``
+    # pointer, or that pointer doesn't resolve to a known workspace).
+    workspace_id: str | None = None
 
 
 class ProjectDetail(ProjectSummary):
@@ -133,6 +137,19 @@ def _try_load_summary(abs_dir: Path) -> ProjectSummary | None:
         logger.warning("Skipping %s: %s", abs_dir, exc)
         return None
 
+    workspace_id: str | None = None
+    if config.workspace and config.workspace.path:
+        # Lazy import — workspace_service can't be imported at module load
+        # because it depends on this module via UserConfig discovery.
+        from tripwire.ui.services.workspace_service import get_workspace_id_for_project
+
+        try:
+            workspace_id = get_workspace_id_for_project(abs_dir, config.workspace.path)
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning(
+                "Could not resolve workspace for %s: %s", abs_dir, exc
+            )
+
     return ProjectSummary(
         id=_project_id(abs_dir),
         name=config.name,
@@ -142,6 +159,7 @@ def _try_load_summary(abs_dir: Path) -> ProjectSummary | None:
         issue_count=_count_issues(abs_dir),
         node_count=_count_nodes(abs_dir),
         session_count=_count_sessions(abs_dir),
+        workspace_id=workspace_id,
     )
 
 
@@ -388,6 +406,19 @@ def get_project(project_id: str) -> ProjectDetail:
     # live in model metadata and can be surfaced later without schema change.
     config_data: dict[str, Any] = config.model_dump(mode="json")
 
+    workspace_id: str | None = None
+    if config.workspace and config.workspace.path:
+        from tripwire.ui.services.workspace_service import get_workspace_id_for_project
+
+        try:
+            workspace_id = get_workspace_id_for_project(
+                project_dir, config.workspace.path
+            )
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning(
+                "Could not resolve workspace for %s: %s", project_dir, exc
+            )
+
     return ProjectDetail(
         id=_project_id(project_dir),
         name=config.name,
@@ -397,6 +428,7 @@ def get_project(project_id: str) -> ProjectDetail:
         issue_count=_count_issues(project_dir),
         node_count=_count_nodes(project_dir),
         session_count=_count_sessions(project_dir),
+        workspace_id=workspace_id,
         description=config.description,
         base_branch=config.base_branch,
         environments=list(config.environments),
