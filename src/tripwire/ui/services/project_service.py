@@ -86,6 +86,11 @@ class ProjectDetail(ProjectSummary):
 
 _discovery_cache: tuple[float, list[ProjectSummary]] | None = None
 _project_index: dict[str, Path] = {}
+# True when the server was started with explicit `--project-dir` paths.
+# In that mode discovery is *pinned* — wider scans (CWD, project_roots,
+# fallback paths) are bypassed so the user only sees the project(s) they
+# asked for.
+_pinned: bool = False
 
 
 def _project_id(abs_dir: Path) -> str:
@@ -234,6 +239,17 @@ def discover_projects(config: UserConfig) -> list[ProjectSummary]:
         if now - cached_at < _CACHE_TTL_SECONDS:
             return cached_results
 
+    if _pinned:
+        # Started with --project-dir; surface only the seeded paths.
+        summaries: list[ProjectSummary] = []
+        for d in _project_index.values():
+            summary = _try_load_summary(d)
+            if summary is not None:
+                summaries.append(summary)
+        summaries = _deduplicate_summaries_by_identity(summaries)
+        _discovery_cache = (now, summaries)
+        return summaries
+
     seen: set[Path] = set()
     candidates: list[Path] = []
 
@@ -257,7 +273,6 @@ def discover_projects(config: UserConfig) -> list[ProjectSummary]:
         for name in _FALLBACK_ROOTS:
             _add(_find_projects_in_root(home / name, max_depth=2))
 
-    # Build summaries
     summaries: list[ProjectSummary] = []
     for project_dir in candidates:
         summary = _try_load_summary(project_dir)
@@ -281,19 +296,27 @@ def seed_project_index(project_dirs: list[Path]) -> None:
     """Populate the project index from an explicit list of directories.
 
     Used by ``start_server`` when the CLI's ``--project-dir`` flag bypasses
-    ``discover_projects()``, which is the normal path that populates the index.
+    ``discover_projects()``. When called with a non-empty list this also
+    *pins* discovery to those paths — subsequent ``discover_projects``
+    calls return only the seeded set instead of widening to CWD,
+    ``config.project_roots`` and the fallback locations.
     """
-    global _project_index
+    global _project_index, _pinned, _discovery_cache
     for d in project_dirs:
         resolved = d.resolve()
         _project_index[_project_id(resolved)] = resolved
+    if project_dirs:
+        _pinned = True
+        # Drop any stale wider cache so the next read reflects the pin.
+        _discovery_cache = None
 
 
 def reload_project_index() -> None:
-    """Clear the discovery cache so the next call rescans."""
-    global _discovery_cache, _project_index
+    """Clear the discovery cache and unpin so the next call rescans."""
+    global _discovery_cache, _project_index, _pinned
     _discovery_cache = None
     _project_index = {}
+    _pinned = False
 
 
 # ---------------------------------------------------------------------------
@@ -310,10 +333,12 @@ def find_project_by_identity(name: str, key_prefix: str) -> ProjectSummary:
     for summary in list_projects():
         if summary.name == name and summary.key_prefix == key_prefix:
             return summary
-    reload_project_index()
-    for summary in list_projects():
-        if summary.name == name and summary.key_prefix == key_prefix:
-            return summary
+    if not _pinned:
+        # Don't unpin a server that was scoped via --project-dir.
+        reload_project_index()
+        for summary in list_projects():
+            if summary.name == name and summary.key_prefix == key_prefix:
+                return summary
     raise KeyError(f"name={name!r} key_prefix={key_prefix!r}")
 
 
@@ -343,11 +368,12 @@ def get_project(project_id: str) -> ProjectDetail:
 
     project_dir = get_project_dir(project_id)
     if project_dir is None:
-        # Force a rescan — useful when a new project appeared since the
-        # cache was populated. Cheap enough to run on the unhappy path.
-        reload_project_index()
-        discover_projects(load_user_config())
-        project_dir = get_project_dir(project_id)
+        if not _pinned:
+            # Force a rescan — useful when a new project appeared since the
+            # cache was populated. Cheap enough to run on the unhappy path.
+            reload_project_index()
+            discover_projects(load_user_config())
+            project_dir = get_project_dir(project_id)
         if project_dir is None:
             raise KeyError(project_id)
 

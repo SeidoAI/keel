@@ -53,21 +53,20 @@ def test_pm_skill_total_size_under_budget() -> None:
     v0.8x bumps to 153KB for the new SCHEMA_INBOX.md reference doc + the
     "Inbox — escalating to the human" section in SKILL.md (PM-as-curator
     of the dashboard's left-column attention queue).
-    v0.9.6 (workflow codification stage 1) bumps to 160KB for the new
+    v0.9.6 (workflow codification stage 1) bumped to 160KB for the new
     MONITOR_CRITERIA.md reference doc — codifies the pm-monitor signal
-    vocabulary the PM agent uses to drive the overseer loop.
-    v0.9.6 (continued) bumps to 166KB for WORKFLOWS_CODE_REVIEW.md —
-    the multi-reviewer cycle (self/superpowers/codex) split out of
-    WORKFLOWS_REVIEW.md as part of the four-primitive codification.
-    v0.9.6 (final, C15) bumps to 170KB for SCHEMA_WORKFLOW.md (NEW;
-    user-facing workflow.yaml schema reference) plus the
-    SUBAGENT_DELEGATION.md rewrite (2.6KB → 3.8KB; "NOT YET ENABLED"
-    stub replaced with the pm_subagent_dispatch contract from plan
-    §9). Net of WORKFLOWS_REVIEW.md deletion.
+    vocabulary. v0.9.6 (continued) bumped to 166KB for
+    WORKFLOWS_CODE_REVIEW.md — multi-reviewer cycle (self/superpowers/
+    codex) split out of WORKFLOWS_REVIEW.md as part of the four-primitive
+    codification. v0.9.6 (final, C15) bumped to 170KB for SCHEMA_WORKFLOW.md
+    plus the SUBAGENT_DELEGATION.md rewrite, net of WORKFLOWS_REVIEW.md
+    deletion. v0.9.7 merge bumps to 185KB to absorb the 8 new node-type
+    example files (principle, practice, glossary, metric, persona,
+    invariant, anti_pattern, skill) plus SCHEMA_NODES expansion.
     """
     pm_dir = TEMPLATES_DIR / "skills" / "project-manager"
     total = _total_chars(pm_dir)
-    assert total < 170_000, (
+    assert total < 185_000, (
         f"PM skill is {total:,} chars ({total / 1024:.0f} KB). "
         f"Budget is 170KB. Consolidate or trim reference docs."
     )
@@ -110,12 +109,13 @@ def test_total_templates_under_budget() -> None:
     started declaring PM workflows, routes, commands, skills, and emitted
     artifacts as first-class workflow.yaml data. v0.9.6 then ran a
     conciseness pass across all four skills and the workflow.yaml.j2
-    template (-51KB vs. pre-trim) and bumps to 360KB to absorb the
-    PM-expansion content that survived the trim.
+    template (-51KB vs. pre-trim) and bumped to 360KB to absorb the
+    PM-expansion content that survived the trim. v0.9.7 merge bumps to
+    380KB for the node-type expansion (8 new example files + enum).
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 360_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 360KB."
+    assert total < 380_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 380KB."
     )
 
 

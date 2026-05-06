@@ -4,10 +4,10 @@ import { ApiError, apiGet } from "../client";
 import { queryKeys, staleTime } from "../queryKeys";
 
 /**
- * Typed client for `/api/projects/:pid/drift` (KUI-157 / I4).
+ * Typed client for `/api/projects/:pid/drift`.
  *
- * Returns the unified coherence score plus the per-class breakdown
- * and active workflow drift findings for the drill-down list. Wraps
+ * The standalone `/drift` page was retired in v0.9.7; the same data
+ * now surfaces as a header card on the Concept Graph page. Wraps
  * the substrate shipped in `tripwire/core/drift.py`.
  */
 export interface DriftBreakdown {
