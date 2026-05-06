@@ -6,6 +6,7 @@ Heavy imports (FastAPI, uvicorn) happen inside the command body so that
 
 from __future__ import annotations
 
+import http.client
 import json
 import sys
 import urllib.error
@@ -49,7 +50,19 @@ def _check_port(host: str, port: int) -> tuple[str, str]:
             f"{url}/api/health", timeout=_PROBE_TIMEOUT
         ) as response:
             body = response.read().decode("utf-8")
-    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError):
+    except (
+        urllib.error.URLError,
+        TimeoutError,
+        ConnectionError,
+        OSError,
+        # `http.client.HTTPException` (and its subclasses
+        # `RemoteDisconnected`, `IncompleteRead`, `BadStatusLine`) does
+        # not inherit from `OSError` or `URLError`. Without it, a server
+        # that closes the connection mid-response (race during shutdown,
+        # mismatched HTTP version, etc.) crashes the CLI instead of
+        # returning a verdict.
+        http.client.HTTPException,
+    ):
         return ("free", url)
 
     try:

@@ -71,3 +71,36 @@ class TestCheckPort:
         with patch("urllib.request.urlopen", return_value=_FakeResponse()):
             verdict, _ = _check_port("127.0.0.1", 8000)
         assert verdict == "conflict"
+
+    def test_remote_disconnected_returns_free(self):
+        """v0.10.0 review fix: `http.client.HTTPException` doesn't
+        inherit from `OSError` / `URLError`. Without an explicit catch,
+        a server that closes the connection mid-response crashes the
+        CLI instead of returning a verdict.
+        """
+        import http.client
+
+        from tripwire.cli.ui import _check_port
+
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=http.client.RemoteDisconnected("server", "shut down"),
+        ):
+            verdict, url = _check_port("127.0.0.1", 8000)
+        assert verdict == "free"
+        assert url == "http://127.0.0.1:8000"
+
+    def test_bad_status_line_returns_free(self):
+        """Same family as `RemoteDisconnected` — a malformed HTTP
+        response should not crash the probe.
+        """
+        import http.client
+
+        from tripwire.cli.ui import _check_port
+
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=http.client.BadStatusLine("not http"),
+        ):
+            verdict, _ = _check_port("127.0.0.1", 8000)
+        assert verdict == "free"
